@@ -353,6 +353,16 @@ app.post("/api/doctor-visits", async (req, res) => {
 // FAMILY API ROUTES
 // ─────────────────────────────────────────────────────────────────────────────
 
+// GET /api/senior/by-name/:name — returning user lookup
+app.get("/api/senior/by-name/:name", async (req, res) => {
+  try {
+    const name = decodeURIComponent(req.params.name).trim();
+    const senior = await db.seniors.findOne({ name: { $regex: new RegExp("^" + name + "$", "i") } });
+    if (!senior) return res.status(404).json({ error: "No profile found with that name" });
+    res.json(senior);
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
 // GET /api/senior/by-code/:code
 app.get("/api/senior/by-code/:code", async (req, res) => {
   try {
@@ -398,6 +408,35 @@ app.get("/api/dashboard/:seniorId", async (req, res) => {
       recentActivity,
       medications: meds.map(m => ({ ...m, takenToday: logs.some(l => l.medicationId === m._id) })),
     });
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+// POST /api/medications/scan — Claude Vision reads a medication bottle label
+app.post("/api/medications/scan", upload.single("image"), async (req, res) => {
+  try {
+    if (!req.file) return res.status(400).json({ error: "No image provided" });
+    const b64  = req.file.buffer.toString("base64");
+    const mime = req.file.mimetype;
+    const response = await anthropic.messages.create({
+      model: "claude-opus-4-5-20251101",
+      max_tokens: 600,
+      messages: [{ role: "user", content: [
+        { type: "image", source: { type: "base64", media_type: mime, data: b64 } },
+        { type: "text", text: `This is a photo of a prescription medication bottle or label.
+Extract the medication information and return ONLY a valid JSON object — no explanation, no markdown, just JSON.
+Fields:
+- "name": medication name (string, required)
+- "dose": dosage/strength like "10mg", "500mg", "5mg/5ml" (string or null)
+- "time": best time to take — infer from directions e.g. "once daily in the morning" → "8:00 AM", "at bedtime" → "9:00 PM", "twice daily" → "8:00 AM" (string or null)
+- "withFood": true if label says "take with food" or "take with meals" (boolean, default false)
+- "directions": the full directions text as written (string or null)
+- "prescriber": doctor name if visible on label (string or null)
+- "refills": number of refills remaining as a number (number or null)` }
+      ]}],
+    });
+    const match = response.content[0].text.match(/\{[\s\S]*\}/);
+    if (!match) return res.status(400).json({ error: "Could not read medication label — please try a clearer photo" });
+    res.json(JSON.parse(match[0]));
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
@@ -664,12 +703,55 @@ app.post("/api/google/sync/:seniorId", async (req, res) => {
 });
 
 // ─────────────────────────────────────────────────────────────────────────────
+// ONBOARDING — Create a new senior profile
+// ─────────────────────────────────────────────────────────────────────────────
+
+// Generate a unique 6-char family code like "SAGE4F"
+function generateFamilyCode() {
+  const chars = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
+  return "SAGE" + Array.from({ length: 2 }, () => chars[Math.floor(Math.random() * chars.length)]).join("");
+}
+
+// POST /api/seniors — create a new senior profile during onboarding
+app.post("/api/seniors", async (req, res) => {
+  try {
+    const { name, age } = req.body;
+    if (!name) return res.status(400).json({ error: "Name is required" });
+
+    // Generate a unique family code
+    let familyCode, exists;
+    do {
+      familyCode = generateFamilyCode();
+      exists = await db.seniors.findOne({ familyCode });
+    } while (exists);
+
+    const seniorId = "senior_" + uuidv4().replace(/-/g, "").slice(0, 12);
+    const senior = {
+      _id: seniorId,
+      name: name.trim(),
+      age: age ? parseInt(age) : null,
+      familyCode,
+      conditions: [],
+      preferences: { voiceSpeed: "normal", theme: "default" },
+      createdAt: new Date(),
+    };
+
+    await db.seniors.insert(senior);
+    await db.activity.insert({ _id: uuidv4(), seniorId, type: "system", description: `${name} joined Sage Companion`, timestamp: new Date() });
+
+    console.log(`✅ New senior created: ${name} | Family code: ${familyCode}`);
+    res.json({ success: true, senior });
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
 // STATIC ROUTES
 // ─────────────────────────────────────────────────────────────────────────────
 app.get("/elder",    (req, res) => res.sendFile(path.join(__dirname, "public", "elder.html")));
 app.get("/family",   (req, res) => res.sendFile(path.join(__dirname, "public", "family.html")));
 app.get("/doctor",   (req, res) => res.sendFile(path.join(__dirname, "public", "doctor.html")));
 app.get("/calendar", (req, res) => res.sendFile(path.join(__dirname, "public", "calendar.html")));
+app.get("/setup",    (req, res) => res.sendFile(path.join(__dirname, "public", "setup.html")));
 app.get("/",         (req, res) => res.sendFile(path.join(__dirname, "public", "index.html")));
 
 // ─────────────────────────────────────────────────────────────────────────────

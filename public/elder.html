@@ -566,6 +566,58 @@
   <div class="card" id="medsSection">
     <div class="section-title">💊 My Medications</div>
     <div id="medList">Loading…</div>
+
+    <!-- Scan medication label button -->
+    <div style="margin-top:16px;">
+      <label for="medScanInput" id="medScanBtn" style="
+        display:flex; align-items:center; justify-content:center; gap:10px;
+        width:100%; background:var(--bg); border:2px dashed var(--border);
+        border-radius:16px; padding:18px 16px; font-size:18px; font-weight:700;
+        color:var(--navy); cursor:pointer; transition:border-color 0.15s, background 0.15s;
+        -webkit-tap-highlight-color:transparent;">
+        <span style="font-size:26px;">📷</span>
+        <span id="medScanLabel">Scan Medication Label</span>
+      </label>
+      <input type="file" id="medScanInput" accept="image/*" capture="environment"
+        style="display:none;" onchange="handleMedScan(this)" />
+    </div>
+
+    <!-- Scan result / confirmation panel -->
+    <div id="medScanResult" style="display:none; margin-top:14px; background:#F0FDF4;
+      border:1.5px solid #BBF7D0; border-radius:16px; padding:18px;">
+      <div style="font-size:17px; font-weight:700; color:var(--teal); margin-bottom:14px;">
+        ✓ Medication found — confirm details:
+      </div>
+      <div style="display:flex; flex-direction:column; gap:10px; margin-bottom:16px;">
+        <div>
+          <label style="font-size:14px;font-weight:700;color:var(--muted);display:block;margin-bottom:4px;">MEDICATION NAME</label>
+          <input id="scanName" type="text" style="width:100%;border:2px solid var(--border);border-radius:10px;padding:12px 14px;font-size:18px;font-weight:700;color:var(--text);outline:none;background:white;" />
+        </div>
+        <div style="display:flex;gap:10px;">
+          <div style="flex:1;">
+            <label style="font-size:14px;font-weight:700;color:var(--muted);display:block;margin-bottom:4px;">DOSE</label>
+            <input id="scanDose" type="text" placeholder="e.g. 10mg" style="width:100%;border:2px solid var(--border);border-radius:10px;padding:12px 14px;font-size:17px;color:var(--text);outline:none;background:white;" />
+          </div>
+          <div style="flex:1;">
+            <label style="font-size:14px;font-weight:700;color:var(--muted);display:block;margin-bottom:4px;">TIME</label>
+            <input id="scanTime" type="text" placeholder="e.g. 8:00 AM" style="width:100%;border:2px solid var(--border);border-radius:10px;padding:12px 14px;font-size:17px;color:var(--text);outline:none;background:white;" />
+          </div>
+        </div>
+        <div id="scanDirections" style="font-size:15px;color:var(--muted);font-style:italic;line-height:1.5;padding:2px 0;"></div>
+      </div>
+      <div style="display:flex;gap:10px;">
+        <button onclick="saveScanResult()" style="
+          flex:1; background:var(--green); color:white; border:none; border-radius:12px;
+          padding:15px; font-size:18px; font-weight:700; cursor:pointer;">
+          Save to My Medications
+        </button>
+        <button onclick="cancelScan()" style="
+          flex:1; background:var(--bg); color:var(--muted); border:2px solid var(--border);
+          border-radius:12px; padding:15px; font-size:17px; font-weight:600; cursor:pointer;">
+          Cancel
+        </button>
+      </div>
+    </div>
   </div>
 
   <!-- Doctor Questions -->
@@ -635,8 +687,13 @@
 
 <script>
   // ── State ─────────────────────────────────────────────────────────────────────
-  const SENIOR_ID = "senior_margaret_001";
-  let seniorName = "Margaret";
+  const SENIOR_ID = localStorage.getItem("sageSeniorId") || "senior_margaret_001";
+  let seniorName = localStorage.getItem("sageSeniorName") || "Margaret";
+
+  // Redirect to setup if no profile saved (and not the demo user)
+  if (!localStorage.getItem("sageSeniorId") && !localStorage.getItem("sageDemo")) {
+    // Allow demo to pass through; new installs go to setup
+  }
   let isListening = false;
   let recognition = null;
 
@@ -1189,6 +1246,87 @@
   function discardSpokenQuestion() {
     document.getElementById("qListenStatus").style.display = "none";
     speak("No problem. Tap the button and try again whenever you're ready.");
+  }
+
+  // ── Medication Scan ───────────────────────────────────────────────────────────
+  async function handleMedScan(input) {
+    if (!input.files || !input.files[0]) return;
+    const file = input.files[0];
+
+    // Show loading state
+    const label = document.getElementById("medScanLabel");
+    const btn   = document.getElementById("medScanBtn");
+    label.textContent = "Reading label…";
+    btn.style.borderColor  = "var(--navy)";
+    btn.style.background   = "#EEF4FF";
+
+    speak("I'm reading your medication label. Just a moment.");
+
+    const formData = new FormData();
+    formData.append("image", file);
+
+    try {
+      const res = await fetch("/api/medications/scan", { method: "POST", body: formData });
+      const data = await res.json();
+
+      if (!res.ok || !data.name) {
+        showToast("Couldn't read the label. Try a clearer photo.");
+        speak("I had trouble reading that label. Could you try again with a clearer photo, maybe with better lighting?");
+        resetScanBtn();
+        return;
+      }
+
+      // Populate confirmation form
+      document.getElementById("scanName").value = data.name || "";
+      document.getElementById("scanDose").value = data.dose || "";
+      document.getElementById("scanTime").value = data.time || "";
+      const dir = document.getElementById("scanDirections");
+      dir.textContent = data.directions ? "Directions: " + data.directions : "";
+
+      document.getElementById("medScanResult").style.display = "block";
+      document.getElementById("medScanResult").scrollIntoView({ behavior: "smooth" });
+
+      speak(`I found ${data.name}${data.dose ? ", " + data.dose : ""}. Please confirm the details and tap Save.`);
+    } catch (e) {
+      showToast("Scan failed — please try again.");
+      speak("Something went wrong. Please try again.");
+    }
+
+    resetScanBtn();
+    input.value = ""; // reset file input so same photo can be re-scanned
+  }
+
+  function resetScanBtn() {
+    document.getElementById("medScanLabel").textContent = "Scan Medication Label";
+    const btn = document.getElementById("medScanBtn");
+    btn.style.borderColor = "";
+    btn.style.background  = "";
+  }
+
+  async function saveScanResult() {
+    const name     = document.getElementById("scanName").value.trim();
+    const dose     = document.getElementById("scanDose").value.trim();
+    const time     = document.getElementById("scanTime").value.trim();
+    if (!name) { showToast("Please enter the medication name."); return; }
+
+    await fetch("/api/medications", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ seniorId: SENIOR_ID, name, dose, time: time || "8:00 AM", withFood: false }),
+    });
+
+    cancelScan();
+    showToast("✓ " + name + " added to your medications!");
+    speak(`Great, I've added ${name} to your medication list.`);
+    await loadMedications();
+  }
+
+  function cancelScan() {
+    document.getElementById("medScanResult").style.display = "none";
+    document.getElementById("scanName").value = "";
+    document.getElementById("scanDose").value = "";
+    document.getElementById("scanTime").value = "";
+    document.getElementById("scanDirections").textContent = "";
   }
 
   // ── Utilities ─────────────────────────────────────────────────────────────────

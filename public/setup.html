@@ -1,0 +1,396 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>Sage Companion — Welcome</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --navy:   #1E3A8A;
+      --teal:   #0F766E;
+      --green:  #16A34A;
+      --bg:     #F1F5F9;
+      --white:  #FFFFFF;
+      --text:   #0F172A;
+      --muted:  #64748B;
+      --border: #E2E8F0;
+      --ease:   cubic-bezier(0.25, 0.46, 0.45, 0.94);
+      --shadow-lg: 0 8px 32px rgba(0,0,0,0.12), 0 2px 8px rgba(0,0,0,0.06);
+    }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
+      background: linear-gradient(160deg, #EEF2FF 0%, #F0FDF4 100%);
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 24px;
+      -webkit-font-smoothing: antialiased;
+    }
+
+    .wrap {
+      width: 100%;
+      max-width: 440px;
+    }
+
+    /* ── STEPS ── */
+    .step { display: none; }
+    .step.active { display: block; animation: fadeUp 0.4s var(--ease) forwards; }
+
+    @keyframes fadeUp {
+      from { opacity: 0; transform: translateY(20px); }
+      to   { opacity: 1; transform: translateY(0); }
+    }
+
+    /* ── CARD ── */
+    .card {
+      background: var(--white);
+      border-radius: 28px;
+      padding: 40px 32px;
+      box-shadow: var(--shadow-lg);
+      text-align: center;
+    }
+
+    .logo { font-size: 52px; margin-bottom: 16px; }
+    .card h1 { font-size: 30px; font-weight: 900; color: var(--navy); margin-bottom: 10px; letter-spacing: -0.02em; }
+    .card h2 { font-size: 26px; font-weight: 900; color: var(--navy); margin-bottom: 10px; letter-spacing: -0.02em; }
+    .card p  { font-size: 17px; color: var(--muted); line-height: 1.6; margin-bottom: 28px; }
+
+    /* ── INPUTS ── */
+    .field { margin-bottom: 16px; text-align: left; }
+    .field label { display: block; font-size: 14px; font-weight: 700; color: var(--muted); letter-spacing: 0.05em; text-transform: uppercase; margin-bottom: 8px; }
+
+    .field input {
+      width: 100%;
+      border: 2.5px solid var(--border);
+      border-radius: 14px;
+      padding: 16px 18px;
+      font-size: 20px;
+      font-weight: 600;
+      outline: none;
+      color: var(--text);
+      background: var(--bg);
+      transition: border-color 0.15s, background 0.15s;
+    }
+
+    .field input:focus { border-color: var(--navy); background: white; }
+    .field input::placeholder { color: #CBD5E1; font-weight: 400; }
+
+    /* ── BUTTONS ── */
+    .btn-primary {
+      width: 100%;
+      background: linear-gradient(135deg, var(--navy), #2D4EAA);
+      color: white;
+      border: none;
+      border-radius: 16px;
+      padding: 20px;
+      font-size: 20px;
+      font-weight: 800;
+      cursor: pointer;
+      box-shadow: 0 4px 20px rgba(30,58,138,0.3);
+      transition: transform 0.15s var(--ease), box-shadow 0.15s;
+      -webkit-tap-highlight-color: transparent;
+      letter-spacing: 0.5px;
+      margin-top: 8px;
+    }
+
+    .btn-primary:active { transform: scale(0.98); box-shadow: 0 2px 8px rgba(30,58,138,0.25); }
+    .btn-primary:disabled { opacity: 0.6; cursor: not-allowed; }
+
+    .btn-secondary {
+      width: 100%;
+      background: var(--bg);
+      color: var(--navy);
+      border: 2px solid var(--border);
+      border-radius: 16px;
+      padding: 18px;
+      font-size: 18px;
+      font-weight: 700;
+      cursor: pointer;
+      margin-top: 10px;
+      transition: border-color 0.15s;
+      -webkit-tap-highlight-color: transparent;
+    }
+
+    .btn-secondary:hover { border-color: var(--navy); }
+
+    /* ── FAMILY CODE BOX ── */
+    .code-box {
+      background: linear-gradient(135deg, var(--navy), #2D4EAA);
+      border-radius: 20px;
+      padding: 28px 24px;
+      margin: 24px 0;
+      color: white;
+    }
+
+    .code-label { font-size: 13px; font-weight: 700; opacity: 0.75; letter-spacing: 0.08em; text-transform: uppercase; margin-bottom: 10px; }
+    .code-value { font-size: 38px; font-weight: 900; letter-spacing: 6px; font-variant-numeric: tabular-nums; margin-bottom: 8px; }
+    .code-hint  { font-size: 14px; opacity: 0.75; line-height: 1.5; }
+
+    .copy-btn {
+      background: rgba(255,255,255,0.2);
+      border: 1.5px solid rgba(255,255,255,0.35);
+      color: white;
+      border-radius: 10px;
+      padding: 10px 20px;
+      font-size: 15px;
+      font-weight: 700;
+      cursor: pointer;
+      margin-top: 14px;
+      -webkit-tap-highlight-color: transparent;
+      transition: background 0.15s;
+    }
+
+    .copy-btn:active { background: rgba(255,255,255,0.35); }
+
+    /* ── PROGRESS DOTS ── */
+    .progress {
+      display: flex;
+      justify-content: center;
+      gap: 8px;
+      margin-bottom: 28px;
+    }
+
+    .dot {
+      width: 8px; height: 8px;
+      border-radius: 50%;
+      background: var(--border);
+      transition: background 0.2s, transform 0.2s;
+    }
+
+    .dot.active { background: var(--navy); transform: scale(1.3); }
+    .dot.done   { background: var(--teal); }
+
+    /* ── ERROR ── */
+    .error-msg { color: #DC2626; font-size: 15px; font-weight: 600; margin-top: 10px; display: none; }
+
+    /* ── DIVIDER ── */
+    .divider {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      margin: 20px 0;
+      color: var(--muted);
+      font-size: 14px;
+      font-weight: 600;
+    }
+
+    .divider::before, .divider::after {
+      content: '';
+      flex: 1;
+      height: 1px;
+      background: var(--border);
+    }
+  </style>
+</head>
+<body>
+<div class="wrap">
+
+  <!-- Progress dots -->
+  <div class="progress">
+    <div class="dot active"  id="dot1"></div>
+    <div class="dot"         id="dot2"></div>
+    <div class="dot"         id="dot3"></div>
+  </div>
+
+  <!-- ── STEP 1: Welcome ────────────────────────────────────── -->
+  <div class="step active" id="step1">
+    <div class="card">
+      <div class="logo">🌿</div>
+      <h1>Welcome to Sage</h1>
+      <p>Your personal AI companion — here to help you stay connected, healthy, and supported every day.</p>
+      <button class="btn-primary" onclick="goStep(2)">Get Started →</button>
+
+      <div class="divider">already have an account?</div>
+      <button class="btn-secondary" onclick="goStep('returning')">I've used Sage before</button>
+    </div>
+  </div>
+
+  <!-- ── STEP 2: Your Name ──────────────────────────────────── -->
+  <div class="step" id="step2">
+    <div class="card">
+      <div class="logo" style="font-size:42px;">👋</div>
+      <h2>What's your name?</h2>
+      <p>Sage will use your first name to greet you and make conversations feel personal.</p>
+
+      <div class="field">
+        <label>Your first name</label>
+        <input type="text" id="nameInput" placeholder="e.g. Margaret"
+          autocomplete="given-name"
+          onkeydown="if(event.key==='Enter') goStep(3)"
+          oninput="document.getElementById('nameError').style.display='none'" />
+        <div class="error-msg" id="nameError">Please enter your first name.</div>
+      </div>
+
+      <div class="field">
+        <label>Age (optional)</label>
+        <input type="number" id="ageInput" placeholder="e.g. 78" min="18" max="120"
+          onkeydown="if(event.key==='Enter') goStep(3)" />
+      </div>
+
+      <button class="btn-primary" onclick="goStep(3)">Continue →</button>
+      <button class="btn-secondary" onclick="goStep(1)">← Back</button>
+    </div>
+  </div>
+
+  <!-- ── STEP 3: Creating profile ───────────────────────────── -->
+  <div class="step" id="step3">
+    <div class="card">
+      <div class="logo" id="step3Logo" style="font-size:42px;">⏳</div>
+      <h2 id="step3Title">Setting up Sage…</h2>
+      <p id="step3Sub">Creating your personal profile. Just a moment!</p>
+
+      <!-- Family code shown after creation -->
+      <div id="codeSection" style="display:none;">
+        <div class="code-box">
+          <div class="code-label">Your Family Code</div>
+          <div class="code-value" id="familyCodeDisplay">——</div>
+          <div class="code-hint">Share this code with family members so they can monitor your wellbeing through the Family Dashboard.</div>
+          <button class="copy-btn" onclick="copyCode()">Copy Code</button>
+        </div>
+
+        <button class="btn-primary" onclick="launchSage()">Start Talking to Sage →</button>
+        <p style="font-size:14px;color:var(--muted);margin-top:16px;line-height:1.5;">
+          Your family can log in at <strong>this app's address/family</strong> and enter your code to get started.
+        </p>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── RETURNING USER ─────────────────────────────────────── -->
+  <div class="step" id="stepReturning">
+    <div class="card">
+      <div class="logo" style="font-size:42px;">🔑</div>
+      <h2>Welcome back!</h2>
+      <p>Enter your name exactly as you set it up, and we'll restore your profile.</p>
+
+      <div class="field">
+        <label>Your first name</label>
+        <input type="text" id="returningName" placeholder="e.g. Margaret"
+          onkeydown="if(event.key==='Enter') lookupReturning()" />
+        <div class="error-msg" id="returningError">Name not found. Please check and try again.</div>
+      </div>
+
+      <button class="btn-primary" onclick="lookupReturning()">Find My Profile →</button>
+      <button class="btn-secondary" onclick="goStep(1)">← Back</button>
+    </div>
+  </div>
+
+</div>
+
+<script>
+  // ── Step navigation ────────────────────────────────────────────────────────
+  function goStep(id) {
+    if (id === 3) {
+      const name = document.getElementById("nameInput").value.trim();
+      if (!name) {
+        document.getElementById("nameError").style.display = "block";
+        document.getElementById("nameInput").focus();
+        return;
+      }
+      createProfile(name);
+    }
+
+    document.querySelectorAll(".step").forEach(s => s.classList.remove("active"));
+
+    if (id === "returning") {
+      document.getElementById("stepReturning").classList.add("active");
+      updateDots(-1);
+    } else {
+      document.getElementById("step" + id).classList.add("active");
+      updateDots(id);
+    }
+  }
+
+  function updateDots(step) {
+    [1, 2, 3].forEach(i => {
+      const dot = document.getElementById("dot" + i);
+      dot.className = "dot" + (i < step ? " done" : i === step ? " active" : "");
+    });
+  }
+
+  // ── Create new profile ────────────────────────────────────────────────────
+  let createdSenior = null;
+
+  async function createProfile(name) {
+    const age = document.getElementById("ageInput").value;
+    document.getElementById("step3Logo").textContent   = "⏳";
+    document.getElementById("step3Title").textContent  = "Setting up Sage…";
+    document.getElementById("step3Sub").textContent    = "Creating your personal profile. Just a moment!";
+    document.getElementById("codeSection").style.display = "none";
+
+    try {
+      const res = await fetch("/api/seniors", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ name, age: age ? parseInt(age) : null }),
+      });
+
+      const data = await res.json();
+      if (!res.ok || !data.senior) throw new Error(data.error || "Setup failed");
+
+      createdSenior = data.senior;
+
+      // Save to localStorage
+      localStorage.setItem("sageSeniorId",   data.senior._id);
+      localStorage.setItem("sageSeniorName", data.senior.name);
+      localStorage.setItem("sageFamilyCode", data.senior.familyCode);
+
+      // Show success state
+      document.getElementById("step3Logo").textContent  = "✅";
+      document.getElementById("step3Title").textContent = `Welcome, ${data.senior.name}!`;
+      document.getElementById("step3Sub").textContent   = "Your profile is ready. Here's your family code to share:";
+      document.getElementById("familyCodeDisplay").textContent = data.senior.familyCode;
+      document.getElementById("codeSection").style.display = "block";
+
+    } catch (e) {
+      document.getElementById("step3Logo").textContent  = "❌";
+      document.getElementById("step3Title").textContent = "Something went wrong";
+      document.getElementById("step3Sub").textContent   = e.message + " — please go back and try again.";
+    }
+  }
+
+  function copyCode() {
+    const code = document.getElementById("familyCodeDisplay").textContent;
+    navigator.clipboard.writeText(code).then(() => {
+      const btn = document.querySelector(".copy-btn");
+      btn.textContent = "✓ Copied!";
+      setTimeout(() => btn.textContent = "Copy Code", 2000);
+    });
+  }
+
+  function launchSage() {
+    window.location.href = "/elder";
+  }
+
+  // ── Returning user lookup ──────────────────────────────────────────────────
+  async function lookupReturning() {
+    const name = document.getElementById("returningName").value.trim();
+    if (!name) return;
+
+    // Try to find by name — use seniors lookup
+    // For now, if user remembers their family code, family.html login handles it.
+    // Here we do a simple name search.
+    try {
+      const res = await fetch(`/api/senior/by-name/${encodeURIComponent(name)}`);
+      if (!res.ok) throw new Error("Not found");
+      const senior = await res.json();
+      localStorage.setItem("sageSeniorId",   senior._id);
+      localStorage.setItem("sageSeniorName", senior.name);
+      localStorage.setItem("sageFamilyCode", senior.familyCode);
+      window.location.href = "/elder";
+    } catch {
+      document.getElementById("returningError").style.display = "block";
+    }
+  }
+
+  // ── If already set up, skip to elder ──────────────────────────────────────
+  if (localStorage.getItem("sageSeniorId")) {
+    window.location.href = "/elder";
+  }
+</script>
+</body>
+</html>

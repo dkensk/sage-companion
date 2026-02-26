@@ -332,7 +332,7 @@
     </p>
 
     <div class="cta-group">
-      <a href="/elder" class="btn btn-senior">
+      <a href="#" onclick="goSenior(); return false;" class="btn btn-senior">
         <span class="btn-icon">👵</span>
         <span class="btn-text">
           <span class="btn-label">I'm the senior</span>
@@ -392,6 +392,15 @@
 </footer>
 
 <script>
+  // Route senior button: existing profile → /elder, new user → /setup
+  function goSenior() {
+    if (localStorage.getItem("sageSeniorId")) {
+      window.location.href = "/elder";
+    } else {
+      window.location.href = "/setup";
+    }
+  }
+
   // Scroll reveal
   const observer = new IntersectionObserver(entries => {
     entries.forEach((e, i) => {
