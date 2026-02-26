@@ -1,0 +1,172 @@
+-- ─────────────────────────────────────────────────────────────────────────────
+-- Sage Companion LLC — Supabase Database Schema
+-- Run this in: Supabase Dashboard → SQL Editor → New query → Run
+-- ─────────────────────────────────────────────────────────────────────────────
+
+-- ── Seniors (user profiles) ───────────────────────────────────────────────────
+CREATE TABLE IF NOT EXISTS seniors (
+  id            UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  name          TEXT NOT NULL,
+  email         TEXT,
+  age           INTEGER,
+  family_code   TEXT UNIQUE NOT NULL,
+  conditions    TEXT[]   DEFAULT '{}',
+  google_tokens JSONB,
+  preferences   JSONB    DEFAULT '{"voiceSpeed":"normal","theme":"default"}',
+  created_at    TIMESTAMPTZ DEFAULT NOW(),
+  last_active   TIMESTAMPTZ DEFAULT NOW()
+);
+
+-- ── Medications ───────────────────────────────────────────────────────────────
+CREATE TABLE IF NOT EXISTS medications (
+  id         UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  senior_id  UUID REFERENCES seniors(id) ON DELETE CASCADE,
+  name       TEXT    NOT NULL,
+  dose       TEXT,
+  time       TEXT,
+  with_food  BOOLEAN DEFAULT FALSE,
+  active     BOOLEAN DEFAULT TRUE,
+  created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+-- ── Medication log ────────────────────────────────────────────────────────────
+CREATE TABLE IF NOT EXISTS med_log (
+  id              UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  senior_id       UUID REFERENCES seniors(id) ON DELETE CASCADE,
+  medication_id   UUID REFERENCES medications(id),
+  medication_name TEXT,
+  taken_at        TIMESTAMPTZ DEFAULT NOW()
+);
+
+-- ── Activity feed ─────────────────────────────────────────────────────────────
+CREATE TABLE IF NOT EXISTS activity (
+  id          UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  senior_id   UUID REFERENCES seniors(id) ON DELETE CASCADE,
+  type        TEXT,
+  description TEXT,
+  timestamp   TIMESTAMPTZ DEFAULT NOW()
+);
+
+-- ── Alerts ────────────────────────────────────────────────────────────────────
+CREATE TABLE IF NOT EXISTS alerts (
+  id          UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  senior_id   UUID REFERENCES seniors(id) ON DELETE CASCADE,
+  type        TEXT,
+  message     TEXT,
+  severity    TEXT,
+  resolved    BOOLEAN DEFAULT FALSE,
+  created_at  TIMESTAMPTZ DEFAULT NOW(),
+  resolved_at TIMESTAMPTZ
+);
+
+-- ── Conversations ─────────────────────────────────────────────────────────────
+CREATE TABLE IF NOT EXISTS conversations (
+  id         UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  senior_id  UUID REFERENCES seniors(id) ON DELETE CASCADE,
+  session_id TEXT,
+  role       TEXT,
+  content    TEXT,
+  timestamp  TIMESTAMPTZ DEFAULT NOW()
+);
+
+-- ── Doctor questions ──────────────────────────────────────────────────────────
+CREATE TABLE IF NOT EXISTS doctor_questions (
+  id         UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  senior_id  UUID REFERENCES seniors(id) ON DELETE CASCADE,
+  question   TEXT NOT NULL,
+  asked      BOOLEAN DEFAULT FALSE,
+  asked_at   TIMESTAMPTZ,
+  created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+-- ── Doctor visits ─────────────────────────────────────────────────────────────
+CREATE TABLE IF NOT EXISTS doctor_visits (
+  id          UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  senior_id   UUID REFERENCES seniors(id) ON DELETE CASCADE,
+  transcript  TEXT,
+  doctor_name TEXT    DEFAULT '',
+  notes       TEXT    DEFAULT '',
+  word_count  INTEGER DEFAULT 0,
+  created_at  TIMESTAMPTZ DEFAULT NOW()
+);
+
+-- ── Appointments ──────────────────────────────────────────────────────────────
+CREATE TABLE IF NOT EXISTS appointments (
+  id              UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  senior_id       UUID REFERENCES seniors(id) ON DELETE CASCADE,
+  title           TEXT NOT NULL,
+  date            DATE,
+  time            TEXT,
+  location        TEXT DEFAULT '',
+  notes           TEXT DEFAULT '',
+  source          TEXT DEFAULT 'manual',
+  google_event_id TEXT,
+  created_at      TIMESTAMPTZ DEFAULT NOW()
+);
+
+-- ── Usage metrics (daily rollup per senior — powers CRM analytics) ────────────
+CREATE TABLE IF NOT EXISTS usage_metrics (
+  id                      UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  senior_id               UUID REFERENCES seniors(id) ON DELETE CASCADE,
+  date                    DATE DEFAULT CURRENT_DATE,
+  chat_messages           INTEGER DEFAULT 0,
+  medications_taken       INTEGER DEFAULT 0,
+  doctor_questions_added  INTEGER DEFAULT 0,
+  appointments_added      INTEGER DEFAULT 0,
+  emergency_alerts        INTEGER DEFAULT 0,
+  created_at              TIMESTAMPTZ DEFAULT NOW(),
+  UNIQUE(senior_id, date)
+);
+
+-- ── Indexes for performance ───────────────────────────────────────────────────
+CREATE INDEX IF NOT EXISTS idx_medications_senior      ON medications(senior_id);
+CREATE INDEX IF NOT EXISTS idx_med_log_senior          ON med_log(senior_id);
+CREATE INDEX IF NOT EXISTS idx_med_log_taken_at        ON med_log(taken_at);
+CREATE INDEX IF NOT EXISTS idx_activity_senior         ON activity(senior_id);
+CREATE INDEX IF NOT EXISTS idx_activity_timestamp      ON activity(timestamp);
+CREATE INDEX IF NOT EXISTS idx_alerts_senior           ON alerts(senior_id);
+CREATE INDEX IF NOT EXISTS idx_conversations_senior    ON conversations(senior_id);
+CREATE INDEX IF NOT EXISTS idx_conversations_timestamp ON conversations(timestamp);
+CREATE INDEX IF NOT EXISTS idx_doctor_questions_senior ON doctor_questions(senior_id);
+CREATE INDEX IF NOT EXISTS idx_doctor_visits_senior    ON doctor_visits(senior_id);
+CREATE INDEX IF NOT EXISTS idx_appointments_senior     ON appointments(senior_id);
+CREATE INDEX IF NOT EXISTS idx_appointments_date       ON appointments(date);
+CREATE INDEX IF NOT EXISTS idx_usage_senior            ON usage_metrics(senior_id);
+CREATE INDEX IF NOT EXISTS idx_usage_date              ON usage_metrics(date);
+CREATE INDEX IF NOT EXISTS idx_seniors_last_active     ON seniors(last_active);
+
+-- ── Atomic usage counter increment (called from server) ───────────────────────
+CREATE OR REPLACE FUNCTION increment_usage(p_senior_id UUID, p_date DATE, p_field TEXT)
+RETURNS void AS $$
+BEGIN
+  INSERT INTO usage_metrics (senior_id, date)
+  VALUES (p_senior_id, p_date)
+  ON CONFLICT (senior_id, date) DO NOTHING;
+
+  EXECUTE format(
+    'UPDATE usage_metrics SET %I = COALESCE(%I, 0) + 1 WHERE senior_id = $1 AND date = $2',
+    p_field, p_field
+  ) USING p_senior_id, p_date;
+END;
+$$ LANGUAGE plpgsql;
+
+-- ── Demo senior (Margaret) — family code: FAMILY123 ───────────────────────────
+INSERT INTO seniors (id, name, age, family_code, conditions, preferences, last_active)
+VALUES (
+  '00000000-0000-0000-0000-000000000001',
+  'Margaret', 78, 'FAMILY123',
+  ARRAY['mild cognitive impairment', 'hypertension'],
+  '{"voiceSpeed":"slow","theme":"high-contrast"}',
+  NOW()
+) ON CONFLICT (id) DO NOTHING;
+
+INSERT INTO medications (senior_id, name, dose, time, with_food, active)
+SELECT '00000000-0000-0000-0000-000000000001', name, dose, time, with_food, true
+FROM (VALUES
+  ('Lisinopril',   '10mg',  '8:00 AM',  true),
+  ('Metformin',    '500mg', '12:00 PM', true),
+  ('Atorvastatin', '20mg',  '9:00 PM',  false)
+) AS v(name, dose, time, with_food)
+WHERE NOT EXISTS (
+  SELECT 1 FROM medications WHERE senior_id = '00000000-0000-0000-0000-000000000001'
+);
