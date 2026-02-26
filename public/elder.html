@@ -1052,8 +1052,7 @@
     if (!recognition) { showToast("Voice not supported — please type below."); return; }
 
     // Stop Sage speaking before opening the mic
-    if (currentAudio) { currentAudio.pause(); currentAudio.src = ""; currentAudio = null; }
-    if (window.speechSynthesis) window.speechSynthesis.cancel();
+    stopCurrentAudio();
 
     isListening     = true;
     finalTranscript = "";
@@ -1082,59 +1081,57 @@
   }
 
   // ── Audio Unlock (iOS / Android autoplay policy) ──────────────────────────────
-  // Both HTMLAudioElement.play() AND speechSynthesis.speak() are blocked until
-  // they have been called at least once inside a direct user gesture.
-  // unlockAudio() must be called synchronously (not in a promise/setTimeout)
-  // from a tap handler before any async audio work happens.
+  // KEY INSIGHT: On iOS, HTMLAudioElement.play() must be called in the
+  // synchronous call stack of a user gesture — and changing src resets it.
+  // After two async fetches (chat API + TTS API) the gesture context is lost.
+  //
+  // SOLUTION: Use Web Audio API (AudioContext) for ElevenLabs playback.
+  // AudioContext.resume() only needs ONE call during a user gesture, then
+  // it stays unlocked for the entire session. We decode the MP3 into an
+  // AudioBuffer and play it through the context — works from any async code.
   let audioUnlocked = false;
+  let ttsAudioCtx   = null; // persistent AudioContext for ElevenLabs playback
+  let currentSource  = null; // currently playing AudioBufferSourceNode
 
   function unlockAudio() {
     if (audioUnlocked) return;
     audioUnlocked = true;
 
-    // 1. Unlock Web Audio context
+    // 1. Create and resume a persistent AudioContext during the user gesture.
+    //    Once resumed, it stays unlocked for the entire page session.
     try {
-      const ctx = new (window.AudioContext || window.webkitAudioContext)();
-      const buf = ctx.createBuffer(1, 1, 22050);
-      const src = ctx.createBufferSource();
+      ttsAudioCtx = new (window.AudioContext || window.webkitAudioContext)();
+      // Play a silent buffer to fully activate the context
+      const buf = ttsAudioCtx.createBuffer(1, 1, 22050);
+      const src = ttsAudioCtx.createBufferSource();
       src.buffer = buf;
-      src.connect(ctx.destination);
+      src.connect(ttsAudioCtx.destination);
       src.start(0);
-      ctx.resume();
-    } catch(e) {}
+      ttsAudioCtx.resume();
+      console.log("[audio] AudioContext created, state:", ttsAudioCtx.state);
+    } catch(e) { console.warn("[audio] AudioContext unlock failed:", e); }
 
-    // 2. Unlock the persistent ttsAudio element with a silent WAV
-    //    This same element is reused for ElevenLabs playback, so the
-    //    gesture-unlock carries forward to all future .play() calls.
+    // 2. Also unlock HTMLAudioElement as a backup
     try {
-      ttsAudio.src = "data:audio/wav;base64,UklGRigAAABXQVZFZm10IBIAAAABAAEARKwAAIhYAQACABAAAABkYXRhAgAAAAEA";
-      ttsAudio.play().catch(() => {});
+      const silence = new Audio("data:audio/wav;base64,UklGRigAAABXQVZFZm10IBIAAAABAAEARKwAAIhYAQACABAAAABkYXRhAgAAAAEA");
+      silence.play().catch(() => {});
     } catch(e) {}
 
     // 3. Warm up speechSynthesis — CRITICAL for iOS Safari.
-    //    speechSynthesis has its own separate gesture gate, independent of
-    //    AudioContext. Speaking a blank utterance here grants permission for
-    //    all future async speak() calls in this session.
+    //    speechSynthesis has its own separate gesture gate.
     try {
       if (window.speechSynthesis) {
-        // Cancel first to flush any queued-but-blocked utterances (e.g. the
-        // greeting that was silently queued before the user tapped anything)
         window.speechSynthesis.cancel();
         const warmup = new SpeechSynthesisUtterance(" ");
         warmup.volume = 0;
         window.speechSynthesis.speak(warmup);
-        // Cancel again shortly after to clear the warmup + any stale queue
         setTimeout(() => window.speechSynthesis.cancel(), 150);
       }
     } catch(e) {}
   }
 
   // ── TTS ───────────────────────────────────────────────────────────────────────
-  // Reuse a single Audio element so the iOS gesture-unlock carries forward.
-  // Creating new Audio() objects after an async fetch breaks the gesture chain.
-  let ttsAudio = new Audio();
-  ttsAudio.setAttribute("playsinline", "");
-  let currentAudio = null;
+  let currentAudio = null; // tracks what's playing for stop/interrupt
 
   // Strip emojis, markdown, and anything that sounds wrong when spoken aloud
   function cleanForSpeech(text) {
@@ -1160,49 +1157,69 @@
     if (!clean) return;
 
     // Stop anything currently playing
-    if (currentAudio) {
-      currentAudio.pause();
-      currentAudio = null;
-    }
-    // Do NOT call speechSynthesis.cancel() here — on iOS it resets the
-    // gesture unlock and blocks all subsequent speak() calls.
+    stopCurrentAudio();
 
     // Show speaking indicator on mic button
     setSpeakingIndicator(true);
 
-    // Try ElevenLabs via server first (natural-sounding voice)
+    // Try ElevenLabs via server → Web Audio API playback
     try {
+      console.log("[tts] Fetching ElevenLabs audio…");
       const res = await fetch("/api/tts", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ text: clean }),
       });
-      if (res.ok) {
-        const blob = await res.blob();
-        const url = URL.createObjectURL(blob);
-        // Reuse the pre-unlocked ttsAudio element so iOS allows playback
-        ttsAudio.onended = () => {
-          URL.revokeObjectURL(url);
+
+      if (res.ok && ttsAudioCtx) {
+        // Ensure context is running (may be suspended if tab was backgrounded)
+        if (ttsAudioCtx.state === "suspended") {
+          await ttsAudioCtx.resume();
+        }
+
+        const arrayBuf = await res.arrayBuffer();
+        console.log("[tts] Got", arrayBuf.byteLength, "bytes, decoding…");
+
+        const audioBuf = await ttsAudioCtx.decodeAudioData(arrayBuf);
+        console.log("[tts] Decoded OK, duration:", audioBuf.duration.toFixed(1), "s. Playing…");
+
+        const source = ttsAudioCtx.createBufferSource();
+        source.buffer = audioBuf;
+        source.connect(ttsAudioCtx.destination);
+        source.onended = () => {
+          currentSource = null;
           currentAudio = null;
           setSpeakingIndicator(false);
         };
-        ttsAudio.onerror = () => { setSpeakingIndicator(false); speakBrowser(clean); };
-        ttsAudio.src = url;
-        currentAudio = ttsAudio;
-        await ttsAudio.play().catch(() => { setSpeakingIndicator(false); speakBrowser(clean); });
+        source.start(0);
+        currentSource = source;
+        currentAudio = "webapi"; // flag so stopCurrentAudio knows what to stop
         return;
-      } else {
-        // Surface the error so we can see what's wrong
+      } else if (!res.ok) {
         const err = await res.json().catch(() => ({ error: `HTTP ${res.status}` }));
-        console.warn("ElevenLabs TTS error:", res.status, err);
+        console.warn("[tts] ElevenLabs error:", res.status, err);
         showToast(`Voice error (${res.status}): ${err.error || "unknown"}`);
+      } else {
+        console.warn("[tts] AudioContext not available, falling back to browser voice");
       }
     } catch (e) {
-      console.warn("ElevenLabs TTS fetch failed:", e.message);
+      console.warn("[tts] ElevenLabs/WebAudio failed:", e.message);
     }
 
     // Fallback: best available browser voice
     speakBrowser(clean);
+  }
+
+  function stopCurrentAudio() {
+    if (currentAudio === "webapi" && currentSource) {
+      try { currentSource.stop(); } catch(e) {}
+      currentSource = null;
+    }
+    if (window.speechSynthesis && window.speechSynthesis.speaking) {
+      // Only cancel browser speech, not all speech
+      window.speechSynthesis.cancel();
+    }
+    currentAudio = null;
   }
 
   function setSpeakingIndicator(on) {
@@ -1364,8 +1381,7 @@
     if (!qRecognition) { showToast("Voice not supported — please type your question."); return; }
 
     // Stop Sage speaking
-    if (currentAudio) { currentAudio.pause(); currentAudio.src = ""; currentAudio = null; }
-    if (window.speechSynthesis) window.speechSynthesis.cancel();
+    stopCurrentAudio();
 
     // Stop main chat listening if active
     if (isListening) stopListening();
