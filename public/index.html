@@ -664,6 +664,71 @@
 
     .footer-copy { font-size: 13px; width: 100%; text-align: center; margin-top: 24px; padding-top: 24px; border-top: 1px solid rgba(255,255,255,0.07); }
 
+    /* ── PHOTO STRIP ────────────────────────────────────────────────── */
+    .photo-strip-section {
+      padding: 0 24px 72px;
+      background: linear-gradient(160deg, #0F172A 0%, #1B3480 50%, #0C5E58 100%);
+    }
+
+    .photo-strip {
+      max-width: 960px;
+      margin: 0 auto;
+      display: grid;
+      grid-template-columns: 1.2fr 1fr 1fr;
+      gap: 16px;
+      align-items: end;
+    }
+
+    .photo-strip-card {
+      border-radius: 20px;
+      overflow: hidden;
+      position: relative;
+      box-shadow: 0 20px 60px rgba(0,0,0,0.4);
+    }
+
+    .photo-strip-card:first-child {
+      border-radius: 24px;
+      transform: translateY(-24px);
+    }
+
+    .photo-strip-card img {
+      width: 100%;
+      display: block;
+      object-fit: cover;
+      transition: transform 0.6s var(--ease);
+    }
+
+    .photo-strip-card:first-child img { height: 320px; }
+    .photo-strip-card:nth-child(2) img { height: 240px; }
+    .photo-strip-card:nth-child(3) img { height: 260px; }
+
+    .photo-strip-card:hover img { transform: scale(1.04); }
+
+    .photo-strip-overlay {
+      position: absolute;
+      bottom: 0; left: 0; right: 0;
+      background: linear-gradient(transparent, rgba(0,0,0,0.72));
+      padding: 32px 18px 18px;
+    }
+
+    .photo-strip-caption {
+      color: rgba(255,255,255,0.92);
+      font-size: 13px;
+      font-weight: 600;
+      line-height: 1.4;
+    }
+
+    /* ── AUDIENCE CARD PHOTO ─────────────────────────────────────────── */
+    .audience-photo {
+      width: 100%;
+      height: 200px;
+      object-fit: cover;
+      border-radius: 18px;
+      margin-bottom: 24px;
+      display: block;
+      box-shadow: 0 8px 32px rgba(0,0,0,0.25);
+    }
+
     /* ── ANIMATIONS ─────────────────────────────────────────────────── */
     @keyframes fadeUp {
       from { opacity: 0; transform: translateY(20px); }
@@ -684,6 +749,9 @@
       .two-col      { grid-template-columns: 1fr; }
       .steps        { grid-template-columns: 1fr; gap: 16px; }
       .steps::before { display: none; }
+      .photo-strip  { grid-template-columns: 1fr 1fr; }
+      .photo-strip-card:first-child { transform: none; grid-column: 1 / -1; }
+      .photo-strip-card:first-child img { height: 220px; }
     }
 
     @media (max-width: 560px) {
@@ -759,6 +827,46 @@
       <div class="trust-divider"></div>
       <div class="trust-item"><strong>Real-time</strong>Family alerts</div>
     </div>
+  </div>
+</section>
+
+<!-- ── PHOTO STRIP ──────────────────────────────────────────────────── -->
+<section class="photo-strip-section">
+  <div class="photo-strip">
+
+    <div class="photo-strip-card reveal">
+      <img
+        src="https://images.unsplash.com/photo-1574269909862-7e1d70bb8078?auto=format&fit=crop&w=800&q=80"
+        alt="Grandmother laughing with granddaughter"
+        loading="lazy"
+      />
+      <div class="photo-strip-overlay">
+        <div class="photo-strip-caption">"She lights up every time she talks to Sage."</div>
+      </div>
+    </div>
+
+    <div class="photo-strip-card reveal reveal-delay-1">
+      <img
+        src="https://images.unsplash.com/photo-1609220136736-443140cffec6?auto=format&fit=crop&w=600&q=80"
+        alt="Senior woman smiling outdoors"
+        loading="lazy"
+      />
+      <div class="photo-strip-overlay">
+        <div class="photo-strip-caption">Independent, happy, supported.</div>
+      </div>
+    </div>
+
+    <div class="photo-strip-card reveal reveal-delay-2">
+      <img
+        src="https://images.unsplash.com/photo-1543269865-cbf427effbad?auto=format&fit=crop&w=600&q=80"
+        alt="Family together — adult children with their parent"
+        loading="lazy"
+      />
+      <div class="photo-strip-overlay">
+        <div class="photo-strip-caption">Family always in the loop.</div>
+      </div>
+    </div>
+
   </div>
 </section>
 
@@ -843,6 +951,12 @@
 
     <div class="two-col">
       <div class="audience-card audience-senior reveal reveal-delay-1">
+        <img
+          class="audience-photo"
+          src="https://images.unsplash.com/photo-1516589178581-6cd7833ae3b2?auto=format&fit=crop&w=600&q=80"
+          alt="Senior woman smiling with family"
+          loading="lazy"
+        />
         <div class="audience-icon">👵</div>
         <div class="audience-title">For Seniors</div>
         <div class="audience-sub">Independence, dignity, and a caring companion — always available, never judgmental.</div>
@@ -859,6 +973,12 @@
       </div>
 
       <div class="audience-card audience-family reveal reveal-delay-2">
+        <img
+          class="audience-photo"
+          src="https://images.unsplash.com/photo-1529156069898-49953e39b3ac?auto=format&fit=crop&w=600&q=80"
+          alt="Adult family members with their elderly parent"
+          loading="lazy"
+        />
         <div class="audience-icon">👨‍👩‍👧</div>
         <div class="audience-title">For Families</div>
         <div class="audience-sub">Real-time visibility into how your loved one is doing — without invading their privacy.</div>
@@ -889,7 +1009,7 @@
         <div class="quote-stars">★★★★★</div>
         <div class="quote-text">"My mom lives alone and I used to worry every single day. Now I can check the dashboard in the morning and actually relax. She loves talking to Sage — says it feels like having a friend."</div>
         <div class="quote-author">
-          <div class="quote-avatar qa-blue">👩</div>
+          <img class="quote-avatar" src="https://images.unsplash.com/photo-1544005313-94ddf0286df2?auto=format&fit=crop&w=80&h=80&q=80" alt="Sarah M." style="width:44px;height:44px;border-radius:50%;object-fit:cover;flex-shrink:0;" loading="lazy" />
           <div>
             <div class="quote-name">Sarah M.</div>
             <div class="quote-role">Daughter, caring for her 81-year-old mom</div>
@@ -901,7 +1021,7 @@
         <div class="quote-stars">★★★★★</div>
         <div class="quote-text">"Dad kept forgetting his blood pressure medication. Since we set up Sage, he hasn't missed a dose in three weeks. The reminder notifications are gentle — he doesn't feel nagged."</div>
         <div class="quote-author">
-          <div class="quote-avatar qa-green">👨</div>
+          <img class="quote-avatar" src="https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?auto=format&fit=crop&w=80&h=80&q=80" alt="James K." style="width:44px;height:44px;border-radius:50%;object-fit:cover;flex-shrink:0;" loading="lazy" />
           <div>
             <div class="quote-name">James K.</div>
             <div class="quote-role">Son, managing care for his 76-year-old father</div>
@@ -913,7 +1033,7 @@
         <div class="quote-stars">★★★★★</div>
         <div class="quote-text">"My grandmother is sharp but lonely since grandpa passed. Sage gives her someone to talk to about her day. She told me she feels 'less forgotten.' That meant everything to me."</div>
         <div class="quote-author">
-          <div class="quote-avatar qa-amber">👧</div>
+          <img class="quote-avatar" src="https://images.unsplash.com/photo-1438761681033-6461ffad8d80?auto=format&fit=crop&w=80&h=80&q=80" alt="Maria L." style="width:44px;height:44px;border-radius:50%;object-fit:cover;flex-shrink:0;" loading="lazy" />
           <div>
             <div class="quote-name">Maria L.</div>
             <div class="quote-role">Granddaughter, remote caregiver</div>
