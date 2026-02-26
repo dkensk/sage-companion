@@ -438,28 +438,70 @@ Today: ${new Date().toLocaleDateString("en-US", { weekday: "long", month: "long"
 app.post("/api/tts", async (req, res) => {
   const { text } = req.body;
   if (!text) return res.status(400).json({ error: "text required" });
-  const apiKey = process.env.ELEVENLABS_API_KEY;
+
+  const apiKey  = (process.env.ELEVENLABS_API_KEY  || "").trim();
+  const voiceId = (process.env.ELEVENLABS_VOICE_ID || "21m00Tcm4TlvDq8ikWAM").trim(); // Rachel — reliable free tier voice
   if (!apiKey) return res.status(503).json({ error: "ElevenLabs not configured" });
-  const voiceId = process.env.ELEVENLABS_VOICE_ID || "9BWtsMINqrJLrRacOk9x";
+
   const https   = require("https");
-  const payload = JSON.stringify({
-    text: text.slice(0, 800), model_id: "eleven_turbo_v2",
-    voice_settings: { stability: 0.55, similarity_boost: 0.80, style: 0.20, use_speaker_boost: true },
+
+  // Try with requested voice first, fall back to Rachel if it fails
+  const tryVoice = (vid) => new Promise((resolve, reject) => {
+    const payload = JSON.stringify({
+      text: text.slice(0, 800),
+      model_id: "eleven_turbo_v2",
+      voice_settings: { stability: 0.55, similarity_boost: 0.80, style: 0.10, use_speaker_boost: true },
+    });
+    const options = {
+      hostname: "api.elevenlabs.io",
+      path: `/v1/text-to-speech/${vid}`,
+      method: "POST",
+      headers: {
+        "xi-api-key":     apiKey,
+        "Content-Type":   "application/json",
+        "Accept":         "audio/mpeg",
+        "Content-Length": Buffer.byteLength(payload),
+      },
+    };
+    const ttsReq = https.request(options, (ttsRes) => {
+      if (ttsRes.statusCode === 200) {
+        resolve(ttsRes);
+      } else {
+        // Capture error body for logging
+        let errBody = "";
+        ttsRes.on("data", d => errBody += d);
+        ttsRes.on("end", () => {
+          console.error(`ElevenLabs ${ttsRes.statusCode} for voice ${vid}:`, errBody.slice(0, 200));
+          reject(new Error(`ElevenLabs ${ttsRes.statusCode}`));
+        });
+      }
+    });
+    ttsReq.on("error", reject);
+    ttsReq.write(payload);
+    ttsReq.end();
   });
-  const options = {
-    hostname: "api.elevenlabs.io", path: `/v1/text-to-speech/${voiceId}`,
-    method: "POST",
-    headers: { "xi-api-key": apiKey, "Content-Type": "application/json", "Accept": "audio/mpeg", "Content-Length": Buffer.byteLength(payload) },
-  };
-  const ttsReq = https.request(options, (ttsRes) => {
-    if (ttsRes.statusCode !== 200) return res.status(502).json({ error: "TTS error" });
+
+  try {
+    // Try the configured voice
+    const FALLBACK_VOICE = "21m00Tcm4TlvDq8ikWAM"; // Rachel
+    let audioStream;
+    try {
+      audioStream = await tryVoice(voiceId);
+    } catch (e) {
+      if (voiceId !== FALLBACK_VOICE) {
+        console.warn(`Voice ${voiceId} failed, trying fallback Rachel...`);
+        audioStream = await tryVoice(FALLBACK_VOICE);
+      } else {
+        throw e;
+      }
+    }
     res.setHeader("Content-Type", "audio/mpeg");
     res.setHeader("Cache-Control", "no-cache");
-    ttsRes.pipe(res);
-  });
-  ttsReq.on("error", () => res.status(502).json({ error: "TTS connection error" }));
-  ttsReq.write(payload);
-  ttsReq.end();
+    audioStream.pipe(res);
+  } catch (e) {
+    console.error("TTS failed:", e.message);
+    res.status(502).json({ error: e.message });
+  }
 });
 
 // ─────────────────────────────────────────────────────────────────────────────
