@@ -1077,15 +1077,17 @@
   }
 
   // ── Audio Unlock (iOS / Android autoplay policy) ──────────────────────────────
-  // Mobile browsers block audio until the user has tapped something.
-  // We call unlockAudio() synchronously inside any button tap so that
-  // subsequent async .play() calls are allowed.
+  // Both HTMLAudioElement.play() AND speechSynthesis.speak() are blocked until
+  // they have been called at least once inside a direct user gesture.
+  // unlockAudio() must be called synchronously (not in a promise/setTimeout)
+  // from a tap handler before any async audio work happens.
   let audioUnlocked = false;
 
   function unlockAudio() {
     if (audioUnlocked) return;
     audioUnlocked = true;
-    // 1. Unlock the Web Audio context with a silent 1-sample buffer
+
+    // 1. Unlock Web Audio context
     try {
       const ctx = new (window.AudioContext || window.webkitAudioContext)();
       const buf = ctx.createBuffer(1, 1, 22050);
@@ -1095,12 +1097,25 @@
       src.start(0);
       ctx.resume();
     } catch(e) {}
-    // 2. Play a tiny silent WAV to prime the iOS audio session
+
+    // 2. Unlock HTMLAudioElement with a silent WAV
     try {
       const silence = new Audio(
         "data:audio/wav;base64,UklGRigAAABXQVZFZm10IBIAAAABAAEARKwAAIhYAQACABAAAABkYXRhAgAAAAEA"
       );
       silence.play().catch(() => {});
+    } catch(e) {}
+
+    // 3. Warm up speechSynthesis — CRITICAL for iOS Safari.
+    //    speechSynthesis has its own separate gesture gate, independent of
+    //    AudioContext. Speaking a blank utterance here grants permission for
+    //    all future async speak() calls in this session.
+    try {
+      if (window.speechSynthesis) {
+        const warmup = new SpeechSynthesisUtterance(" ");
+        warmup.volume = 0;
+        window.speechSynthesis.speak(warmup);
+      }
     } catch(e) {}
   }
 
@@ -1136,7 +1151,11 @@
       currentAudio.src = "";
       currentAudio = null;
     }
-    if (window.speechSynthesis) window.speechSynthesis.cancel();
+    // Do NOT call speechSynthesis.cancel() here — on iOS it resets the
+    // gesture unlock and blocks all subsequent speak() calls.
+
+    // Show speaking indicator on mic button
+    setSpeakingIndicator(true);
 
     // Try ElevenLabs via server first (natural-sounding voice)
     try {
@@ -1149,17 +1168,34 @@
         const blob = await res.blob();
         const url = URL.createObjectURL(blob);
         currentAudio = new Audio(url);
-        currentAudio.onended = () => { URL.revokeObjectURL(url); currentAudio = null; };
-        currentAudio.onerror = () => speakBrowser(clean);
-        await currentAudio.play().catch(() => speakBrowser(clean));
+        currentAudio.onended = () => {
+          URL.revokeObjectURL(url);
+          currentAudio = null;
+          setSpeakingIndicator(false);
+        };
+        currentAudio.onerror = () => { setSpeakingIndicator(false); speakBrowser(clean); };
+        await currentAudio.play().catch(() => { setSpeakingIndicator(false); speakBrowser(clean); });
         return;
       }
     } catch (e) {
-      // ElevenLabs not configured — fall through
+      // ElevenLabs not configured — fall through to browser TTS
     }
 
     // Fallback: best available browser voice
     speakBrowser(clean);
+  }
+
+  function setSpeakingIndicator(on) {
+    if (isListening) return; // don't change button state while listening
+    const icon  = document.getElementById("micIcon");
+    const label = document.getElementById("talkBtnLabel");
+    if (on) {
+      icon.textContent  = "🔊";
+      label.textContent = "SAGE IS SPEAKING";
+    } else {
+      icon.textContent  = "🎙️";
+      label.textContent = "TAP TO TALK";
+    }
   }
 
   function speakBrowser(text) {
@@ -1169,6 +1205,8 @@
       const utter = new SpeechSynthesisUtterance(text);
       utter.rate = 0.85;
       utter.pitch = 1.0;
+      utter.onend = () => setSpeakingIndicator(false);
+      utter.onerror = () => setSpeakingIndicator(false);
       // Prefer natural-sounding voices; always fall back to any English voice
       const pick =
         voices.find(v => v.name.includes("Enhanced") && v.lang.startsWith("en")) ||
@@ -1177,7 +1215,7 @@
         voices.find(v => v.lang.startsWith("en-US") && !v.name.toLowerCase().includes("google")) ||
         voices.find(v => v.lang.startsWith("en"));
       if (pick) utter.voice = pick;
-      window.speechSynthesis.cancel(); // clear any queued utterances first
+      // Note: do NOT call cancel() here — on iOS it resets the gesture unlock
       window.speechSynthesis.speak(utter);
     }
 
