@@ -3,6 +3,15 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <!-- PWA -->
+  <link rel="manifest" href="/manifest.json">
+  <meta name="theme-color" content="#1E3A8A">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="Sage">
+  <link rel="apple-touch-icon" href="/icons/apple-touch-icon.png">
+  <link rel="icon" type="image/png" sizes="192x192" href="/icons/icon-192.png">
   <title>Sage Companion — Family Dashboard</title>
   <style>
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
@@ -454,6 +463,13 @@
       #dashboard { padding: 16px 14px; }
     }
   </style>
+  <script>
+    if ('serviceWorker' in navigator) {
+      window.addEventListener('load', () => {
+        navigator.serviceWorker.register('/sw.js').catch(() => {});
+      });
+    }
+  </script>
 </head>
 <body>
 
@@ -611,17 +627,23 @@
     const code = document.getElementById("codeInput").value.trim().toUpperCase();
     if (!code) return;
 
-    const res = await fetch(`/api/senior/by-code/${code}`);
+    const res = await fetch("/api/family/login", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ familyCode: code }),
+    });
+
     if (!res.ok) {
       document.getElementById("loginError").style.display = "block";
       return;
     }
 
-    const senior = await res.json();
+    const { token, senior } = await res.json();
     seniorId = senior._id;
     seniorName = senior.name;
-    localStorage.setItem("familySeniorId", seniorId);
-    localStorage.setItem("familySeniorName", seniorName);
+    localStorage.setItem("familySeniorId",    seniorId);
+    localStorage.setItem("familySeniorName",  seniorName);
+    localStorage.setItem("familyToken",       token);
 
     document.getElementById("loginError").style.display = "none";
     showDashboard();
@@ -972,6 +994,7 @@
   function logout() {
     localStorage.removeItem("familySeniorId");
     localStorage.removeItem("familySeniorName");
+    localStorage.removeItem("familyToken");
     location.reload();
   }
 

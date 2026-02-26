@@ -15,6 +15,8 @@
     "googleapis": "^171.4.0",
     "multer": "^2.0.2",
     "nedb-promises": "^6.0.0",
-    "uuid": "^9.0.0"
+    "node-cron": "^4.2.1",
+    "uuid": "^9.0.0",
+    "web-push": "^3.6.7"
   }
 }

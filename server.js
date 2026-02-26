@@ -13,6 +13,8 @@ const Anthropic  = require("@anthropic-ai/sdk");
 const { createClient } = require("@supabase/supabase-js");
 const multer     = require("multer");
 const { google } = require("googleapis");
+const webpush    = require("web-push");
+const cron       = require("node-cron");
 
 // ── Multer (image uploads — memory only) ─────────────────────────────────────
 const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 15 * 1024 * 1024 } });
@@ -30,6 +32,15 @@ const supabase = createClient(
 
 // ── Demo senior ID ────────────────────────────────────────────────────────────
 const DEMO_SENIOR_ID = "00000000-0000-0000-0000-000000000001";
+
+// ── Web Push (VAPID) setup ────────────────────────────────────────────────────
+const VAPID_PUBLIC  = process.env.VAPID_PUBLIC_KEY  || "";
+const VAPID_PRIVATE = process.env.VAPID_PRIVATE_KEY || "";
+const VAPID_EMAIL   = process.env.VAPID_EMAIL        || "mailto:hello@sagecompanion.com";
+
+if (VAPID_PUBLIC && VAPID_PRIVATE) {
+  webpush.setVapidDetails(VAPID_EMAIL, VAPID_PUBLIC, VAPID_PRIVATE);
+}
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -78,6 +89,105 @@ function adminAuth(req, res, next) {
     return res.status(401).json({ error: "Unauthorized" });
   }
   next();
+}
+
+// ── Family auth (HMAC token tied to seniorId) ─────────────────────────────────
+const JWT_SECRET = process.env.JWT_SECRET || "sage-family-secret-dev";
+
+function makeFamilyToken(seniorId) {
+  const payload = Buffer.from(JSON.stringify({ seniorId, iat: Date.now() })).toString("base64url");
+  const sig     = crypto.createHmac("sha256", JWT_SECRET).update(payload).digest("hex");
+  return `${payload}.${sig}`;
+}
+
+function verifyFamilyToken(token) {
+  try {
+    const [payload, sig] = (token || "").split(".");
+    if (!payload || !sig) return null;
+    const expected = crypto.createHmac("sha256", JWT_SECRET).update(payload).digest("hex");
+    if (sig !== expected) return null;
+    return JSON.parse(Buffer.from(payload, "base64url").toString());
+  } catch { return null; }
+}
+
+function familyAuth(req, res, next) {
+  const token   = req.headers["x-family-token"];
+  const payload = verifyFamilyToken(token);
+  if (!payload) return res.status(401).json({ error: "Family authentication required" });
+  req.seniorId = payload.seniorId;
+  next();
+}
+
+// ── Medication reminder cron (runs every minute) ──────────────────────────────
+async function checkMedicationReminders() {
+  if (!VAPID_PUBLIC || !VAPID_PRIVATE) return; // Push not configured
+  if (!process.env.SUPABASE_URL || process.env.SUPABASE_URL === "YOUR_SUPABASE_PROJECT_URL") return;
+
+  try {
+    const now         = new Date();
+    const currentTime = now.toLocaleTimeString("en-US", {
+      hour: "numeric", minute: "2-digit", hour12: true,
+    }); // e.g. "8:00 AM"
+
+    // Get all active medications scheduled for right now
+    const { data: meds } = await supabase
+      .from("medications")
+      .select("id, name, dose, senior_id")
+      .eq("active", true)
+      .eq("time", currentTime);
+
+    if (!meds || !meds.length) return;
+
+    const today    = now.toISOString().split("T")[0];
+    const todayStart = today + "T00:00:00.000Z";
+
+    for (const med of meds) {
+      // Skip if already taken today
+      const { count: taken } = await supabase
+        .from("med_log")
+        .select("*", { count: "exact", head: true })
+        .eq("senior_id", med.senior_id)
+        .eq("medication_id", med.id)
+        .gte("taken_at", todayStart);
+
+      if (taken > 0) continue;
+
+      // Get all push subscriptions for this senior
+      const { data: subs } = await supabase
+        .from("push_subscriptions")
+        .select("id, subscription_json")
+        .eq("senior_id", med.senior_id);
+
+      for (const sub of (subs || [])) {
+        try {
+          await webpush.sendNotification(
+            JSON.parse(sub.subscription_json),
+            JSON.stringify({
+              title:        "💊 Time for your medication",
+              body:         `It's time to take ${med.name}${med.dose ? " (" + med.dose + ")" : ""}`,
+              icon:         "/icons/icon-192.png",
+              badge:        "/icons/badge-72.png",
+              tag:          `med-${med.id}-${today}`,
+              medicationId: med.id,
+              seniorId:     med.senior_id,
+            })
+          );
+          // Update last_used timestamp
+          await supabase.from("push_subscriptions")
+            .update({ last_used: new Date().toISOString() })
+            .eq("id", sub.id);
+        } catch (e) {
+          // Subscription expired or invalid — remove it
+          if (e.statusCode === 410 || e.statusCode === 404) {
+            await supabase.from("push_subscriptions").delete().eq("id", sub.id);
+          }
+        }
+      }
+    }
+  } catch (e) {
+    // Non-critical — don't crash server
+    console.error("Reminder check error:", e.message);
+  }
 }
 
 // ── Middleware ────────────────────────────────────────────────────────────────
@@ -873,6 +983,118 @@ app.get("/api/admin/alerts", adminAuth, async (req, res) => {
 });
 
 // ─────────────────────────────────────────────────────────────────────────────
+// FAMILY AUTH
+// ─────────────────────────────────────────────────────────────────────────────
+
+// Family login — exchange family code for a session token
+app.post("/api/family/login", async (req, res) => {
+  try {
+    const { familyCode } = req.body;
+    if (!familyCode) return res.status(400).json({ error: "Family code required" });
+
+    const { data: senior } = await supabase
+      .from("seniors")
+      .select("*")
+      .eq("family_code", familyCode.trim().toUpperCase())
+      .single();
+
+    if (!senior) return res.status(401).json({ error: "Invalid family code" });
+
+    const token = makeFamilyToken(senior.id);
+    res.json({ token, senior: norm(senior) });
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// PUSH NOTIFICATIONS
+// ─────────────────────────────────────────────────────────────────────────────
+
+// Return VAPID public key to client (needed for subscription)
+app.get("/api/push/key", (req, res) => {
+  res.json({ publicKey: VAPID_PUBLIC || null });
+});
+
+// Save a push subscription for a senior
+app.post("/api/push/subscribe", async (req, res) => {
+  try {
+    const { subscription, seniorId, deviceLabel } = req.body;
+    if (!subscription || !seniorId) return res.status(400).json({ error: "subscription and seniorId required" });
+
+    const subJson = JSON.stringify(subscription);
+
+    // Upsert by endpoint — avoid duplicates
+    const { data: existing } = await supabase
+      .from("push_subscriptions")
+      .select("id")
+      .eq("senior_id", seniorId)
+      .eq("subscription_json", subJson)
+      .maybeSingle();
+
+    if (existing) {
+      await supabase.from("push_subscriptions")
+        .update({ last_used: new Date().toISOString() })
+        .eq("id", existing.id);
+    } else {
+      await supabase.from("push_subscriptions").insert({
+        senior_id:         seniorId,
+        subscription_json: subJson,
+        device_label:      deviceLabel || "Unknown device",
+      });
+    }
+
+    res.json({ ok: true });
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+// Remove a push subscription
+app.post("/api/push/unsubscribe", async (req, res) => {
+  try {
+    const { seniorId } = req.body;
+    if (!seniorId) return res.status(400).json({ error: "seniorId required" });
+    await supabase.from("push_subscriptions").delete().eq("senior_id", seniorId);
+    res.json({ ok: true });
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+// Send a test push notification
+app.post("/api/push/test", async (req, res) => {
+  try {
+    const { seniorId } = req.body;
+    if (!seniorId) return res.status(400).json({ error: "seniorId required" });
+    if (!VAPID_PUBLIC || !VAPID_PRIVATE) return res.status(400).json({ error: "Push not configured" });
+
+    const { data: subs } = await supabase
+      .from("push_subscriptions")
+      .select("id, subscription_json")
+      .eq("senior_id", seniorId);
+
+    if (!subs || !subs.length) return res.status(404).json({ error: "No subscriptions found" });
+
+    let sent = 0;
+    for (const sub of subs) {
+      try {
+        await webpush.sendNotification(
+          JSON.parse(sub.subscription_json),
+          JSON.stringify({
+            title: "🌿 Sage Reminders Active",
+            body:  "You'll now get medication reminders at the right time. Great!",
+            icon:  "/icons/icon-192.png",
+            badge: "/icons/badge-72.png",
+            tag:   "sage-test",
+          })
+        );
+        sent++;
+      } catch (e) {
+        if (e.statusCode === 410 || e.statusCode === 404) {
+          await supabase.from("push_subscriptions").delete().eq("id", sub.id);
+        }
+      }
+    }
+    res.json({ ok: true, sent });
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
 // STATIC ROUTES
 // ─────────────────────────────────────────────────────────────────────────────
 app.get("/elder",    (req, res) => res.sendFile(path.join(__dirname, "public", "elder.html")));
@@ -900,6 +1122,14 @@ async function start() {
     console.log(`   🔐 Admin CRM:     http://localhost:${PORT}/admin`);
     console.log(`\n   Demo family code: FAMILY123`);
     console.log("\n   Press Ctrl+C to stop\n");
+
+    // Start medication reminder cron — checks every minute
+    if (VAPID_PUBLIC && VAPID_PRIVATE) {
+      cron.schedule("* * * * *", checkMedicationReminders);
+      console.log("   💊 Medication reminders: active (checking every minute)\n");
+    } else {
+      console.log("   💊 Medication reminders: disabled (VAPID keys not set)\n");
+    }
   });
 }
 

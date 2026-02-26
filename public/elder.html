@@ -3,6 +3,15 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <!-- PWA -->
+  <link rel="manifest" href="/manifest.json">
+  <meta name="theme-color" content="#1E3A8A">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="Sage">
+  <link rel="apple-touch-icon" href="/icons/apple-touch-icon.png">
+  <link rel="icon" type="image/png" sizes="192x192" href="/icons/icon-192.png">
   <title>Sage — Your Companion</title>
   <style>
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
@@ -507,6 +516,13 @@
       transform: translateX(-50%) translateY(0);
     }
   </style>
+  <script>
+    if ('serviceWorker' in navigator) {
+      window.addEventListener('load', () => {
+        navigator.serviceWorker.register('/sw.js').catch(() => {});
+      });
+    }
+  </script>
 </head>
 <body>
 
@@ -564,7 +580,15 @@
 
   <!-- Medications -->
   <div class="card" id="medsSection">
-    <div class="section-title">💊 My Medications</div>
+    <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px;margin-bottom:4px;">
+      <div class="section-title" style="margin-bottom:0;">💊 My Medications</div>
+      <button id="reminderBtn" onclick="toggleReminders()"
+        style="background:var(--bg);border:2px solid var(--border);border-radius:12px;
+               padding:9px 16px;font-size:15px;font-weight:700;color:var(--navy);
+               cursor:pointer;transition:all 0.15s;white-space:nowrap;">
+        🔔 Enable Reminders
+      </button>
+    </div>
     <div id="medList">Loading…</div>
 
     <!-- Scan medication label button -->
@@ -1343,6 +1367,113 @@
   }
 
   init();
+
+  // ── Push Notification / Medication Reminders ──────────────────────────────────
+  async function initReminders() {
+    if (!("serviceWorker" in navigator) || !("PushManager" in window)) {
+      document.getElementById("reminderBtn").style.display = "none";
+      return;
+    }
+    // Check current permission state and reflect in button
+    if (Notification.permission === "granted") {
+      const reg = await navigator.serviceWorker.ready;
+      const sub = await reg.pushManager.getSubscription();
+      if (sub) setReminderBtnActive(true);
+    }
+  }
+
+  function setReminderBtnActive(active) {
+    const btn = document.getElementById("reminderBtn");
+    if (active) {
+      btn.textContent = "🔔 Reminders On";
+      btn.style.background    = "#DCFCE7";
+      btn.style.borderColor   = "#16A34A";
+      btn.style.color         = "#15803D";
+    } else {
+      btn.textContent = "🔔 Enable Reminders";
+      btn.style.background    = "var(--bg)";
+      btn.style.borderColor   = "var(--border)";
+      btn.style.color         = "var(--navy)";
+    }
+  }
+
+  async function toggleReminders() {
+    if (!("serviceWorker" in navigator) || !("PushManager" in window)) {
+      showToast("Reminders not supported on this browser");
+      return;
+    }
+
+    const reg = await navigator.serviceWorker.ready;
+    const existing = await reg.pushManager.getSubscription();
+
+    if (existing) {
+      // Already subscribed — unsubscribe
+      await existing.unsubscribe();
+      await fetch("/api/push/unsubscribe", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ seniorId: SENIOR_ID }),
+      });
+      setReminderBtnActive(false);
+      showToast("Medication reminders turned off");
+      return;
+    }
+
+    // Request permission
+    const permission = await Notification.requestPermission();
+    if (permission !== "granted") {
+      showToast("Permission denied — reminders won't work");
+      return;
+    }
+
+    // Get VAPID public key from server
+    const keyRes  = await fetch("/api/push/key");
+    const keyData = await keyRes.json();
+    if (!keyData.publicKey) {
+      showToast("Push notifications not configured on server yet");
+      return;
+    }
+
+    // Subscribe
+    const sub = await reg.pushManager.subscribe({
+      userVisibleOnly: true,
+      applicationServerKey: urlBase64ToUint8Array(keyData.publicKey),
+    });
+
+    // Send subscription to server
+    await fetch("/api/push/subscribe", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        subscription:  sub.toJSON(),
+        seniorId:      SENIOR_ID,
+        deviceLabel:   navigator.userAgent.includes("iPhone") ? "iPhone" :
+                       navigator.userAgent.includes("iPad")   ? "iPad"   :
+                       navigator.userAgent.includes("Android")? "Android": "Browser",
+      }),
+    });
+
+    setReminderBtnActive(true);
+    showToast("✅ Reminders enabled! You'll be notified at medication times.");
+
+    // Send a test notification so they see it works
+    await fetch("/api/push/test", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ seniorId: SENIOR_ID }),
+    });
+  }
+
+  // Helper: convert VAPID base64url key to Uint8Array
+  function urlBase64ToUint8Array(base64String) {
+    const padding  = "=".repeat((4 - base64String.length % 4) % 4);
+    const base64   = (base64String + padding).replace(/-/g, "+").replace(/_/g, "/");
+    const rawData  = window.atob(base64);
+    return Uint8Array.from([...rawData].map(c => c.charCodeAt(0)));
+  }
+
+  // Init reminders state on page load
+  initReminders();
 </script>
 </body>
 </html>

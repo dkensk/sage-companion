@@ -1,0 +1,55 @@
+{
+  "name": "Sage Companion",
+  "short_name": "Sage",
+  "description": "Your personal AI companion — stay connected, healthy, and supported every day.",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#1E3A8A",
+  "theme_color": "#1E3A8A",
+  "orientation": "portrait-primary",
+  "scope": "/",
+  "lang": "en-US",
+  "icons": [
+    {
+      "src": "/icons/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/icons/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/icons/apple-touch-icon.png",
+      "sizes": "180x180",
+      "type": "image/png"
+    },
+    {
+      "src": "/icons/icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml"
+    }
+  ],
+  "shortcuts": [
+    {
+      "name": "Talk to Sage",
+      "short_name": "Talk",
+      "description": "Start a conversation with Sage",
+      "url": "/elder",
+      "icons": [{ "src": "/icons/icon-192.png", "sizes": "192x192" }]
+    },
+    {
+      "name": "Medications",
+      "short_name": "Meds",
+      "description": "View and log medications",
+      "url": "/elder#meds",
+      "icons": [{ "src": "/icons/icon-192.png", "sizes": "192x192" }]
+    }
+  ],
+  "categories": ["health", "medical", "lifestyle"],
+  "related_applications": [],
+  "prefer_related_applications": false
+}

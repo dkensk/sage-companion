@@ -170,3 +170,26 @@ FROM (VALUES
 WHERE NOT EXISTS (
   SELECT 1 FROM medications WHERE senior_id = '00000000-0000-0000-0000-000000000001'
 );
+
+-- ── Push Subscriptions (medication reminder notifications) ────────────────────
+CREATE TABLE IF NOT EXISTS push_subscriptions (
+  id               UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  senior_id        UUID NOT NULL REFERENCES seniors(id) ON DELETE CASCADE,
+  subscription_json TEXT NOT NULL,
+  device_label     TEXT,
+  created_at       TIMESTAMPTZ DEFAULT NOW(),
+  last_used        TIMESTAMPTZ DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS idx_push_subscriptions_senior ON push_subscriptions(senior_id);
+
+-- ── Reminder Snooze Log (track snoozed reminders to avoid re-sending) ─────────
+CREATE TABLE IF NOT EXISTS reminder_snooze (
+  id            UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  senior_id     UUID NOT NULL REFERENCES seniors(id) ON DELETE CASCADE,
+  medication_id UUID NOT NULL REFERENCES medications(id) ON DELETE CASCADE,
+  snoozed_until TIMESTAMPTZ NOT NULL,
+  created_at    TIMESTAMPTZ DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS idx_reminder_snooze_senior ON reminder_snooze(senior_id);
