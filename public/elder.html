@@ -863,6 +863,7 @@
   }
 
   async function sendMessage(text) {
+    unlockAudio(); // ensure audio is unlocked whenever a message is sent
     const input = document.getElementById("typeInput");
     const msg = text || input.value.trim();
     if (!msg) return;
@@ -1029,6 +1030,7 @@
   }
 
   function toggleVoice() {
+    unlockAudio(); // must run synchronously during the user gesture
     if (isListening) {
       // Manual stop — send whatever was captured
       clearTimeout(silenceTimer);
@@ -1072,6 +1074,34 @@
     const status = document.getElementById("listenStatus");
     status.style.display = "none";
     status.textContent   = "";
+  }
+
+  // ── Audio Unlock (iOS / Android autoplay policy) ──────────────────────────────
+  // Mobile browsers block audio until the user has tapped something.
+  // We call unlockAudio() synchronously inside any button tap so that
+  // subsequent async .play() calls are allowed.
+  let audioUnlocked = false;
+
+  function unlockAudio() {
+    if (audioUnlocked) return;
+    audioUnlocked = true;
+    // 1. Unlock the Web Audio context with a silent 1-sample buffer
+    try {
+      const ctx = new (window.AudioContext || window.webkitAudioContext)();
+      const buf = ctx.createBuffer(1, 1, 22050);
+      const src = ctx.createBufferSource();
+      src.buffer = buf;
+      src.connect(ctx.destination);
+      src.start(0);
+      ctx.resume();
+    } catch(e) {}
+    // 2. Play a tiny silent WAV to prime the iOS audio session
+    try {
+      const silence = new Audio(
+        "data:audio/wav;base64,UklGRigAAABXQVZFZm10IBIAAAABAAEARKwAAIhYAQACABAAAABkYXRhAgAAAAEA"
+      );
+      silence.play().catch(() => {});
+    } catch(e) {}
   }
 
   // ── TTS ───────────────────────────────────────────────────────────────────────
@@ -1134,21 +1164,40 @@
 
   function speakBrowser(text) {
     if (!window.speechSynthesis) return;
-    const utter = new SpeechSynthesisUtterance(text);
-    utter.rate = 0.85;
-    utter.pitch = 1.0;
+
+    function doSpeak(voices) {
+      const utter = new SpeechSynthesisUtterance(text);
+      utter.rate = 0.85;
+      utter.pitch = 1.0;
+      // Prefer natural-sounding voices; always fall back to any English voice
+      const pick =
+        voices.find(v => v.name.includes("Enhanced") && v.lang.startsWith("en")) ||
+        voices.find(v => v.name === "Samantha" && v.lang.startsWith("en")) ||
+        voices.find(v => (v.name.includes("Samantha") || v.name.includes("Karen") || v.name.includes("Serena")) && v.lang.startsWith("en")) ||
+        voices.find(v => v.lang.startsWith("en-US") && !v.name.toLowerCase().includes("google")) ||
+        voices.find(v => v.lang.startsWith("en"));
+      if (pick) utter.voice = pick;
+      window.speechSynthesis.cancel(); // clear any queued utterances first
+      window.speechSynthesis.speak(utter);
+    }
+
     const voices = window.speechSynthesis.getVoices();
-    // Prefer Enhanced voices (much more natural on Mac)
-    const pick =
-      voices.find(v => v.name.includes("Enhanced") && v.lang.startsWith("en")) ||
-      voices.find(v => v.name === "Samantha" && v.lang.startsWith("en")) ||
-      voices.find(v => (v.name.includes("Samantha") || v.name.includes("Karen") || v.name.includes("Serena")) && v.lang.startsWith("en")) ||
-      voices.find(v => v.lang.startsWith("en-US") && !v.name.toLowerCase().includes("google"));
-    if (pick) utter.voice = pick;
-    window.speechSynthesis.speak(utter);
+    if (voices.length > 0) {
+      doSpeak(voices);
+    } else {
+      // Mobile browsers load voices asynchronously — wait for them
+      window.speechSynthesis.addEventListener("voiceschanged", () => {
+        doSpeak(window.speechSynthesis.getVoices());
+      }, { once: true });
+      // Safety fallback: if voiceschanged never fires, try after 600ms
+      setTimeout(() => {
+        const v = window.speechSynthesis.getVoices();
+        if (!window.speechSynthesis.speaking) doSpeak(v.length ? v : []);
+      }, 600);
+    }
   }
 
-  // Trigger voice list load (browsers load voices async)
+  // Trigger async voice-list loading as early as possible
   if (window.speechSynthesis) window.speechSynthesis.getVoices();
 
   // ── Emergency ─────────────────────────────────────────────────────────────────
