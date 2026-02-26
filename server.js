@@ -454,13 +454,26 @@ ${weatherInfo ? `Current weather: ${weatherInfo}` : ""}`;
 // TEXT-TO-SPEECH (ElevenLabs)
 // ─────────────────────────────────────────────────────────────────────────────
 
+// Quick status check — hit /api/tts/status to confirm key is loaded
+app.get("/api/tts/status", (req, res) => {
+  const key = (process.env.ELEVENLABS_API_KEY || "").trim();
+  res.json({
+    configured: !!key,
+    keyPrefix: key ? key.slice(0, 8) + "…" : null,
+    voiceId: (process.env.ELEVENLABS_VOICE_ID || "21m00Tcm4TlvDq8ikWAM"),
+  });
+});
+
 app.post("/api/tts", async (req, res) => {
   const { text } = req.body;
   if (!text) return res.status(400).json({ error: "text required" });
 
   const apiKey  = (process.env.ELEVENLABS_API_KEY  || "").trim();
   const voiceId = (process.env.ELEVENLABS_VOICE_ID || "21m00Tcm4TlvDq8ikWAM").trim(); // Rachel — reliable free tier voice
-  if (!apiKey) return res.status(503).json({ error: "ElevenLabs not configured" });
+  if (!apiKey) {
+    console.warn("TTS: ELEVENLABS_API_KEY not set");
+    return res.status(503).json({ error: "ElevenLabs not configured" });
+  }
 
   const https   = require("https");
 
@@ -468,7 +481,7 @@ app.post("/api/tts", async (req, res) => {
   const tryVoice = (vid) => new Promise((resolve, reject) => {
     const payload = JSON.stringify({
       text: text.slice(0, 800),
-      model_id: "eleven_turbo_v2",
+      model_id: "eleven_flash_v2_5",
       voice_settings: { stability: 0.55, similarity_boost: 0.80, style: 0.10, use_speaker_boost: true },
     });
     const options = {

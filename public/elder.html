@@ -1176,9 +1176,14 @@
         currentAudio.onerror = () => { setSpeakingIndicator(false); speakBrowser(clean); };
         await currentAudio.play().catch(() => { setSpeakingIndicator(false); speakBrowser(clean); });
         return;
+      } else {
+        // Surface the error so we can see what's wrong
+        const err = await res.json().catch(() => ({ error: `HTTP ${res.status}` }));
+        console.warn("ElevenLabs TTS error:", res.status, err);
+        showToast(`Voice error (${res.status}): ${err.error || "unknown"}`);
       }
     } catch (e) {
-      // ElevenLabs not configured — fall through to browser TTS
+      console.warn("ElevenLabs TTS fetch failed:", e.message);
     }
 
     // Fallback: best available browser voice
