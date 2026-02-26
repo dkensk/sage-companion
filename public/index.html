@@ -109,11 +109,10 @@
       flex-direction: column;
       align-items: center;
       justify-content: center;
-      padding: 100px 24px 72px;
+      padding: 80px 48px 72px;
       background: linear-gradient(160deg, #0F172A 0%, #1B3480 50%, #0C5E58 100%);
       position: relative;
       overflow: hidden;
-      text-align: center;
     }
 
     .hero::before {
@@ -136,11 +135,74 @@
       pointer-events: none;
     }
 
-    .hero-inner {
+    .hero-layout {
       position: relative;
       z-index: 1;
-      max-width: 700px;
+      display: flex;
+      align-items: center;
+      gap: 60px;
+      max-width: 1080px;
       width: 100%;
+    }
+
+    .hero-inner {
+      flex: 1;
+      max-width: 500px;
+      width: 100%;
+    }
+
+    /* ── HERO PHOTO COLUMN ───────────────────────────────────────────── */
+    .hero-photo-col {
+      flex: 0 0 420px;
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+      position: relative;
+    }
+
+    .hero-photo-main {
+      width: 100%;
+      height: 340px;
+      object-fit: cover;
+      border-radius: 28px;
+      box-shadow: 0 28px 80px rgba(0,0,0,0.55);
+      border: 3px solid rgba(255,255,255,0.13);
+      display: block;
+    }
+
+    .hero-photo-secondary {
+      width: 72%;
+      height: 190px;
+      object-fit: cover;
+      border-radius: 20px;
+      box-shadow: 0 16px 48px rgba(0,0,0,0.45);
+      border: 3px solid rgba(255,255,255,0.13);
+      display: block;
+      align-self: flex-end;
+      margin-top: -48px;
+    }
+
+    .hero-photo-tag {
+      position: absolute;
+      bottom: 24px;
+      left: 16px;
+      background: rgba(15, 23, 42, 0.88);
+      backdrop-filter: blur(12px);
+      border: 1px solid rgba(255,255,255,0.14);
+      color: white;
+      font-size: 12px;
+      font-weight: 700;
+      padding: 8px 14px;
+      border-radius: 100px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .hero-photo-tag-dot {
+      width: 7px; height: 7px;
+      border-radius: 50%;
+      background: #4ADE80;
+      box-shadow: 0 0 8px rgba(74,222,128,0.8);
     }
 
     .hero-badge {
@@ -192,13 +254,11 @@
     }
 
     .hero-sub {
-      font-size: clamp(17px, 2.5vw, 21px);
+      font-size: clamp(16px, 2vw, 20px);
       color: rgba(255,255,255,0.68);
       line-height: 1.65;
-      margin-bottom: 52px;
-      max-width: 520px;
-      margin-left: auto;
-      margin-right: auto;
+      margin-bottom: 40px;
+      max-width: 460px;
       animation: fadeUp 0.7s var(--ease) 0.35s both;
     }
 
@@ -206,8 +266,8 @@
       display: flex;
       flex-direction: column;
       gap: 14px;
-      max-width: 420px;
-      margin: 0 auto 52px;
+      max-width: 400px;
+      margin: 0 0 44px;
       animation: fadeUp 0.7s var(--ease) 0.5s both;
     }
 
@@ -250,7 +310,7 @@
     .hero-trust {
       display: flex;
       align-items: center;
-      justify-content: center;
+      justify-content: flex-start;
       gap: 28px;
       animation: fadeUp 0.7s var(--ease) 0.65s both;
     }
@@ -743,6 +803,14 @@
     .reveal-delay-4 { transition-delay: 0.4s; }
 
     /* ── RESPONSIVE ─────────────────────────────────────────────────── */
+    @media (max-width: 1000px) {
+      .hero { padding: 80px 32px 64px; }
+      .hero-layout { gap: 36px; }
+      .hero-photo-col { flex: 0 0 340px; }
+      .hero-photo-main { height: 280px; }
+      .hero-photo-secondary { height: 160px; }
+    }
+
     @media (max-width: 860px) {
       .feature-grid { grid-template-columns: 1fr 1fr; }
       .quotes       { grid-template-columns: 1fr; }
@@ -752,6 +820,18 @@
       .photo-strip  { grid-template-columns: 1fr 1fr; }
       .photo-strip-card:first-child { transform: none; grid-column: 1 / -1; }
       .photo-strip-card:first-child img { height: 220px; }
+      /* hero stacks vertically on tablet */
+      .hero { padding: 100px 28px 56px; }
+      .hero-layout { flex-direction: column; gap: 40px; text-align: center; }
+      .hero-inner { max-width: 580px; }
+      .hero-sub { margin-left: auto; margin-right: auto; }
+      .hero-btns { margin: 0 auto 44px; }
+      .hero-trust { justify-content: center; }
+      /* photos go side by side under text */
+      .hero-photo-col { flex: none; width: 100%; max-width: 560px; flex-direction: row; align-self: center; }
+      .hero-photo-main { flex: 1; height: 220px; border-radius: 20px; }
+      .hero-photo-secondary { width: 44%; flex: none; height: 180px; align-self: flex-end; margin-top: 0; border-radius: 16px; }
+      .hero-photo-tag { bottom: 12px; left: 12px; font-size: 11px; }
     }
 
     @media (max-width: 560px) {
@@ -762,6 +842,9 @@
       .cta-btns     { flex-direction: column; align-items: center; }
       .audience-card { padding: 32px 24px; }
       .footer-inner { flex-direction: column; align-items: center; text-align: center; }
+      /* on small phones, photo col stacks */
+      .hero-photo-col { flex-direction: column; }
+      .hero-photo-secondary { width: 70%; align-self: flex-end; margin-top: -32px; height: 160px; }
     }
   </style>
   <script>
@@ -781,8 +864,8 @@
     <span class="nav-logo-text">Sage Companion</span>
   </a>
   <div class="nav-links">
-    <a href="#features" class="nav-link">Features</a>
     <a href="#how-it-works" class="nav-link">How It Works</a>
+    <a href="#features" class="nav-link">Features</a>
     <a href="#faq" class="nav-link">FAQ</a>
     <a href="#" onclick="goSenior(); return false;" class="nav-cta">Get Started</a>
   </div>
@@ -791,42 +874,67 @@
 <!-- ── HERO ─────────────────────────────────────────────────────────── -->
 <section class="hero">
   <div class="hero-glow"></div>
-  <div class="hero-inner">
-    <div class="hero-badge">
-      <div class="badge-dot"></div>
-      Now available — free to try
+  <div class="hero-layout">
+
+    <!-- LEFT: text content -->
+    <div class="hero-inner">
+      <div class="hero-badge">
+        <div class="badge-dot"></div>
+        Now available — free to try
+      </div>
+
+      <h1>Your loved one,<br><em>always supported.</em></h1>
+
+      <p class="hero-sub">
+        Sage is a caring AI companion that keeps seniors engaged, safe, and connected — while giving families real-time peace of mind, 24 hours a day.
+      </p>
+
+      <div class="hero-btns">
+        <button onclick="goSenior()" class="btn btn-primary">
+          <span class="btn-icon">👵</span>
+          <span class="btn-text">
+            <span class="btn-label">I'm the senior</span>
+            <span class="btn-sub">Start talking to Sage</span>
+          </span>
+        </button>
+        <a href="/family" class="btn btn-secondary">
+          <span class="btn-icon">👨‍👩‍👧</span>
+          <span class="btn-text">
+            <span class="btn-label">I'm a family member</span>
+            <span class="btn-sub">Open the family dashboard</span>
+          </span>
+        </a>
+      </div>
+
+      <div class="hero-trust">
+        <div class="trust-item"><strong>24/7</strong>Always available</div>
+        <div class="trust-divider"></div>
+        <div class="trust-item"><strong>100%</strong>Private & secure</div>
+        <div class="trust-divider"></div>
+        <div class="trust-item"><strong>Real-time</strong>Family alerts</div>
+      </div>
     </div>
 
-    <h1>Your loved one,<br><em>always supported.</em></h1>
-
-    <p class="hero-sub">
-      Sage is a caring AI companion that keeps seniors engaged, safe, and on track — while giving families real-time peace of mind, 24 hours a day.
-    </p>
-
-    <div class="hero-btns">
-      <button onclick="goSenior()" class="btn btn-primary">
-        <span class="btn-icon">👵</span>
-        <span class="btn-text">
-          <span class="btn-label">I'm the senior</span>
-          <span class="btn-sub">Start talking to Sage</span>
-        </span>
-      </button>
-      <a href="/family" class="btn btn-secondary">
-        <span class="btn-icon">👨‍👩‍👧</span>
-        <span class="btn-text">
-          <span class="btn-label">I'm a family member</span>
-          <span class="btn-sub">Open the family dashboard</span>
-        </span>
-      </a>
+    <!-- RIGHT: emotional photos -->
+    <div class="hero-photo-col">
+      <img
+        class="hero-photo-main"
+        src="https://images.unsplash.com/photo-1574269909862-7e1d70bb8078?auto=format&fit=crop&w=800&q=85"
+        alt="Grandmother laughing and playing with her granddaughter"
+        loading="eager"
+      />
+      <img
+        class="hero-photo-secondary"
+        src="https://images.unsplash.com/photo-1529156069898-49953e39b3ac?auto=format&fit=crop&w=600&q=80"
+        alt="Adult family spending time with their elderly parent"
+        loading="lazy"
+      />
+      <div class="hero-photo-tag">
+        <div class="hero-photo-tag-dot"></div>
+        Families feel the difference
+      </div>
     </div>
 
-    <div class="hero-trust">
-      <div class="trust-item"><strong>24/7</strong>Always available</div>
-      <div class="trust-divider"></div>
-      <div class="trust-item"><strong>100%</strong>Private & secure</div>
-      <div class="trust-divider"></div>
-      <div class="trust-item"><strong>Real-time</strong>Family alerts</div>
-    </div>
   </div>
 </section>
 
