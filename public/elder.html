@@ -793,7 +793,12 @@
     if (!sessionStorage.getItem("sageGreeted")) {
       setTimeout(() => {
         addBubble("assistant", `Good ${part}, ${seniorName}! I'm Sage, your AI companion. You can tap the button to talk, or type below. How are you feeling today?`);
-        speak(`Good ${part}, ${seniorName}. I'm Sage. How are you feeling today?`);
+        // Only speak the greeting if audio is already unlocked (user tapped
+        // something before the 700ms delay). Otherwise the utterance gets
+        // silently queued by iOS and replays later when user taps Talk.
+        if (audioUnlocked) {
+          speak(`Good ${part}, ${seniorName}. I'm Sage. How are you feeling today?`);
+        }
         sessionStorage.setItem("sageGreeted", "1");
       }, 700);
     }
@@ -1112,9 +1117,14 @@
     //    all future async speak() calls in this session.
     try {
       if (window.speechSynthesis) {
+        // Cancel first to flush any queued-but-blocked utterances (e.g. the
+        // greeting that was silently queued before the user tapped anything)
+        window.speechSynthesis.cancel();
         const warmup = new SpeechSynthesisUtterance(" ");
         warmup.volume = 0;
         window.speechSynthesis.speak(warmup);
+        // Cancel again shortly after to clear the warmup + any stale queue
+        setTimeout(() => window.speechSynthesis.cancel(), 150);
       }
     } catch(e) {}
   }
