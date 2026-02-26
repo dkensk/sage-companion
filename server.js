@@ -1156,6 +1156,36 @@ app.post("/api/push/test", async (req, res) => {
 });
 
 // ─────────────────────────────────────────────────────────────────────────────
+// UNSPLASH PHOTO RESOLVER  (public — no API key needed via oembed)
+// ─────────────────────────────────────────────────────────────────────────────
+const unsplashCache = new Map(); // cache resolved URLs for the process lifetime
+
+app.get("/api/unsplash/:photoId", async (req, res) => {
+  const { photoId } = req.params;
+  const w = parseInt(req.query.w) || 800;
+
+  // Serve from in-process cache to avoid hammering oembed
+  const cacheKey = `${photoId}-${w}`;
+  if (unsplashCache.has(cacheKey)) {
+    return res.json({ url: unsplashCache.get(cacheKey) });
+  }
+
+  try {
+    const oembedUrl = `https://oembed.unsplash.com/?url=https://unsplash.com/photos/${photoId}`;
+    const r = await fetch(oembedUrl);
+    if (!r.ok) return res.status(404).json({ error: "photo not found" });
+    const data = await r.json();
+    const base = data.thumbnail_url && data.thumbnail_url.split("?")[0];
+    if (!base) return res.status(404).json({ error: "no cdn url" });
+    const final = `${base}?auto=format&fit=crop&w=${w}&q=85`;
+    unsplashCache.set(cacheKey, final);
+    res.json({ url: final });
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
 // STATIC ROUTES
 // ─────────────────────────────────────────────────────────────────────────────
 app.get("/elder",    (req, res) => res.sendFile(path.join(__dirname, "public", "elder.html")));

@@ -789,6 +789,12 @@
       box-shadow: 0 8px 32px rgba(0,0,0,0.25);
     }
 
+    /* ── UNSPLASH PLACEHOLDER ───────────────────────────────────────── */
+    img[data-unsplash-id] {
+      background: linear-gradient(135deg, #1a2f6b 0%, #0d4f4a 100%);
+      min-height: 40px;
+    }
+
     /* ── ANIMATIONS ─────────────────────────────────────────────────── */
     @keyframes fadeUp {
       from { opacity: 0; transform: translateY(20px); }
@@ -919,17 +925,17 @@
     <div class="hero-photo-col">
       <img
         class="hero-photo-main"
-        src="https://images.unsplash.com/photo-kFcuTltqEjc?auto=format&fit=crop&crop=faces&w=800&q=85"
+        data-unsplash-id="kFcuTltqEjc"
+        data-unsplash-w="800"
         alt="Grandfather and grandson sharing a warm hug"
         loading="eager"
-        onerror="this.onerror=null;this.src='https://images.unsplash.com/photo-iV9F0sHl7OU?auto=format&fit=crop&w=800&q=85'"
       />
       <img
         class="hero-photo-secondary"
-        src="https://images.unsplash.com/photo-uwviieUXDuo?auto=format&fit=crop&crop=faces&w=600&q=80"
+        data-unsplash-id="uwviieUXDuo"
+        data-unsplash-w="600"
         alt="Multi-generational family smiling together outdoors"
         loading="lazy"
-        onerror="this.onerror=null;this.src='https://images.unsplash.com/photo-muwtmNCFhLM?auto=format&fit=crop&w=600&q=80'"
       />
       <div class="hero-photo-tag">
         <div class="hero-photo-tag-dot"></div>
@@ -946,12 +952,8 @@
 
     <!-- Four generations of a family -->
     <div class="photo-strip-card reveal">
-      <img
-        src="https://images.unsplash.com/photo-Igz9FOy54oY?auto=format&fit=crop&crop=faces&w=800&q=80"
-        alt="Four generations of a family together"
-        loading="lazy"
-        onerror="this.onerror=null;this.src='https://images.unsplash.com/photo-muwtmNCFhLM?auto=format&fit=crop&w=800&q=80'"
-      />
+      <img data-unsplash-id="Igz9FOy54oY" data-unsplash-w="800"
+           alt="Four generations of a family together" loading="lazy" />
       <div class="photo-strip-overlay">
         <div class="photo-strip-caption">Four generations, one family.</div>
       </div>
@@ -959,12 +961,8 @@
 
     <!-- Elderly couple smiling together -->
     <div class="photo-strip-card reveal reveal-delay-1">
-      <img
-        src="https://images.unsplash.com/photo-hZ8bAA8CjcA?auto=format&fit=crop&crop=faces&w=600&q=80"
-        alt="Elderly couple smiling warmly together"
-        loading="lazy"
-        onerror="this.onerror=null;this.src='https://images.unsplash.com/photo-iV9F0sHl7OU?auto=format&fit=crop&w=600&q=80'"
-      />
+      <img data-unsplash-id="hZ8bAA8CjcA" data-unsplash-w="600"
+           alt="Elderly couple smiling warmly together" loading="lazy" />
       <div class="photo-strip-overlay">
         <div class="photo-strip-caption">Independent, happy, supported.</div>
       </div>
@@ -972,12 +970,8 @@
 
     <!-- Older woman holding great-grandchild -->
     <div class="photo-strip-card reveal reveal-delay-2">
-      <img
-        src="https://images.unsplash.com/photo-m3ypbJjvXks?auto=format&fit=crop&crop=faces&w=600&q=80"
-        alt="Great-grandmother holding her grandchild — generations of love"
-        loading="lazy"
-        onerror="this.onerror=null;this.src='https://images.unsplash.com/photo-kFcuTltqEjc?auto=format&fit=crop&w=600&q=80'"
-      />
+      <img data-unsplash-id="m3ypbJjvXks" data-unsplash-w="600"
+           alt="Great-grandmother holding her grandchild — generations of love" loading="lazy" />
       <div class="photo-strip-overlay">
         <div class="photo-strip-caption">Making every moment count.</div>
       </div>
@@ -1069,10 +1063,10 @@
       <div class="audience-card audience-senior reveal reveal-delay-1">
         <img
           class="audience-photo"
-          src="https://images.unsplash.com/photo-iV9F0sHl7OU?auto=format&fit=crop&crop=faces&w=600&q=80"
+          data-unsplash-id="iV9F0sHl7OU"
+          data-unsplash-w="600"
           alt="Elderly couple smiling warmly together at home"
           loading="lazy"
-          onerror="this.onerror=null;this.src='https://images.unsplash.com/photo-hZ8bAA8CjcA?auto=format&fit=crop&w=600&q=80'"
         />
         <div class="audience-icon">👵</div>
         <div class="audience-title">For Seniors</div>
@@ -1092,10 +1086,10 @@
       <div class="audience-card audience-family reveal reveal-delay-2">
         <img
           class="audience-photo"
-          src="https://images.unsplash.com/photo-muwtmNCFhLM?auto=format&fit=crop&crop=faces&w=600&q=80"
+          data-unsplash-id="muwtmNCFhLM"
+          data-unsplash-w="600"
           alt="Multi-generational family with grandfather, smiling together"
           loading="lazy"
-          onerror="this.onerror=null;this.src='https://images.unsplash.com/photo-uwviieUXDuo?auto=format&fit=crop&w=600&q=80'"
         />
         <div class="audience-icon">👨‍👩‍👧</div>
         <div class="audience-title">For Families</div>
@@ -1266,6 +1260,26 @@
   }, { threshold: 0.12 });
 
   document.querySelectorAll(".reveal").forEach(el => observer.observe(el));
+
+  // ── Load Unsplash photos via server-side oembed resolver ──────────────────
+  async function loadUnsplashImages() {
+    const imgs = document.querySelectorAll("img[data-unsplash-id]");
+    await Promise.all([...imgs].map(async (img) => {
+      const id = img.dataset.unsplashId;
+      const w  = img.dataset.unsplashW || 800;
+      try {
+        const res  = await fetch(`/api/unsplash/${id}?w=${w}`);
+        const data = await res.json();
+        if (data.url) {
+          img.src = data.url;
+          img.style.background = "none";
+        }
+      } catch (e) {
+        // keep gradient placeholder — don't break the page
+      }
+    }));
+  }
+  loadUnsplashImages();
 </script>
 </body>
 </html>
