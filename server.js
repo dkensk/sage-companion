@@ -338,7 +338,7 @@ app.post("/api/emergency", async (req, res) => {
 
 app.post("/api/chat", async (req, res) => {
   try {
-    const { seniorId, message, sessionId } = req.body;
+    const { seniorId, message, sessionId, clientTime, timezone, location } = req.body;
     if (!message) return res.status(400).json({ error: "Message required" });
     const effectiveSeniorId = seniorId || DEMO_SENIOR_ID;
 
@@ -360,6 +360,23 @@ app.post("/api/chat", async (req, res) => {
     const { data: historyRows } = await supabase.from("conversations").select("role, content")
       .eq("senior_id", effectiveSeniorId).order("timestamp", { ascending: false }).limit(20);
     const recentHistory = (historyRows || []).reverse();
+
+    // Fetch weather if location provided and message seems weather-related
+    let weatherInfo = null;
+    const weatherKeywords = /weather|temperature|outside|warm|cold|rain|sunny|snow|hot|degrees|forecast/i;
+    if (location && weatherKeywords.test(message)) {
+      try {
+        weatherInfo = await new Promise((resolve) => {
+          const https = require("https");
+          const city  = encodeURIComponent(location);
+          https.get(`https://wttr.in/${city}?format=3`, (r) => {
+            let data = "";
+            r.on("data", d => data += d);
+            r.on("end", () => resolve(data.trim()));
+          }).on("error", () => resolve(null));
+        });
+      } catch { weatherInfo = null; }
+    }
 
     const messages = [
       ...recentHistory.map(h => ({ role: h.role, content: h.content })),
@@ -397,8 +414,10 @@ For true emergencies like chest pain, difficulty breathing, or a fall: Always sa
 Today's medication status:
 ${medSummary || "No medications scheduled today"}
 
-Current time: ${new Date().toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit" })}
-Today: ${new Date().toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric" })}`;
+Current time: ${clientTime || new Date().toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit" })}
+Today: ${timezone ? new Date().toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric", timeZone: timezone }) : new Date().toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric" })}
+${location ? `User's location: ${location}` : ""}
+${weatherInfo ? `Current weather: ${weatherInfo}` : ""}`;
 
     const response = await anthropic.messages.create({
       model: "claude-opus-4-5-20251101",
