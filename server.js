@@ -443,7 +443,7 @@ app.post("/api/tts", async (req, res) => {
   const voiceId = process.env.ELEVENLABS_VOICE_ID || "9BWtsMINqrJLrRacOk9x";
   const https   = require("https");
   const payload = JSON.stringify({
-    text: text.slice(0, 800), model_id: "eleven_turbo_v2_5",
+    text: text.slice(0, 800), model_id: "eleven_turbo_v2",
     voice_settings: { stability: 0.55, similarity_boost: 0.80, style: 0.20, use_speaker_boost: true },
   });
   const options = {
