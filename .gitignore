@@ -1,0 +1,18 @@
+# Dependencies
+node_modules/
+
+# Environment variables — NEVER commit these (contains API keys)
+.env
+
+# Database files (auto-generated at runtime)
+data/
+
+# macOS
+.DS_Store
+
+# Logs
+*.log
+npm-debug.log*
+
+# Runtime
+.npm

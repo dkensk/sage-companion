@@ -1,0 +1,604 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>Sage — My Calendar</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    :root {
+      --navy:   #1E3A8A; --teal:  #0F766E; --green: #16A34A;
+      --red:    #DC2626; --bg:    #F1F5F9; --white: #FFFFFF;
+      --text:   #0F172A; --muted: #64748B; --border:#E2E8F0;
+      --ease:   cubic-bezier(0.25, 0.46, 0.45, 0.94);
+      --shadow: 0 2px 12px rgba(0,0,0,0.07), 0 1px 3px rgba(0,0,0,0.05);
+      --shadow-lg: 0 8px 32px rgba(0,0,0,0.12);
+    }
+    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif; background: var(--bg); color: var(--text); min-height: 100vh; -webkit-font-smoothing: antialiased; padding-bottom: 40px; font-size: 18px; }
+
+    /* HEADER */
+    header { background: linear-gradient(135deg, #1E3A8A 0%, #2D4EAA 100%); color: white; padding: 20px 24px 24px; display: flex; align-items: center; justify-content: space-between; position: sticky; top: 0; z-index: 100; box-shadow: 0 2px 16px rgba(30,58,138,0.25); }
+    .logo { font-size: 22px; font-weight: 900; display: flex; align-items: center; gap: 8px; }
+    .header-sub { font-size: 14px; opacity: 0.8; margin-top: 2px; }
+    .home-btn {
+      background: rgba(255,255,255,0.18);
+      border: 2px solid rgba(255,255,255,0.35);
+      color: white;
+      font-size: 17px;
+      font-weight: 700;
+      text-decoration: none;
+      padding: 11px 18px;
+      border-radius: 14px;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      white-space: nowrap;
+      transition: background 0.15s;
+      -webkit-tap-highlight-color: transparent;
+    }
+    .home-btn:hover { background: rgba(255,255,255,0.28); }
+
+    /* MAIN */
+    .main { padding: 20px 18px; max-width: 620px; margin: 0 auto; }
+
+    /* CARDS */
+    .card { background: var(--white); border-radius: 20px; padding: 22px 20px; margin-bottom: 16px; box-shadow: var(--shadow); opacity: 0; transform: translateY(14px); animation: fadeUp 0.45s var(--ease) forwards; }
+    .card:nth-child(1){animation-delay:.05s} .card:nth-child(2){animation-delay:.12s}
+    .card:nth-child(3){animation-delay:.19s} .card:nth-child(4){animation-delay:.26s}
+    .card:nth-child(5){animation-delay:.33s}
+    @keyframes fadeUp { to { opacity:1; transform:translateY(0); } }
+    .section-title { font-size:15px; font-weight:700; color:var(--muted); letter-spacing:.05em; text-transform:uppercase; margin-bottom:16px; }
+
+    /* BIG ACTION BUTTONS */
+    .action-btn-big {
+      width: 100%; border: none; border-radius: 16px; padding: 22px 16px;
+      font-size: 19px; font-weight: 800; letter-spacing: 1px; cursor: pointer;
+      display: flex; flex-direction: column; align-items: center; gap: 8px;
+      transition: transform 0.15s var(--ease), box-shadow 0.15s;
+      -webkit-tap-highlight-color: transparent; color: white; margin-bottom: 12px;
+    }
+    .action-btn-big:active { transform: scale(0.97); }
+    .action-btn-big .btn-icon { font-size: 36px; line-height: 1; }
+    .action-btn-big .btn-sub { font-size: 14px; opacity: 0.85; font-weight: 600; letter-spacing: 0; }
+
+    .btn-voice { background: linear-gradient(145deg, var(--navy), #2D4EAA); box-shadow: 0 4px 18px rgba(30,58,138,0.35); }
+    .btn-voice.listening { background: linear-gradient(145deg, var(--teal), #0D9488); box-shadow: 0 4px 24px rgba(15,118,110,0.45); animation: pulse 1.5s ease-in-out infinite; }
+    .btn-scan { background: linear-gradient(145deg, #7C3AED, #6D28D9); box-shadow: 0 4px 18px rgba(124,58,237,0.35); }
+    @keyframes pulse { 0%,100%{box-shadow:0 4px 18px rgba(15,118,110,0.4)} 50%{box-shadow:0 4px 36px rgba(15,118,110,0.65), 0 0 0 8px rgba(15,118,110,0.1)} }
+
+    /* LIVE STATUS */
+    .live-status { display:none; background:#F0FDF4; border:1.5px solid #BBF7D0; border-radius:12px; padding:13px 16px; font-size:17px; color:var(--muted); font-style:italic; line-height:1.5; margin-bottom:12px; }
+
+    /* CONFIRM CARD */
+    .confirm-box { background:#EFF6FF; border:1.5px solid #BFDBFE; border-radius:14px; padding:18px; margin-bottom:12px; display:none; }
+    .confirm-box .confirm-title { font-size:17px; font-weight:700; color:var(--navy); margin-bottom:6px; }
+    .confirm-box .confirm-detail { font-size:16px; color:var(--muted); line-height:1.6; margin-bottom:14px; }
+    .confirm-btns { display:flex; gap:10px; }
+    .confirm-btns button { flex:1; padding:13px; border:none; border-radius:11px; font-size:17px; font-weight:700; cursor:pointer; transition:transform 0.15s; -webkit-tap-highlight-color:transparent; }
+    .confirm-btns button:active { transform:scale(0.96); }
+    .btn-confirm { background:var(--green); color:white; }
+    .btn-retry { background:var(--bg); color:var(--muted); border:2px solid var(--border) !important; }
+
+    /* OCR RESULTS */
+    .ocr-event { display:flex; align-items:flex-start; gap:12px; padding:12px 0; border-bottom:1px solid var(--border); }
+    .ocr-event:last-child { border-bottom:none; }
+    .ocr-check { width:28px; height:28px; border-radius:50%; border:2px solid var(--border); background:white; cursor:pointer; display:flex; align-items:center; justify-content:center; font-size:14px; flex-shrink:0; margin-top:2px; transition:background 0.15s, border-color 0.15s; }
+    .ocr-check.checked { background:var(--navy); border-color:var(--navy); color:white; }
+    .ocr-event-info { flex:1; }
+    .ocr-event-title { font-size:17px; font-weight:700; }
+    .ocr-event-meta { font-size:15px; color:var(--muted); margin-top:2px; }
+
+    /* APPOINTMENTS LIST */
+    .day-group { margin-bottom:18px; }
+    .day-label { font-size:13px; font-weight:800; color:var(--muted); text-transform:uppercase; letter-spacing:.06em; margin-bottom:8px; padding: 0 2px; }
+    .day-label.today { color:var(--navy); }
+
+    .appt-item { display:flex; align-items:flex-start; gap:14px; padding:14px 16px; background:var(--bg); border-radius:14px; margin-bottom:8px; position:relative; }
+    .appt-item.is-today { background:#EFF6FF; border-left:3px solid var(--navy); }
+    .appt-time { font-size:15px; font-weight:700; color:var(--navy); min-width:60px; margin-top:2px; }
+    .appt-time.no-time { color:var(--muted); font-weight:600; }
+    .appt-info { flex:1; }
+    .appt-title { font-size:19px; font-weight:700; line-height:1.3; }
+    .appt-meta { font-size:14px; color:var(--muted); margin-top:3px; }
+    .appt-del { background:none; border:none; color:var(--muted); font-size:20px; cursor:pointer; padding:4px 6px; border-radius:6px; transition:color 0.15s; flex-shrink:0; }
+    .appt-del:hover { color:var(--red); }
+
+    .empty-msg { color:var(--muted); font-size:17px; font-style:italic; padding:8px 0; }
+
+    /* SYNC BUTTONS */
+    .sync-btn {
+      width:100%; display:flex; align-items:center; gap:14px;
+      padding:16px 18px; border-radius:14px; border:2px solid var(--border);
+      background:white; font-size:17px; font-weight:700; cursor:pointer;
+      transition:border-color 0.15s, box-shadow 0.15s, transform 0.15s;
+      margin-bottom:10px; -webkit-tap-highlight-color:transparent; text-align:left;
+    }
+    .sync-btn:hover { border-color:var(--navy); box-shadow:var(--shadow-lg); }
+    .sync-btn:active { transform:scale(0.98); }
+    .sync-btn .sync-icon { font-size:28px; flex-shrink:0; }
+    .sync-btn .sync-text { flex:1; }
+    .sync-btn .sync-label { font-size:17px; font-weight:700; }
+    .sync-btn .sync-sub { font-size:14px; color:var(--muted); font-weight:500; margin-top:2px; }
+    .sync-btn .sync-status { font-size:13px; font-weight:700; padding:4px 10px; border-radius:8px; }
+    .status-connected { background:#DCFCE7; color:var(--green); }
+    .status-disconnected { background:#F1F5F9; color:var(--muted); }
+
+    /* IMAGE UPLOAD */
+    #cameraInput { display:none; }
+
+    /* TOAST */
+    #toast { position:fixed; top:24px; left:50%; transform:translateX(-50%) translateY(-8px); background:#0F172A; color:white; padding:12px 22px; border-radius:100px; font-size:16px; font-weight:600; opacity:0; transition:opacity 0.25s var(--ease), transform 0.25s var(--ease); z-index:999; pointer-events:none; white-space:nowrap; }
+    #toast.show { opacity:1; transform:translateX(-50%) translateY(0); }
+
+    /* LOADING SPINNER */
+    .spinner { display:inline-block; width:20px; height:20px; border:3px solid rgba(255,255,255,0.3); border-top-color:white; border-radius:50%; animation:spin 0.8s linear infinite; vertical-align:middle; margin-right:8px; }
+    @keyframes spin { to { transform:rotate(360deg); } }
+  </style>
+</head>
+<body>
+
+<header>
+  <div>
+    <div class="logo">📅 My Calendar</div>
+    <div class="header-sub">Appointments &amp; reminders</div>
+  </div>
+  <a href="/elder" class="home-btn">🏠 Home</a>
+</header>
+
+<div class="main">
+
+  <!-- Add by voice -->
+  <div class="card">
+    <div class="section-title">Add an Appointment</div>
+
+    <button id="voiceBtn" class="action-btn-big btn-voice" onclick="toggleVoice()">
+      <span class="btn-icon" id="voiceBtnIcon">🎙️</span>
+      <span id="voiceBtnLabel">TAP TO SPEAK AN APPOINTMENT</span>
+      <span class="btn-sub" id="voiceBtnSub">Say something like "Doctor on Thursday at 2pm"</span>
+    </button>
+
+    <div class="live-status" id="voiceStatus">Listening…</div>
+
+    <!-- Confirm what was heard -->
+    <div class="confirm-box" id="voiceConfirm">
+      <div class="confirm-title">I heard this appointment:</div>
+      <div class="confirm-detail" id="voiceConfirmDetail"></div>
+      <div class="confirm-btns">
+        <button class="btn-confirm" onclick="saveVoiceAppointment()">Yes, save it</button>
+        <button class="btn-retry" onclick="retryVoice()">Try again</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Scan paper calendar -->
+  <div class="card">
+    <div class="section-title">Scan a Paper Calendar</div>
+
+    <button class="action-btn-big btn-scan" onclick="document.getElementById('cameraInput').click()">
+      <span class="btn-icon">📷</span>
+      <span id="scanLabel">TAKE A PHOTO OF YOUR CALENDAR</span>
+      <span class="btn-sub">Sage will read it and add your appointments</span>
+    </button>
+    <input type="file" id="cameraInput" accept="image/*" capture="environment" onchange="handleScan(this)" />
+
+    <!-- OCR results -->
+    <div id="ocrResults" style="display:none;">
+      <div class="section-title" style="margin-top:16px;">Found these appointments — tap the ones to save:</div>
+      <div id="ocrEventList"></div>
+      <div style="display:flex;gap:10px;margin-top:14px;">
+        <button onclick="saveCheckedOcr()" style="flex:1;background:var(--navy);color:white;border:none;border-radius:12px;padding:14px;font-size:17px;font-weight:700;cursor:pointer;">Save Selected</button>
+        <button onclick="dismissOcr()" style="flex:1;background:var(--bg);color:var(--muted);border:2px solid var(--border);border-radius:12px;padding:14px;font-size:17px;font-weight:600;cursor:pointer;">Cancel</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Upcoming appointments -->
+  <div class="card">
+    <div class="section-title">Upcoming Appointments</div>
+    <div id="apptList">Loading…</div>
+  </div>
+
+  <!-- Calendar sync -->
+  <div class="card">
+    <div class="section-title">Sync Your Calendars</div>
+
+    <!-- Google Calendar -->
+    <button class="sync-btn" id="googleBtn" onclick="handleGoogleSync()">
+      <span class="sync-icon">🗓️</span>
+      <span class="sync-text">
+        <div class="sync-label">Google Calendar</div>
+        <div class="sync-sub" id="googleSub">Connect to sync your appointments both ways</div>
+      </span>
+      <span class="sync-status" id="googleStatus">—</span>
+    </button>
+
+    <!-- Apple Calendar -->
+    <button class="sync-btn" onclick="subscribeApple()">
+      <span class="sync-icon"></span>
+      <span class="sync-text">
+        <div class="sync-label">Apple Calendar</div>
+        <div class="sync-sub">Subscribe so your appointments appear on your iPhone &amp; Mac</div>
+      </span>
+      <span class="sync-status status-disconnected">Subscribe</span>
+    </button>
+  </div>
+
+</div>
+
+<div id="toast"></div>
+
+<script>
+  const SENIOR_ID = "senior_margaret_001";
+  let voiceRec       = null;
+  let voiceListening = false;
+  let voiceFinal     = "";
+  let voiceSilence   = null;
+  let parsedAppt     = null;
+  let ocrEvents      = [];
+
+  // ── Init ────────────────────────────────────────────────────────────────────
+  async function init() {
+    setupVoice();
+    await loadAppointments();
+    await checkGoogleStatus();
+    // Handle redirect from Google OAuth
+    const params = new URLSearchParams(window.location.search);
+    if (params.get("google") === "connected") {
+      showToast("Google Calendar connected!");
+      await syncGoogle();
+      history.replaceState({}, "", "/calendar");
+    }
+  }
+
+  // ── Load Appointments ───────────────────────────────────────────────────────
+  async function loadAppointments() {
+    const res   = await fetch(`/api/appointments/${SENIOR_ID}`);
+    const appts = await res.json();
+    renderAppointments(appts);
+  }
+
+  function renderAppointments(appts) {
+    const el = document.getElementById("apptList");
+    const now = new Date();
+    const todayStr = now.toISOString().split("T")[0];
+
+    // Only show from today forward
+    const upcoming = appts.filter(a => a.date >= todayStr);
+
+    if (upcoming.length === 0) {
+      el.innerHTML = `<div class="empty-msg">No upcoming appointments. Add one by voice or scan your calendar!</div>`;
+      return;
+    }
+
+    // Group by date
+    const groups = {};
+    for (const a of upcoming) {
+      if (!groups[a.date]) groups[a.date] = [];
+      groups[a.date].push(a);
+    }
+
+    el.innerHTML = Object.entries(groups).sort(([a],[b]) => a.localeCompare(b)).map(([date, items]) => {
+      const d = new Date(date + "T12:00:00");
+      const isToday = date === todayStr;
+      const isTomorrow = date === new Date(now.getTime() + 86400000).toISOString().split("T")[0];
+      const label = isToday ? "Today" : isTomorrow ? "Tomorrow" : d.toLocaleDateString("en-US", { weekday:"long", month:"long", day:"numeric" });
+      return `
+        <div class="day-group">
+          <div class="day-label ${isToday ? 'today' : ''}">${label}</div>
+          ${items.map(a => `
+            <div class="appt-item ${isToday ? 'is-today' : ''}">
+              <div class="appt-time ${a.time ? '' : 'no-time'}">${a.time || 'All day'}</div>
+              <div class="appt-info">
+                <div class="appt-title">${escHtml(a.title)}</div>
+                ${a.location ? `<div class="appt-meta">📍 ${escHtml(a.location)}</div>` : ""}
+                ${a.notes    ? `<div class="appt-meta">${escHtml(a.notes)}</div>` : ""}
+              </div>
+              <button class="appt-del" onclick="deleteAppt('${a._id}')" title="Remove">✕</button>
+            </div>
+          `).join("")}
+        </div>
+      `;
+    }).join("");
+  }
+
+  async function deleteAppt(id) {
+    await fetch(`/api/appointments/${id}`, { method: "DELETE" });
+    showToast("Appointment removed");
+    await loadAppointments();
+  }
+
+  // ── Voice Input ─────────────────────────────────────────────────────────────
+  function setupVoice() {
+    const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+    if (!SR) {
+      document.getElementById("voiceBtnSub").textContent = "Voice not supported — type below instead";
+      return;
+    }
+    voiceRec = new SR();
+    voiceRec.continuous = true;
+    voiceRec.interimResults = true;
+    voiceRec.lang = "en-US";
+
+    voiceRec.onresult = (e) => {
+      clearTimeout(voiceSilence);
+      let interim = "";
+      for (let i = e.resultIndex; i < e.results.length; i++) {
+        if (e.results[i].isFinal) voiceFinal += e.results[i][0].transcript + " ";
+        else interim += e.results[i][0].transcript;
+      }
+      const st = document.getElementById("voiceStatus");
+      st.textContent = (voiceFinal + interim).trim() || "Listening…";
+      st.style.color = voiceFinal.trim() ? "var(--text)" : "var(--muted)";
+      st.style.fontStyle = voiceFinal.trim() ? "normal" : "italic";
+
+      if (voiceFinal.trim()) {
+        voiceSilence = setTimeout(() => {
+          const text = voiceFinal.trim();
+          voiceFinal = "";
+          stopVoice();
+          parseVoiceInput(text);
+        }, 1800);
+      }
+    };
+
+    voiceRec.onerror = (e) => {
+      if (e.error === "no-speech" || e.error === "aborted") return;
+      if (e.error === "not-allowed") showToast("Microphone blocked — allow mic access in browser settings.");
+      stopVoice();
+    };
+
+    voiceRec.onend = () => {
+      if (voiceListening) try { voiceRec.start(); } catch(e) {}
+    };
+  }
+
+  function toggleVoice() {
+    if (voiceListening) {
+      clearTimeout(voiceSilence);
+      const text = voiceFinal.trim();
+      voiceFinal = "";
+      stopVoice();
+      if (text) parseVoiceInput(text);
+    } else {
+      startVoice();
+    }
+  }
+
+  function startVoice() {
+    if (!voiceRec) { showToast("Voice not supported in this browser."); return; }
+    voiceListening = true;
+    voiceFinal = "";
+    document.getElementById("voiceConfirm").style.display = "none";
+    try { voiceRec.start(); } catch(e) {}
+    const btn = document.getElementById("voiceBtn");
+    btn.classList.add("listening");
+    document.getElementById("voiceBtnIcon").textContent  = "🔴";
+    document.getElementById("voiceBtnLabel").textContent = "LISTENING — TAP TO DONE";
+    document.getElementById("voiceBtnSub").textContent   = 'Say your appointment, e.g. "Eye doctor Friday at 10am"';
+    const st = document.getElementById("voiceStatus");
+    st.style.display = "block";
+    st.textContent   = "Listening…";
+  }
+
+  function stopVoice() {
+    voiceListening = false;
+    if (voiceRec) try { voiceRec.stop(); } catch(e) {}
+    const btn = document.getElementById("voiceBtn");
+    btn.classList.remove("listening");
+    document.getElementById("voiceBtnIcon").textContent  = "🎙️";
+    document.getElementById("voiceBtnLabel").textContent = "TAP TO SPEAK AN APPOINTMENT";
+    document.getElementById("voiceBtnSub").textContent   = 'Say something like "Doctor on Thursday at 2pm"';
+    document.getElementById("voiceStatus").style.display = "none";
+  }
+
+  async function parseVoiceInput(text) {
+    document.getElementById("voiceStatus").style.display = "block";
+    document.getElementById("voiceStatus").textContent   = "Understanding your appointment…";
+    document.getElementById("voiceStatus").style.fontStyle = "italic";
+    document.getElementById("voiceStatus").style.color = "var(--muted)";
+
+    try {
+      const res  = await fetch("/api/appointments/parse", {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ text }),
+      });
+      const data = await res.json();
+      if (data.error) { showToast("Couldn't understand that — please try again."); document.getElementById("voiceStatus").style.display = "none"; return; }
+
+      parsedAppt = data;
+      const d = new Date(data.date + "T12:00:00");
+      const dateStr = d.toLocaleDateString("en-US", { weekday:"long", month:"long", day:"numeric", year:"numeric" });
+
+      document.getElementById("voiceStatus").style.display = "none";
+      const box = document.getElementById("voiceConfirm");
+      document.getElementById("voiceConfirmDetail").innerHTML =
+        `<strong>${escHtml(data.title)}</strong><br>${dateStr}${data.time ? " at " + data.time : ""}${data.location ? "<br>📍 " + escHtml(data.location) : ""}`;
+      box.style.display = "block";
+    } catch(e) {
+      document.getElementById("voiceStatus").style.display = "none";
+      showToast("Connection error — please try again.");
+    }
+  }
+
+  async function saveVoiceAppointment() {
+    if (!parsedAppt) return;
+    document.getElementById("voiceConfirm").style.display = "none";
+    await fetch("/api/appointments", {
+      method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ seniorId: SENIOR_ID, ...parsedAppt, source: "voice" }),
+    });
+    showToast("Appointment saved!");
+    parsedAppt = null;
+    await loadAppointments();
+  }
+
+  function retryVoice() {
+    parsedAppt = null;
+    document.getElementById("voiceConfirm").style.display = "none";
+    startVoice();
+  }
+
+  // ── OCR Scan ────────────────────────────────────────────────────────────────
+  async function handleScan(input) {
+    const file = input.files[0];
+    if (!file) return;
+
+    const label = document.getElementById("scanLabel");
+    label.innerHTML = '<span class="spinner"></span> Reading your calendar…';
+
+    const form = new FormData();
+    form.append("image", file);
+
+    try {
+      const res  = await fetch("/api/appointments/ocr", { method: "POST", body: form });
+      const data = await res.json();
+      label.textContent = "TAKE A PHOTO OF YOUR CALENDAR";
+      input.value = "";
+
+      if (!data.events || data.events.length === 0) {
+        showToast("Couldn't read any appointments — try a clearer photo.");
+        return;
+      }
+
+      ocrEvents = data.events;
+      renderOcrResults(data.events);
+    } catch(e) {
+      label.textContent = "TAKE A PHOTO OF YOUR CALENDAR";
+      input.value = "";
+      showToast("Error reading photo — please try again.");
+    }
+  }
+
+  function renderOcrResults(events) {
+    const list = document.getElementById("ocrEventList");
+    list.innerHTML = events.map((ev, i) => `
+      <div class="ocr-event">
+        <div class="ocr-check" id="ocrck-${i}" onclick="toggleOcrCheck(${i})"></div>
+        <div class="ocr-event-info">
+          <div class="ocr-event-title">${escHtml(ev.title)}</div>
+          <div class="ocr-event-meta">${ev.date}${ev.time ? " · " + ev.time : ""}${ev.notes ? " · " + ev.notes : ""}</div>
+        </div>
+      </div>
+    `).join("");
+    // Check all by default
+    events.forEach((_, i) => {
+      document.getElementById(`ocrck-${i}`).classList.add("checked");
+      document.getElementById(`ocrck-${i}`).textContent = "✓";
+    });
+    document.getElementById("ocrResults").style.display = "block";
+  }
+
+  function toggleOcrCheck(i) {
+    const el = document.getElementById(`ocrck-${i}`);
+    el.classList.toggle("checked");
+    el.textContent = el.classList.contains("checked") ? "✓" : "";
+  }
+
+  async function saveCheckedOcr() {
+    const checked = ocrEvents.filter((_, i) => document.getElementById(`ocrck-${i}`)?.classList.contains("checked"));
+    if (checked.length === 0) { showToast("Select at least one appointment."); return; }
+    let saved = 0;
+    for (const ev of checked) {
+      try {
+        // Parse the date string through our API
+        const parseRes = await fetch("/api/appointments/parse", {
+          method: "POST", headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ text: `${ev.title} on ${ev.date}${ev.time ? " at " + ev.time : ""}` }),
+        });
+        const parsed = await parseRes.json();
+        await fetch("/api/appointments", {
+          method: "POST", headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ seniorId: SENIOR_ID, title: parsed.title || ev.title, date: parsed.date || ev.date, time: ev.time || parsed.time, notes: ev.notes || "", source: "ocr" }),
+        });
+        saved++;
+      } catch(e) { /* skip */ }
+    }
+    dismissOcr();
+    showToast(`${saved} appointment${saved !== 1 ? "s" : ""} saved from your calendar!`);
+    await loadAppointments();
+  }
+
+  function dismissOcr() {
+    document.getElementById("ocrResults").style.display = "none";
+    ocrEvents = [];
+  }
+
+  // ── Google Calendar ─────────────────────────────────────────────────────────
+  async function checkGoogleStatus() {
+    try {
+      const res  = await fetch(`/api/google/status/${SENIOR_ID}`);
+      const data = await res.json();
+      const statusEl = document.getElementById("googleStatus");
+      const subEl    = document.getElementById("googleSub");
+      if (!data.configured) {
+        statusEl.textContent = "Setup needed";
+        statusEl.className   = "sync-status status-disconnected";
+        subEl.textContent    = "Add Google credentials to .env to enable";
+      } else if (data.connected) {
+        statusEl.textContent = "Connected";
+        statusEl.className   = "sync-status status-connected";
+        subEl.textContent    = "Tap to sync now";
+      } else {
+        statusEl.textContent = "Connect";
+        statusEl.className   = "sync-status status-disconnected";
+        subEl.textContent    = "Connect to sync your appointments both ways";
+      }
+    } catch(e) {}
+  }
+
+  async function handleGoogleSync() {
+    const res  = await fetch(`/api/google/status/${SENIOR_ID}`);
+    const data = await res.json();
+    if (!data.configured) {
+      alert("Google Calendar needs to be set up first.\n\nSee the .env file setup instructions.");
+      return;
+    }
+    if (!data.connected) {
+      window.location.href = `/api/google/auth?seniorId=${SENIOR_ID}`;
+    } else {
+      await syncGoogle();
+    }
+  }
+
+  async function syncGoogle() {
+    const btn = document.getElementById("googleBtn");
+    btn.innerHTML = btn.innerHTML.replace("🗓️", '<span class="spinner" style="border-top-color:var(--navy)"></span>');
+    try {
+      const res  = await fetch(`/api/google/sync/${SENIOR_ID}`, { method: "POST" });
+      const data = await res.json();
+      if (data.success) {
+        showToast(`Synced! ${data.pulled} new from Google, ${data.pushed} sent to Google`);
+        renderAppointments(data.appointments);
+      } else {
+        showToast("Sync failed — please try again.");
+      }
+    } catch(e) {
+      showToast("Sync error — please try again.");
+    }
+    await checkGoogleStatus();
+    btn.querySelector(".spinner")?.replaceWith(Object.assign(document.createElement("span"), { className:"sync-icon", textContent:"🗓️" }));
+  }
+
+  // ── Apple Calendar ──────────────────────────────────────────────────────────
+  function subscribeApple() {
+    const webcal = `webcal://${window.location.host}/api/calendar/${SENIOR_ID}/feed.ics`;
+    window.location.href = webcal;
+    showToast("Opening Apple Calendar subscription…");
+  }
+
+  // ── Utilities ───────────────────────────────────────────────────────────────
+  function escHtml(s) {
+    return String(s||"").replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;");
+  }
+
+  function showToast(msg, ms = 3500) {
+    const t = document.getElementById("toast");
+    t.textContent = msg;
+    t.classList.add("show");
+    setTimeout(() => t.classList.remove("show"), ms);
+  }
+
+  init();
+</script>
+</body>
+</html>

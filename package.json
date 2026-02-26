@@ -1,0 +1,19 @@
+{
+  "name": "sage-companion-mvp",
+  "version": "1.0.0",
+  "description": "Sage Companion LLC — AI elder care platform",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "setup": "npm install && node server.js"
+  },
+  "dependencies": {
+    "@anthropic-ai/sdk": "^0.24.0",
+    "dotenv": "^16.4.0",
+    "express": "^4.19.0",
+    "googleapis": "^171.4.0",
+    "multer": "^2.0.2",
+    "nedb-promises": "^6.0.0",
+    "uuid": "^9.0.0"
+  }
+}

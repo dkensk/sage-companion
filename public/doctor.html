@@ -1,0 +1,581 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>Sage — Doctor Visit</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --navy:   #1E3A8A;
+      --teal:   #0F766E;
+      --green:  #16A34A;
+      --red:    #DC2626;
+      --bg:     #F1F5F9;
+      --white:  #FFFFFF;
+      --text:   #0F172A;
+      --muted:  #64748B;
+      --border: #E2E8F0;
+      --ease:   cubic-bezier(0.25, 0.46, 0.45, 0.94);
+      --shadow: 0 2px 12px rgba(0,0,0,0.07), 0 1px 3px rgba(0,0,0,0.05);
+      --shadow-lg: 0 8px 32px rgba(0,0,0,0.12), 0 2px 8px rgba(0,0,0,0.06);
+    }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      font-size: 18px;
+      min-height: 100vh;
+      -webkit-font-smoothing: antialiased;
+    }
+
+    /* ── HEADER ────────────────────────────────────── */
+    header {
+      background: linear-gradient(135deg, #0F766E 0%, #0D9488 100%);
+      color: white;
+      padding: 20px 24px 24px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      position: sticky;
+      top: 0;
+      z-index: 100;
+      box-shadow: 0 2px 16px rgba(15,118,110,0.3);
+    }
+
+    .logo { font-size: 22px; font-weight: 900; display: flex; align-items: center; gap: 8px; }
+    .header-sub { font-size: 14px; opacity: 0.8; margin-top: 2px; }
+    .home-btn {
+      background: rgba(255,255,255,0.18);
+      border: 2px solid rgba(255,255,255,0.35);
+      color: white;
+      font-size: 17px;
+      font-weight: 700;
+      text-decoration: none;
+      padding: 11px 18px;
+      border-radius: 14px;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      white-space: nowrap;
+      transition: background 0.15s;
+      -webkit-tap-highlight-color: transparent;
+    }
+    .home-btn:hover { background: rgba(255,255,255,0.28); }
+
+    /* ── MAIN ──────────────────────────────────────── */
+    .main { padding: 20px 18px 100px; max-width: 620px; margin: 0 auto; }
+
+    /* ── CARDS ─────────────────────────────────────── */
+    .card {
+      background: var(--white);
+      border-radius: 20px;
+      padding: 22px 20px;
+      margin-bottom: 16px;
+      box-shadow: var(--shadow);
+      opacity: 0;
+      transform: translateY(14px);
+      animation: fadeUp 0.45s var(--ease) forwards;
+    }
+    .card:nth-child(1) { animation-delay: 0.05s; }
+    .card:nth-child(2) { animation-delay: 0.12s; }
+    .card:nth-child(3) { animation-delay: 0.19s; }
+
+    @keyframes fadeUp { to { opacity: 1; transform: translateY(0); } }
+
+    .section-title {
+      font-size: 15px; font-weight: 700; color: var(--muted);
+      letter-spacing: 0.05em; text-transform: uppercase; margin-bottom: 16px;
+      display: flex; align-items: center; gap: 8px;
+    }
+
+    /* ── SETUP ROW ─────────────────────────────────── */
+    .setup-row { display: flex; gap: 12px; margin-bottom: 20px; flex-wrap: wrap; }
+    .setup-row input {
+      flex: 1; min-width: 160px;
+      border: 2px solid var(--border); border-radius: 12px;
+      padding: 12px 14px; font-size: 17px; outline: none;
+      background: var(--bg); color: var(--text);
+      transition: border-color 0.15s;
+    }
+    .setup-row input:focus { border-color: var(--teal); background: white; }
+
+    /* ── RECORD BUTTON ─────────────────────────────── */
+    #recordBtn {
+      width: 100%;
+      background: linear-gradient(145deg, var(--teal), #0D9488);
+      color: white; border: none; border-radius: 18px;
+      padding: 26px 20px; font-size: 22px; font-weight: 800;
+      letter-spacing: 1px; cursor: pointer;
+      display: flex; flex-direction: column; align-items: center; gap: 10px;
+      transition: transform 0.15s var(--ease), box-shadow 0.15s var(--ease);
+      box-shadow: 0 6px 24px rgba(15,118,110,0.35);
+      min-height: 110px; position: relative; overflow: hidden;
+      -webkit-tap-highlight-color: transparent;
+    }
+    #recordBtn::before {
+      content: ''; position: absolute; inset: 0;
+      background: linear-gradient(145deg, rgba(255,255,255,0.08), transparent);
+    }
+    #recordBtn:active { transform: scale(0.97); }
+    #recordBtn.recording {
+      background: linear-gradient(145deg, var(--red), #B91C1C);
+      box-shadow: 0 6px 24px rgba(220,38,38,0.4);
+      animation: recPulse 2s ease-in-out infinite;
+    }
+    @keyframes recPulse {
+      0%,100% { box-shadow: 0 6px 24px rgba(220,38,38,0.4); }
+      50% { box-shadow: 0 6px 40px rgba(220,38,38,0.65), 0 0 0 10px rgba(220,38,38,0.1); }
+    }
+
+    .rec-icon { font-size: 40px; line-height: 1; }
+    #recordLabel { font-size: 19px; font-weight: 800; letter-spacing: 2px; opacity: 0.95; }
+    #recTimer { font-size: 14px; font-weight: 600; opacity: 0.8; letter-spacing: 1px; }
+
+    /* ── LIVE TRANSCRIPT ───────────────────────────── */
+    #transcriptBox {
+      background: #F8FAFC;
+      border: 2px solid var(--border);
+      border-radius: 14px;
+      padding: 16px;
+      min-height: 140px;
+      max-height: 300px;
+      overflow-y: auto;
+      font-size: 17px;
+      line-height: 1.7;
+      color: var(--text);
+      white-space: pre-wrap;
+      margin-top: 16px;
+      transition: border-color 0.2s;
+    }
+    #transcriptBox.recording { border-color: var(--red); }
+    #transcriptBox.has-content { border-color: var(--teal); }
+
+    .transcript-placeholder { color: var(--muted); font-style: italic; }
+
+    .interim-text { color: var(--muted); font-style: italic; }
+
+    /* ── SAVE / ACTION ROW ─────────────────────────── */
+    .action-row { display: flex; gap: 10px; margin-top: 14px; flex-wrap: wrap; }
+
+    .btn-save {
+      flex: 1; min-width: 140px;
+      background: var(--navy); color: white;
+      border: none; border-radius: 14px;
+      padding: 14px 20px; font-size: 17px; font-weight: 700;
+      cursor: pointer; transition: transform 0.15s var(--ease), background 0.15s;
+      -webkit-tap-highlight-color: transparent;
+    }
+    .btn-save:hover { background: #1E4DA0; }
+    .btn-save:active { transform: scale(0.96); }
+    .btn-save:disabled { opacity: 0.4; cursor: not-allowed; }
+
+    .btn-clear {
+      background: var(--bg); color: var(--muted);
+      border: 2px solid var(--border); border-radius: 14px;
+      padding: 14px 18px; font-size: 17px; font-weight: 600;
+      cursor: pointer; transition: transform 0.15s, border-color 0.15s;
+      -webkit-tap-highlight-color: transparent;
+    }
+    .btn-clear:hover { border-color: var(--red); color: var(--red); }
+    .btn-clear:active { transform: scale(0.96); }
+
+    /* ── NOTES ─────────────────────────────────────── */
+    #notesBox {
+      width: 100%; border: 2px solid var(--border); border-radius: 12px;
+      padding: 12px 14px; font-size: 17px; line-height: 1.6;
+      color: var(--text); background: var(--bg); outline: none;
+      resize: vertical; min-height: 80px;
+      transition: border-color 0.15s;
+    }
+    #notesBox:focus { border-color: var(--navy); background: white; }
+
+    /* ── DOCTOR QUESTIONS LIST ─────────────────────── */
+    .q-item {
+      display: flex; align-items: flex-start; gap: 12px;
+      padding: 14px 0; border-bottom: 1px solid var(--border);
+    }
+    .q-item:last-child { border-bottom: none; }
+
+    .q-check {
+      width: 28px; height: 28px; border-radius: 50%;
+      border: 2px solid var(--border);
+      background: white; cursor: pointer; flex-shrink: 0;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 14px; transition: background 0.15s, border-color 0.15s;
+      margin-top: 2px;
+    }
+    .q-check:hover { border-color: var(--green); }
+    .q-check.done { background: var(--green); border-color: var(--green); color: white; }
+
+    .q-text { flex: 1; font-size: 17px; line-height: 1.5; }
+    .q-text.done { text-decoration: line-through; color: var(--muted); }
+
+    .q-del {
+      background: none; border: none; color: var(--muted);
+      font-size: 20px; cursor: pointer; padding: 2px 6px;
+      border-radius: 6px; transition: color 0.15s;
+      -webkit-tap-highlight-color: transparent;
+    }
+    .q-del:hover { color: var(--red); }
+
+    .empty-q { color: var(--muted); font-size: 17px; font-style: italic; padding: 8px 0; }
+
+    /* ── TOAST ─────────────────────────────────────── */
+    #toast {
+      position: fixed; top: 24px; left: 50%;
+      transform: translateX(-50%) translateY(-8px);
+      background: #0F172A; color: white;
+      padding: 12px 22px; border-radius: 100px;
+      font-size: 16px; font-weight: 600;
+      opacity: 0; transition: opacity 0.25s var(--ease), transform 0.25s var(--ease);
+      z-index: 999; pointer-events: none; white-space: nowrap;
+    }
+    #toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+
+    /* ── SAVED VISITS ──────────────────────────────── */
+    .visit-item {
+      border: 1px solid var(--border); border-radius: 14px;
+      padding: 16px; margin-bottom: 12px; background: #F8FAFC;
+    }
+    .visit-header { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 10px; }
+    .visit-date { font-size: 15px; font-weight: 700; color: var(--navy); }
+    .visit-meta { font-size: 14px; color: var(--muted); margin-top: 2px; }
+    .visit-transcript {
+      font-size: 16px; line-height: 1.7; color: var(--text);
+      max-height: 120px; overflow: hidden; position: relative;
+      white-space: pre-wrap;
+    }
+    .visit-transcript.expanded { max-height: none; }
+    .visit-transcript::after {
+      content: ''; position: absolute; bottom: 0; left: 0; right: 0;
+      height: 40px;
+      background: linear-gradient(transparent, #F8FAFC);
+      pointer-events: none;
+    }
+    .visit-transcript.expanded::after { display: none; }
+    .expand-btn {
+      background: none; border: none; color: var(--navy); font-size: 15px;
+      font-weight: 700; cursor: pointer; margin-top: 8px; padding: 0;
+    }
+  </style>
+</head>
+<body>
+
+<header>
+  <div>
+    <div class="logo">🩺 Doctor Visit</div>
+    <div class="header-sub">Record · Transcribe · Share with family</div>
+  </div>
+  <a href="/elder" class="home-btn">🏠 Home</a>
+</header>
+
+<div class="main">
+
+  <!-- Recording card -->
+  <div class="card">
+    <div class="section-title">🎙️ Record Your Visit</div>
+
+    <div class="setup-row">
+      <input type="text" id="doctorNameInput" placeholder="Doctor's name (optional)" />
+    </div>
+
+    <button id="recordBtn" onclick="toggleRecording()">
+      <span class="rec-icon" id="recIcon">🎙️</span>
+      <span id="recordLabel">TAP TO START RECORDING</span>
+      <span id="recTimer" style="display:none">00:00</span>
+    </button>
+
+    <div id="transcriptBox">
+      <span class="transcript-placeholder" id="placeholder">Your conversation will appear here as you record…</span>
+    </div>
+
+    <div class="action-row">
+      <button class="btn-save" id="saveBtn" onclick="saveVisit()" disabled>💾 Save & Share with Family</button>
+      <button class="btn-clear" onclick="clearTranscript()">✕ Clear</button>
+    </div>
+  </div>
+
+  <!-- Notes -->
+  <div class="card">
+    <div class="section-title">📝 Your Notes</div>
+    <textarea id="notesBox" placeholder="Any notes about the visit (optional)…"></textarea>
+  </div>
+
+  <!-- Doctor Questions -->
+  <div class="card">
+    <div class="section-title">❓ Questions to Ask Today</div>
+    <div id="questionsList"><div class="empty-q">Loading your questions…</div></div>
+  </div>
+
+  <!-- Past Visits -->
+  <div class="card" id="pastVisitsCard" style="display:none">
+    <div class="section-title">📋 Past Visit Transcripts</div>
+    <div id="pastVisitsList"></div>
+  </div>
+
+</div>
+
+<div id="toast"></div>
+
+<script>
+  const SENIOR_ID = "senior_margaret_001";
+  let isRecording = false;
+  let recognition = null;
+  let transcript = "";
+  let interim = "";
+  let timerInterval = null;
+  let secondsElapsed = 0;
+
+  // ── Init ──────────────────────────────────────────────────────────────────
+  async function init() {
+    setupRecognition();
+    await loadQuestions();
+    await loadPastVisits();
+  }
+
+  // ── Recording ─────────────────────────────────────────────────────────────
+  function setupRecognition() {
+    const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+    if (!SR) {
+      document.getElementById("recordBtn").innerHTML = `<span style="font-size:17px;text-align:center;line-height:1.4">Voice recording isn't supported in this browser.<br>Try Safari or Chrome.</span>`;
+      return;
+    }
+    recognition = new SR();
+    recognition.continuous = true;
+    recognition.interimResults = true;
+    recognition.lang = "en-US";
+
+    recognition.onresult = (e) => {
+      interim = "";
+      for (let i = e.resultIndex; i < e.results.length; i++) {
+        const t = e.results[i][0].transcript;
+        if (e.results[i].isFinal) {
+          transcript += (transcript ? " " : "") + t.trim();
+        } else {
+          interim += t;
+        }
+      }
+      renderTranscript();
+    };
+
+    recognition.onerror = (e) => {
+      if (e.error === "no-speech") return; // silently ignore
+      console.error("Recognition error:", e.error);
+    };
+
+    recognition.onend = () => {
+      // Auto-restart if still supposed to be recording
+      if (isRecording) {
+        try { recognition.start(); } catch(e) {}
+      }
+    };
+  }
+
+  function toggleRecording() {
+    isRecording ? stopRecording() : startRecording();
+  }
+
+  function startRecording() {
+    if (!recognition) return;
+    isRecording = true;
+    secondsElapsed = 0;
+
+    try { recognition.start(); } catch(e) {}
+
+    const btn = document.getElementById("recordBtn");
+    btn.classList.add("recording");
+    document.getElementById("recIcon").textContent = "⏹️";
+    document.getElementById("recordLabel").textContent = "TAP TO STOP";
+    document.getElementById("recTimer").style.display = "block";
+
+    timerInterval = setInterval(() => {
+      secondsElapsed++;
+      const m = String(Math.floor(secondsElapsed / 60)).padStart(2, "0");
+      const s = String(secondsElapsed % 60).padStart(2, "0");
+      document.getElementById("recTimer").textContent = `${m}:${s}`;
+    }, 1000);
+
+    document.getElementById("transcriptBox").classList.add("recording");
+    document.getElementById("placeholder").style.display = "none";
+  }
+
+  function stopRecording() {
+    isRecording = false;
+    if (recognition) try { recognition.stop(); } catch(e) {}
+    clearInterval(timerInterval);
+
+    const btn = document.getElementById("recordBtn");
+    btn.classList.remove("recording");
+    document.getElementById("recIcon").textContent = "🎙️";
+    document.getElementById("recordLabel").textContent = "TAP TO RESUME RECORDING";
+    document.getElementById("recTimer").style.display = "none";
+
+    document.getElementById("transcriptBox").classList.remove("recording");
+    if (transcript) {
+      document.getElementById("transcriptBox").classList.add("has-content");
+      document.getElementById("saveBtn").disabled = false;
+    }
+    interim = "";
+    renderTranscript();
+  }
+
+  function renderTranscript() {
+    const box = document.getElementById("transcriptBox");
+    const placeholder = document.getElementById("placeholder");
+    if (!transcript && !interim) {
+      placeholder.style.display = "block";
+      box.innerHTML = '<span class="transcript-placeholder" id="placeholder">Your conversation will appear here as you record…</span>';
+      return;
+    }
+    placeholder.style.display = "none";
+    box.innerHTML = (transcript || "") + (interim ? `<span class="interim-text"> ${interim}</span>` : "");
+    box.scrollTop = box.scrollHeight;
+  }
+
+  function clearTranscript() {
+    if (isRecording) stopRecording();
+    transcript = "";
+    interim = "";
+    secondsElapsed = 0;
+    document.getElementById("transcriptBox").classList.remove("has-content", "recording");
+    document.getElementById("saveBtn").disabled = true;
+    document.getElementById("recordLabel").textContent = "TAP TO START RECORDING";
+    document.getElementById("recTimer").textContent = "00:00";
+    renderTranscript();
+  }
+
+  // ── Save Visit ────────────────────────────────────────────────────────────
+  async function saveVisit() {
+    if (!transcript.trim()) return;
+    if (isRecording) stopRecording();
+
+    const doctorName = document.getElementById("doctorNameInput").value.trim();
+    const notes = document.getElementById("notesBox").value.trim();
+
+    const btn = document.getElementById("saveBtn");
+    btn.disabled = true;
+    btn.textContent = "Saving…";
+
+    try {
+      const res = await fetch("/api/doctor-visits", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ seniorId: SENIOR_ID, transcript, doctorName, notes }),
+      });
+      const data = await res.json();
+      if (data.success) {
+        showToast("✅ Visit saved! Family can now see it.");
+        clearTranscript();
+        document.getElementById("notesBox").value = "";
+        document.getElementById("doctorNameInput").value = "";
+        await loadPastVisits();
+      } else {
+        showToast("Error saving — please try again.");
+        btn.disabled = false;
+        btn.textContent = "💾 Save & Share with Family";
+      }
+    } catch (e) {
+      showToast("Connection error — please try again.");
+      btn.disabled = false;
+      btn.textContent = "💾 Save & Share with Family";
+    }
+  }
+
+  // ── Doctor Questions ──────────────────────────────────────────────────────
+  async function loadQuestions() {
+    const res = await fetch(`/api/doctor-questions/${SENIOR_ID}`);
+    const questions = await res.json();
+    renderQuestions(questions);
+  }
+
+  function renderQuestions(questions) {
+    const el = document.getElementById("questionsList");
+    const pending = questions.filter(q => !q.asked);
+    const done = questions.filter(q => q.asked);
+    const all = [...pending, ...done];
+
+    if (all.length === 0) {
+      el.innerHTML = `<div class="empty-q">No questions yet. Add them from the Sage chat!</div>`;
+      return;
+    }
+
+    el.innerHTML = all.map(q => `
+      <div class="q-item" id="qi-${q._id}">
+        <button class="q-check ${q.asked ? 'done' : ''}" onclick="markAsked('${q._id}', ${q.asked})" title="${q.asked ? 'Asked!' : 'Mark as asked'}">
+          ${q.asked ? '✓' : ''}
+        </button>
+        <div class="q-text ${q.asked ? 'done' : ''}">${escHtml(q.question)}</div>
+        <button class="q-del" onclick="deleteQuestion('${q._id}')" title="Remove">✕</button>
+      </div>
+    `).join("");
+  }
+
+  async function markAsked(id, alreadyAsked) {
+    if (alreadyAsked) return;
+    await fetch(`/api/doctor-questions/${id}/asked`, { method: "PATCH" });
+    showToast("✓ Marked as asked!");
+    await loadQuestions();
+  }
+
+  async function deleteQuestion(id) {
+    await fetch(`/api/doctor-questions/${id}`, { method: "DELETE" });
+    await loadQuestions();
+  }
+
+  // ── Past Visits ───────────────────────────────────────────────────────────
+  async function loadPastVisits() {
+    const res = await fetch(`/api/doctor-visits/${SENIOR_ID}`);
+    const visits = await res.json();
+    const card = document.getElementById("pastVisitsCard");
+    const el = document.getElementById("pastVisitsList");
+
+    if (!visits || visits.length === 0) {
+      card.style.display = "none";
+      return;
+    }
+
+    card.style.display = "block";
+    el.innerHTML = visits.map(v => {
+      const date = new Date(v.createdAt).toLocaleDateString("en-US", { weekday: "short", month: "long", day: "numeric", year: "numeric" });
+      const time = new Date(v.createdAt).toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" });
+      return `
+        <div class="visit-item">
+          <div class="visit-header">
+            <div>
+              <div class="visit-date">${date} · ${time}</div>
+              <div class="visit-meta">${v.doctorName ? `Dr. ${escHtml(v.doctorName)} · ` : ""}${v.wordCount} words</div>
+            </div>
+          </div>
+          <div class="visit-transcript" id="vt-${v._id}">${escHtml(v.transcript)}</div>
+          ${v.notes ? `<div style="margin-top:8px;font-size:15px;color:var(--muted)"><strong>Notes:</strong> ${escHtml(v.notes)}</div>` : ""}
+          <button class="expand-btn" onclick="toggleExpand('${v._id}', this)">Read more ↓</button>
+        </div>
+      `;
+    }).join("");
+  }
+
+  function toggleExpand(id, btn) {
+    const el = document.getElementById(`vt-${id}`);
+    el.classList.toggle("expanded");
+    btn.textContent = el.classList.contains("expanded") ? "Show less ↑" : "Read more ↓";
+  }
+
+  // ── Utilities ─────────────────────────────────────────────────────────────
+  function escHtml(s) {
+    return String(s).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;");
+  }
+
+  function showToast(msg) {
+    const t = document.getElementById("toast");
+    t.textContent = msg;
+    t.classList.add("show");
+    setTimeout(() => t.classList.remove("show"), 3000);
+  }
+
+  init();
+</script>
+</body>
+</html>

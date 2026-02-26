@@ -1,0 +1,407 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Sage Companion — Care That Never Sleeps</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --navy:    #1E3A8A;
+      --navy-light: #2D4EAA;
+      --teal:    #0F766E;
+      --teal-light: #14B8A6;
+      --bg:      #F8FAFC;
+      --white:   #FFFFFF;
+      --text:    #0F172A;
+      --muted:   #64748B;
+      --border:  #E2E8F0;
+      --shadow-sm: 0 1px 3px rgba(0,0,0,0.08), 0 1px 2px rgba(0,0,0,0.04);
+      --shadow-md: 0 4px 16px rgba(0,0,0,0.10), 0 2px 6px rgba(0,0,0,0.06);
+      --shadow-lg: 0 10px 40px rgba(0,0,0,0.14), 0 4px 12px rgba(0,0,0,0.08);
+      --radius: 20px;
+      --ease: cubic-bezier(0.25, 0.46, 0.45, 0.94);
+    }
+
+    html { scroll-behavior: smooth; }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      min-height: 100vh;
+      -webkit-font-smoothing: antialiased;
+    }
+
+    /* ── HERO ────────────────────────────────────────────── */
+    .hero {
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      padding: 48px 24px;
+      background: linear-gradient(160deg, #0F172A 0%, #1E3A8A 55%, #0F766E 100%);
+      position: relative;
+      overflow: hidden;
+      text-align: center;
+    }
+
+    /* Subtle grid overlay */
+    .hero::before {
+      content: '';
+      position: absolute; inset: 0;
+      background-image:
+        linear-gradient(rgba(255,255,255,0.03) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(255,255,255,0.03) 1px, transparent 1px);
+      background-size: 48px 48px;
+      pointer-events: none;
+    }
+
+    /* Glow blob */
+    .hero::after {
+      content: '';
+      position: absolute;
+      width: 600px; height: 600px;
+      border-radius: 50%;
+      background: radial-gradient(circle, rgba(20,184,166,0.18) 0%, transparent 70%);
+      top: 50%; left: 50%;
+      transform: translate(-50%, -50%);
+      pointer-events: none;
+    }
+
+    .hero-inner { position: relative; z-index: 1; max-width: 560px; width: 100%; }
+
+    .badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      background: rgba(255,255,255,0.1);
+      border: 1px solid rgba(255,255,255,0.15);
+      color: rgba(255,255,255,0.9);
+      font-size: 13px;
+      font-weight: 600;
+      letter-spacing: 0.04em;
+      text-transform: uppercase;
+      padding: 6px 14px;
+      border-radius: 100px;
+      margin-bottom: 32px;
+      backdrop-filter: blur(8px);
+      opacity: 0;
+      transform: translateY(16px);
+      animation: fadeUp 0.6s var(--ease) 0.1s forwards;
+    }
+
+    .badge-dot {
+      width: 6px; height: 6px;
+      border-radius: 50%;
+      background: #4ADE80;
+      box-shadow: 0 0 8px #4ADE80;
+      animation: pulse 2s ease-in-out infinite;
+    }
+
+    @keyframes pulse {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0.4; }
+    }
+
+    h1 {
+      font-size: clamp(40px, 8vw, 64px);
+      font-weight: 900;
+      color: #FFFFFF;
+      line-height: 1.08;
+      letter-spacing: -0.03em;
+      margin-bottom: 20px;
+      opacity: 0;
+      transform: translateY(20px);
+      animation: fadeUp 0.7s var(--ease) 0.2s forwards;
+    }
+
+    h1 span {
+      background: linear-gradient(135deg, #7DD3FC, #4ADE80);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+    }
+
+    .subhead {
+      font-size: clamp(17px, 3vw, 20px);
+      color: rgba(255,255,255,0.72);
+      line-height: 1.6;
+      margin-bottom: 48px;
+      max-width: 420px;
+      margin-left: auto;
+      margin-right: auto;
+      opacity: 0;
+      transform: translateY(20px);
+      animation: fadeUp 0.7s var(--ease) 0.35s forwards;
+    }
+
+    .cta-group {
+      display: flex;
+      flex-direction: column;
+      gap: 14px;
+      max-width: 400px;
+      margin: 0 auto;
+      opacity: 0;
+      transform: translateY(20px);
+      animation: fadeUp 0.7s var(--ease) 0.5s forwards;
+    }
+
+    .btn {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 12px;
+      padding: 20px 28px;
+      border-radius: 16px;
+      font-size: 18px;
+      font-weight: 700;
+      text-decoration: none;
+      cursor: pointer;
+      transition: transform 0.18s var(--ease), box-shadow 0.18s var(--ease), background 0.18s;
+      -webkit-tap-highlight-color: transparent;
+    }
+
+    .btn:active { transform: scale(0.97) !important; }
+
+    .btn-senior {
+      background: #FFFFFF;
+      color: var(--navy);
+      box-shadow: var(--shadow-md), 0 0 0 0 rgba(255,255,255,0);
+    }
+    .btn-senior:hover {
+      transform: translateY(-3px);
+      box-shadow: var(--shadow-lg);
+    }
+
+    .btn-family {
+      background: rgba(255,255,255,0.12);
+      color: #FFFFFF;
+      border: 1.5px solid rgba(255,255,255,0.25);
+      backdrop-filter: blur(8px);
+    }
+    .btn-family:hover {
+      transform: translateY(-3px);
+      background: rgba(255,255,255,0.18);
+      box-shadow: 0 8px 24px rgba(0,0,0,0.3);
+    }
+
+    .btn-icon { font-size: 24px; }
+    .btn-text { text-align: left; }
+    .btn-label { font-size: 18px; font-weight: 700; }
+    .btn-sub { font-size: 13px; font-weight: 500; opacity: 0.7; margin-top: 1px; }
+
+    .trust {
+      margin-top: 48px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 24px;
+      opacity: 0;
+      animation: fadeUp 0.7s var(--ease) 0.7s forwards;
+    }
+
+    .trust-item {
+      text-align: center;
+      color: rgba(255,255,255,0.5);
+      font-size: 13px;
+      font-weight: 500;
+      line-height: 1.4;
+    }
+
+    .trust-item strong {
+      display: block;
+      font-size: 22px;
+      font-weight: 800;
+      color: rgba(255,255,255,0.9);
+      letter-spacing: -0.02em;
+    }
+
+    .trust-divider {
+      width: 1px; height: 32px;
+      background: rgba(255,255,255,0.15);
+    }
+
+    /* ── FEATURES ────────────────────────────────────────── */
+    .features {
+      padding: 80px 24px;
+      max-width: 680px;
+      margin: 0 auto;
+    }
+
+    .section-label {
+      text-align: center;
+      font-size: 13px;
+      font-weight: 700;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      color: var(--teal);
+      margin-bottom: 12px;
+    }
+
+    .section-title {
+      text-align: center;
+      font-size: clamp(28px, 5vw, 40px);
+      font-weight: 900;
+      color: var(--text);
+      letter-spacing: -0.02em;
+      margin-bottom: 48px;
+      line-height: 1.15;
+    }
+
+    .feature-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 16px;
+    }
+
+    .feature-card {
+      background: var(--white);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 28px 24px;
+      box-shadow: var(--shadow-sm);
+      transition: transform 0.2s var(--ease), box-shadow 0.2s var(--ease);
+    }
+
+    .feature-card:hover {
+      transform: translateY(-4px);
+      box-shadow: var(--shadow-md);
+    }
+
+    .feature-icon {
+      font-size: 32px;
+      margin-bottom: 14px;
+    }
+
+    .feature-title {
+      font-size: 17px;
+      font-weight: 700;
+      color: var(--text);
+      margin-bottom: 6px;
+    }
+
+    .feature-desc {
+      font-size: 14px;
+      color: var(--muted);
+      line-height: 1.55;
+    }
+
+    /* ── FOOTER ──────────────────────────────────────────── */
+    footer {
+      text-align: center;
+      padding: 32px 24px;
+      font-size: 14px;
+      color: var(--muted);
+      border-top: 1px solid var(--border);
+    }
+
+    footer strong { color: var(--text); }
+
+    /* ── ANIMATIONS ──────────────────────────────────────── */
+    @keyframes fadeUp {
+      to { opacity: 1; transform: translateY(0); }
+    }
+
+    /* Scroll-reveal */
+    .reveal { opacity: 0; transform: translateY(24px); transition: opacity 0.6s var(--ease), transform 0.6s var(--ease); }
+    .reveal.visible { opacity: 1; transform: translateY(0); }
+
+    @media (max-width: 480px) {
+      .feature-grid { grid-template-columns: 1fr; }
+      .trust { gap: 16px; }
+    }
+  </style>
+</head>
+<body>
+
+<!-- Hero -->
+<section class="hero">
+  <div class="hero-inner">
+    <div class="badge">
+      <div class="badge-dot"></div>
+      Now in Beta
+    </div>
+
+    <h1>Care That <span>Never Sleeps</span></h1>
+
+    <p class="subhead">
+      Sage Companion gives seniors a caring companion and gives families the peace of mind they deserve — 24 hours a day.
+    </p>
+
+    <div class="cta-group">
+      <a href="/elder" class="btn btn-senior">
+        <span class="btn-icon">👵</span>
+        <span class="btn-text">
+          <span class="btn-label">I'm the senior</span>
+          <span class="btn-sub">Open my Sage companion</span>
+        </span>
+      </a>
+      <a href="/family" class="btn btn-family">
+        <span class="btn-icon">👨‍👩‍👧</span>
+        <span class="btn-text">
+          <span class="btn-label">I'm a family member</span>
+          <span class="btn-sub">Open the family dashboard</span>
+        </span>
+      </a>
+    </div>
+
+    <div class="trust">
+      <div class="trust-item"><strong>24/7</strong>AI support</div>
+      <div class="trust-divider"></div>
+      <div class="trust-item"><strong>100%</strong>Private & secure</div>
+      <div class="trust-divider"></div>
+      <div class="trust-item"><strong>Real-time</strong>Family alerts</div>
+    </div>
+  </div>
+</section>
+
+<!-- Features -->
+<section class="features">
+  <div class="section-label">What Sage does</div>
+  <h2 class="section-title">Everything your family needs,<br>in one place</h2>
+
+  <div class="feature-grid">
+    <div class="feature-card reveal">
+      <div class="feature-icon">💬</div>
+      <div class="feature-title">Always There to Talk</div>
+      <div class="feature-desc">A warm, patient AI companion available anytime — for conversation, questions, or just company.</div>
+    </div>
+    <div class="feature-card reveal">
+      <div class="feature-icon">💊</div>
+      <div class="feature-title">Medication Reminders</div>
+      <div class="feature-desc">Gentle reminders for every pill. Family sees real-time adherence so nothing gets missed.</div>
+    </div>
+    <div class="feature-card reveal">
+      <div class="feature-icon">🚨</div>
+      <div class="feature-title">Emergency Button</div>
+      <div class="feature-desc">One press and the family is instantly notified. Fast, simple, and always ready.</div>
+    </div>
+    <div class="feature-card reveal">
+      <div class="feature-icon">📊</div>
+      <div class="feature-title">Family Dashboard</div>
+      <div class="feature-desc">See everything at a glance — activity, medications, conversations, and alerts.</div>
+    </div>
+  </div>
+</section>
+
+<footer>
+  <strong>Sage Companion LLC</strong> · Built with care · Powered by Claude AI
+</footer>
+
+<script>
+  // Scroll reveal
+  const observer = new IntersectionObserver(entries => {
+    entries.forEach((e, i) => {
+      if (e.isIntersecting) {
+        setTimeout(() => e.target.classList.add('visible'), i * 80);
+      }
+    });
+  }, { threshold: 0.15 });
+
+  document.querySelectorAll('.reveal').forEach(el => observer.observe(el));
+</script>
+</body>
+</html>

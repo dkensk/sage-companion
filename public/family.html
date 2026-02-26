@@ -1,0 +1,981 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Sage Companion — Family Dashboard</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --navy:   #1E3A8A;
+      --teal:   #0F766E;
+      --bg:     #F1F5F9;
+      --white:  #FFFFFF;
+      --text:   #0F172A;
+      --muted:  #64748B;
+      --border: #E2E8F0;
+      --red:    #DC2626;
+      --green:  #16A34A;
+      --yellow: #D97706;
+      --ease:   cubic-bezier(0.25, 0.46, 0.45, 0.94);
+      --shadow: 0 1px 4px rgba(0,0,0,0.07), 0 2px 12px rgba(0,0,0,0.05);
+      --shadow-lg: 0 8px 32px rgba(0,0,0,0.12);
+    }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      min-height: 100vh;
+      -webkit-font-smoothing: antialiased;
+    }
+
+    /* ── HEADER ──────────────────────────────────────────── */
+    header {
+      background: linear-gradient(135deg, var(--navy) 0%, #1E4DA0 100%);
+      color: white;
+      padding: 18px 24px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      position: sticky;
+      top: 0;
+      z-index: 100;
+      box-shadow: 0 2px 16px rgba(30,58,138,0.25);
+    }
+
+    .logo { font-size: 20px; font-weight: 900; letter-spacing: -0.3px; display: flex; align-items: center; gap: 8px; }
+    .header-sub { font-size: 13px; opacity: 0.75; margin-top: 3px; font-weight: 500; }
+
+    .header-actions { display: flex; gap: 8px; }
+
+    .header-btn {
+      background: rgba(255,255,255,0.15);
+      border: 1px solid rgba(255,255,255,0.2);
+      color: white;
+      padding: 8px 14px;
+      border-radius: 10px;
+      cursor: pointer;
+      font-size: 13px;
+      font-weight: 600;
+      transition: background 0.15s;
+      -webkit-tap-highlight-color: transparent;
+    }
+
+    .header-btn:hover { background: rgba(255,255,255,0.25); }
+
+    /* ── LOGIN ───────────────────────────────────────────── */
+    #loginScreen {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      min-height: calc(100vh - 64px);
+      padding: 24px;
+    }
+
+    .login-card {
+      background: white;
+      border-radius: 24px;
+      padding: 40px 32px;
+      max-width: 400px;
+      width: 100%;
+      box-shadow: var(--shadow-lg);
+      text-align: center;
+      animation: fadeUp 0.5s var(--ease) forwards;
+    }
+
+    .login-shield { font-size: 56px; margin-bottom: 16px; }
+
+    .login-card h2 {
+      font-size: 28px;
+      font-weight: 900;
+      color: var(--navy);
+      margin-bottom: 8px;
+      letter-spacing: -0.02em;
+    }
+
+    .login-card p {
+      font-size: 16px;
+      color: var(--muted);
+      margin-bottom: 32px;
+      line-height: 1.55;
+    }
+
+    .login-card input {
+      width: 100%;
+      border: 2px solid var(--border);
+      border-radius: 14px;
+      padding: 18px;
+      font-size: 22px;
+      text-align: center;
+      letter-spacing: 6px;
+      font-weight: 800;
+      outline: none;
+      margin-bottom: 14px;
+      text-transform: uppercase;
+      transition: border-color 0.15s;
+      color: var(--text);
+    }
+
+    .login-card input:focus { border-color: var(--navy); }
+
+    .login-card button {
+      width: 100%;
+      background: linear-gradient(135deg, var(--navy), #2D4EAA);
+      color: white;
+      border: none;
+      border-radius: 14px;
+      padding: 17px;
+      font-size: 17px;
+      font-weight: 700;
+      cursor: pointer;
+      box-shadow: 0 4px 16px rgba(30,58,138,0.3);
+      transition: transform 0.15s var(--ease), box-shadow 0.15s;
+      -webkit-tap-highlight-color: transparent;
+    }
+
+    .login-card button:active { transform: scale(0.98); box-shadow: 0 2px 8px rgba(30,58,138,0.25); }
+
+    .login-error { color: var(--red); font-size: 14px; margin-top: 12px; display: none; font-weight: 500; }
+    .login-hint { font-size: 13px; color: var(--muted); margin-top: 20px; }
+    .login-hint strong { color: var(--text); }
+
+    /* ── DASHBOARD ───────────────────────────────────────── */
+    #dashboard { display: none; padding: 20px 18px; max-width: 720px; margin: 0 auto; }
+
+    /* ── STATUS BANNER ───────────────────────────────────── */
+    .status-banner {
+      border-radius: 20px;
+      padding: 20px 22px;
+      margin-bottom: 16px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      animation: fadeUp 0.4s var(--ease) forwards;
+    }
+
+    .status-ok    { background: linear-gradient(135deg, #F0FDF4, #DCFCE7); border: 1.5px solid #BBF7D0; }
+    .status-alert { background: linear-gradient(135deg, #FEF2F2, #FEE2E2); border: 1.5px solid #FECACA; }
+
+    .status-left { flex: 1; }
+    .status-indicator { display: flex; align-items: center; gap: 8px; margin-bottom: 4px; }
+    .status-dot { width: 10px; height: 10px; border-radius: 50%; flex-shrink: 0; }
+    .dot-green { background: var(--green); box-shadow: 0 0 8px rgba(22,163,74,0.5); }
+    .dot-red   { background: var(--red);   box-shadow: 0 0 8px rgba(220,38,38,0.5);   }
+    .status-name { font-size: 24px; font-weight: 900; color: var(--text); letter-spacing: -0.02em; }
+    .status-line { font-size: 14px; color: var(--muted); font-weight: 500; }
+
+    .call-btn {
+      background: var(--navy);
+      color: white;
+      border: none;
+      border-radius: 12px;
+      padding: 11px 18px;
+      font-size: 14px;
+      font-weight: 700;
+      cursor: pointer;
+      white-space: nowrap;
+      transition: transform 0.15s var(--ease);
+      flex-shrink: 0;
+    }
+
+    .call-btn:active { transform: scale(0.96); }
+
+    /* ── STATS GRID ──────────────────────────────────────── */
+    .stats {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 12px;
+      margin-bottom: 16px;
+    }
+
+    .stat {
+      background: var(--white);
+      border-radius: 18px;
+      padding: 18px 16px;
+      box-shadow: var(--shadow);
+      transition: transform 0.18s var(--ease), box-shadow 0.18s var(--ease);
+      animation: fadeUp 0.45s var(--ease) forwards;
+      opacity: 0;
+    }
+
+    .stat:nth-child(1) { animation-delay: 0.05s; }
+    .stat:nth-child(2) { animation-delay: 0.1s; }
+    .stat:nth-child(3) { animation-delay: 0.15s; }
+    .stat:nth-child(4) { animation-delay: 0.2s; }
+
+    .stat:hover { transform: translateY(-3px); box-shadow: var(--shadow-lg); }
+
+    .stat-emoji { font-size: 26px; margin-bottom: 8px; }
+    .stat-label { font-size: 12px; color: var(--muted); font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; margin-bottom: 4px; }
+    .stat-value { font-size: 24px; font-weight: 900; color: var(--text); letter-spacing: -0.02em; }
+    .stat-sub { font-size: 12px; color: var(--muted); margin-top: 2px; }
+    .stat.warn .stat-value { color: var(--yellow); }
+    .stat.good .stat-value { color: var(--green); }
+
+    .progress-track { height: 6px; background: var(--border); border-radius: 3px; overflow: hidden; margin-top: 10px; }
+    .progress-fill  { height: 100%; border-radius: 3px; transition: width 0.8s var(--ease); }
+    .fill-green  { background: var(--green); }
+    .fill-yellow { background: var(--yellow); }
+    .fill-red    { background: var(--red); }
+
+    /* ── TABS ────────────────────────────────────────────── */
+    .tabs {
+      display: flex;
+      gap: 8px;
+      margin-bottom: 16px;
+      overflow-x: auto;
+      padding-bottom: 2px;
+      scrollbar-width: none;
+    }
+
+    .tabs::-webkit-scrollbar { display: none; }
+
+    .tab {
+      background: var(--white);
+      border: 1.5px solid var(--border);
+      border-radius: 100px;
+      padding: 9px 18px;
+      font-size: 14px;
+      font-weight: 600;
+      cursor: pointer;
+      white-space: nowrap;
+      color: var(--muted);
+      transition: all 0.15s var(--ease);
+      -webkit-tap-highlight-color: transparent;
+    }
+
+    .tab:hover { border-color: var(--navy); color: var(--navy); }
+    .tab.active { background: var(--navy); color: white; border-color: var(--navy); }
+
+    /* ── CARDS ───────────────────────────────────────────── */
+    .card {
+      background: var(--white);
+      border-radius: 20px;
+      padding: 20px;
+      margin-bottom: 16px;
+      box-shadow: var(--shadow);
+    }
+
+    .card-title {
+      font-size: 16px;
+      font-weight: 700;
+      color: var(--muted);
+      letter-spacing: 0.04em;
+      text-transform: uppercase;
+      margin-bottom: 16px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    /* ── MED LIST ────────────────────────────────────────── */
+    .med-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 13px 0;
+      border-bottom: 1px solid var(--border);
+      gap: 12px;
+    }
+
+    .med-row:last-child { border-bottom: none; }
+    .med-name { font-size: 16px; font-weight: 700; }
+    .med-detail { font-size: 13px; color: var(--muted); margin-top: 2px; }
+
+    .med-status {
+      font-size: 13px;
+      font-weight: 700;
+      padding: 6px 12px;
+      border-radius: 8px;
+      flex-shrink: 0;
+    }
+
+    .med-taken   { background: #DCFCE7; color: #15803D; border: 1px solid #BBF7D0; }
+    .med-pending { background: #FEF9C3; color: #92400E; border: 1px solid #FDE68A; }
+
+    /* ── ACTIVITY ────────────────────────────────────────── */
+    .activity-item {
+      display: flex;
+      gap: 12px;
+      padding: 10px 0;
+      border-bottom: 1px solid var(--border);
+      align-items: flex-start;
+    }
+
+    .activity-item:last-child { border-bottom: none; }
+
+    .activity-dot {
+      width: 8px; height: 8px;
+      border-radius: 50%;
+      background: var(--navy);
+      flex-shrink: 0;
+      margin-top: 6px;
+    }
+
+    .activity-text { font-size: 14px; color: var(--text); flex: 1; line-height: 1.4; }
+    .activity-time { font-size: 12px; color: var(--muted); white-space: nowrap; font-weight: 500; }
+
+    /* ── ALERTS ──────────────────────────────────────────── */
+    .alert-item {
+      background: #FEF2F2;
+      border: 1px solid #FECACA;
+      border-radius: 14px;
+      padding: 14px 16px;
+      margin-bottom: 10px;
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      gap: 12px;
+    }
+
+    .alert-msg { font-size: 14px; color: var(--text); font-weight: 500; }
+    .alert-time { font-size: 12px; color: var(--muted); margin-top: 4px; }
+
+    .resolve-btn {
+      background: var(--white);
+      border: 1.5px solid var(--border);
+      border-radius: 8px;
+      padding: 7px 13px;
+      font-size: 13px;
+      font-weight: 600;
+      cursor: pointer;
+      color: var(--muted);
+      white-space: nowrap;
+      flex-shrink: 0;
+      transition: border-color 0.15s, color 0.15s;
+    }
+
+    .resolve-btn:hover { border-color: var(--green); color: var(--green); }
+    .no-alerts { color: var(--muted); font-size: 15px; padding: 6px 0; }
+
+    /* ── CONVERSATIONS ───────────────────────────────────── */
+    .convo-item {
+      display: flex;
+      gap: 10px;
+      margin-bottom: 10px;
+    }
+
+    .convo-bubble {
+      padding: 10px 14px;
+      border-radius: 14px;
+      font-size: 14px;
+      line-height: 1.5;
+      max-width: 82%;
+    }
+
+    .convo-user { background: var(--navy); color: white; }
+    .convo-sage { background: #EEF4FF; color: var(--text); border: 1px solid #DBEAFE; }
+    .convo-label { font-size: 11px; color: var(--muted); margin-bottom: 4px; font-weight: 600; letter-spacing: 0.03em; text-transform: uppercase; }
+
+    /* ── ADD MED FORM ────────────────────────────────────── */
+    .add-med-form { display: none; border-top: 1px solid var(--border); padding-top: 16px; margin-top: 16px; }
+    .add-med-form.open { display: block; }
+
+    .form-row { display: flex; gap: 10px; margin-bottom: 10px; }
+
+    .form-row input, .form-row select {
+      flex: 1;
+      border: 2px solid var(--border);
+      border-radius: 10px;
+      padding: 11px 13px;
+      font-size: 14px;
+      outline: none;
+      transition: border-color 0.15s;
+      color: var(--text);
+      background: var(--bg);
+    }
+
+    .form-row input:focus, .form-row select:focus { border-color: var(--navy); background: white; }
+
+    .add-btn {
+      background: var(--teal);
+      color: white;
+      border: none;
+      border-radius: 10px;
+      padding: 11px 18px;
+      font-size: 14px;
+      font-weight: 700;
+      cursor: pointer;
+      flex-shrink: 0;
+      transition: transform 0.15s var(--ease);
+    }
+
+    .add-btn:active { transform: scale(0.96); }
+
+    .toggle-form-btn {
+      background: none;
+      border: 2px dashed var(--border);
+      border-radius: 12px;
+      padding: 11px 16px;
+      font-size: 14px;
+      color: var(--muted);
+      cursor: pointer;
+      width: 100%;
+      font-weight: 600;
+      margin-top: 14px;
+      transition: border-color 0.15s, color 0.15s;
+    }
+
+    .toggle-form-btn:hover { border-color: var(--teal); color: var(--teal); }
+
+    /* ── EMPTY / TOAST ───────────────────────────────────── */
+    .empty { color: var(--muted); font-size: 14px; padding: 8px 0; }
+
+    #toast {
+      position: fixed;
+      top: 24px;
+      left: 50%;
+      transform: translateX(-50%) translateY(-8px);
+      background: #0F172A;
+      color: white;
+      padding: 12px 22px;
+      border-radius: 100px;
+      font-size: 14px;
+      font-weight: 600;
+      opacity: 0;
+      transition: opacity 0.25s var(--ease), transform 0.25s var(--ease);
+      z-index: 999;
+      pointer-events: none;
+      white-space: nowrap;
+    }
+
+    #toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+
+    /* ── ANIMATIONS ──────────────────────────────────────── */
+    @keyframes fadeUp {
+      to { opacity: 1; transform: translateY(0); }
+    }
+
+    @media (max-width: 480px) {
+      .stats { grid-template-columns: 1fr 1fr; }
+      #dashboard { padding: 16px 14px; }
+    }
+  </style>
+</head>
+<body>
+
+<header>
+  <div>
+    <div class="logo">🌿 Sage Family</div>
+    <div class="header-sub" id="headerSub">Family Dashboard</div>
+  </div>
+  <div class="header-actions">
+    <button class="header-btn" onclick="loadDashboard()">↻ Refresh</button>
+    <button class="header-btn" onclick="logout()">Sign out</button>
+  </div>
+</header>
+
+<!-- Login -->
+<div id="loginScreen">
+  <div class="login-card">
+    <div class="login-shield">🛡️</div>
+    <h2>Family Access</h2>
+    <p>Enter your family code to monitor your loved one and stay connected.</p>
+    <input type="text" id="codeInput" placeholder="FAMILY123" maxlength="10"
+      oninput="this.value=this.value.toUpperCase()"
+      onkeydown="if(event.key==='Enter') joinFamily()" />
+    <button onclick="joinFamily()">Connect →</button>
+    <div class="login-error" id="loginError">Code not found. Please check and try again.</div>
+    <p class="login-hint">Demo code: <strong>FAMILY123</strong></p>
+  </div>
+</div>
+
+<!-- Dashboard -->
+<div id="dashboard">
+
+  <!-- Status banner -->
+  <div class="status-banner status-ok" id="statusBanner">
+    <div class="status-left">
+      <div class="status-indicator">
+        <div class="status-dot dot-green" id="statusDot"></div>
+        <div class="status-name" id="seniorNameDisplay">Loading…</div>
+      </div>
+      <div class="status-line" id="statusLine">Checking status…</div>
+    </div>
+    <button class="call-btn" id="callBtn">📞 Call</button>
+  </div>
+
+  <!-- Stats -->
+  <div class="stats" id="statsGrid">
+    <div class="stat">
+      <div class="stat-emoji">💊</div>
+      <div class="stat-label">Medications</div>
+      <div class="stat-value" id="statMeds">—</div>
+      <div class="stat-sub" id="statMedsSub">taken today</div>
+    </div>
+    <div class="stat">
+      <div class="stat-emoji">📋</div>
+      <div class="stat-label">Adherence</div>
+      <div class="stat-value" id="statAdh">—%</div>
+      <div class="progress-track"><div class="progress-fill" id="adhBar" style="width:0%"></div></div>
+    </div>
+    <div class="stat">
+      <div class="stat-emoji">⚠️</div>
+      <div class="stat-label">Open Alerts</div>
+      <div class="stat-value" id="statAlerts">—</div>
+    </div>
+    <div class="stat">
+      <div class="stat-emoji">💬</div>
+      <div class="stat-label">AI Chats Today</div>
+      <div class="stat-value" id="statConvo">—</div>
+    </div>
+  </div>
+
+  <!-- Tabs -->
+  <div class="tabs">
+    <button class="tab active" onclick="showTab('meds', this)">💊 Medications</button>
+    <button class="tab" onclick="showTab('activity', this)">📋 Activity</button>
+    <button class="tab" onclick="showTab('alerts', this)">⚠️ Alerts</button>
+    <button class="tab" onclick="showTab('convo', this)">💬 Conversations</button>
+    <button class="tab" onclick="showTab('doctorq', this)">❓ Doctor Questions</button>
+    <button class="tab" onclick="showTab('visits', this)">🩺 Visit Transcripts</button>
+    <button class="tab" onclick="showTab('calendar', this)">📅 Calendar</button>
+  </div>
+
+  <!-- Medications tab -->
+  <div id="tab-meds" class="card">
+    <div class="card-title">💊 Medications</div>
+    <div id="medList">Loading…</div>
+    <button class="toggle-form-btn" onclick="toggleAddMed()">+ Add medication</button>
+    <div class="add-med-form" id="addMedForm">
+      <div class="form-row">
+        <input type="text" id="medName" placeholder="Medication name" />
+        <input type="text" id="medDosage" placeholder="Dose (e.g. 10mg)" />
+      </div>
+      <div class="form-row">
+        <input type="time" id="medTime1" value="08:00" />
+        <input type="time" id="medTime2" placeholder="2nd time (optional)" />
+      </div>
+      <div class="form-row">
+        <select id="medFood">
+          <option value="0">No food required</option>
+          <option value="1">Take with food</option>
+        </select>
+        <button class="add-btn" onclick="addMedication()">Add</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Activity tab -->
+  <div id="tab-activity" class="card" style="display:none">
+    <div class="card-title">📋 Activity Feed</div>
+    <div id="activityList">Loading…</div>
+  </div>
+
+  <!-- Alerts tab -->
+  <div id="tab-alerts" class="card" style="display:none">
+    <div class="card-title">⚠️ Alerts</div>
+    <div id="alertList">Loading…</div>
+  </div>
+
+  <!-- Conversations tab -->
+  <div id="tab-convo" class="card" style="display:none">
+    <div class="card-title">💬 Conversations with Sage</div>
+    <div id="convoList">Loading…</div>
+  </div>
+
+  <!-- Doctor Questions tab -->
+  <div id="tab-doctorq" class="card" style="display:none">
+    <div class="card-title">❓ Doctor Questions</div>
+    <p style="color:var(--muted);font-size:15px;margin-bottom:16px;">Questions saved from conversations with Sage — to be asked at the next doctor visit.</p>
+    <div id="doctorqList">Loading…</div>
+  </div>
+
+  <!-- Doctor Visit Transcripts tab -->
+  <div id="tab-visits" class="card" style="display:none">
+    <div class="card-title">🩺 Doctor Visit Transcripts</div>
+    <p style="color:var(--muted);font-size:15px;margin-bottom:16px;">Recordings made during doctor visits using the Sage companion app.</p>
+    <div id="visitsList">Loading…</div>
+  </div>
+
+  <!-- Calendar tab -->
+  <div id="tab-calendar" class="card" style="display:none">
+    <div class="card-title">📅 Upcoming Appointments</div>
+    <p style="color:var(--muted);font-size:15px;margin-bottom:16px;">Appointments added by voice, photo scan, or synced from Google Calendar.</p>
+    <div id="calendarList">Loading…</div>
+  </div>
+
+</div>
+
+<div id="toast"></div>
+
+<script>
+  let seniorId = localStorage.getItem("familySeniorId");
+  let seniorName = "";
+  let activeTab = "meds";
+
+  async function joinFamily() {
+    const code = document.getElementById("codeInput").value.trim().toUpperCase();
+    if (!code) return;
+
+    const res = await fetch(`/api/senior/by-code/${code}`);
+    if (!res.ok) {
+      document.getElementById("loginError").style.display = "block";
+      return;
+    }
+
+    const senior = await res.json();
+    seniorId = senior._id;
+    seniorName = senior.name;
+    localStorage.setItem("familySeniorId", seniorId);
+    localStorage.setItem("familySeniorName", seniorName);
+
+    document.getElementById("loginError").style.display = "none";
+    showDashboard();
+  }
+
+  async function showDashboard() {
+    if (!seniorId) return;
+    document.getElementById("loginScreen").style.display = "none";
+    document.getElementById("dashboard").style.display = "block";
+    seniorName = localStorage.getItem("familySeniorName") || seniorName;
+    document.getElementById("headerSub").textContent = `Monitoring ${seniorName}`;
+    await loadDashboard();
+    setInterval(loadDashboard, 30000);
+  }
+
+  async function loadDashboard() {
+    if (!seniorId) return;
+    try {
+      const res = await fetch(`/api/dashboard/${seniorId}`);
+      const d = await res.json();
+
+      document.getElementById("seniorNameDisplay").textContent = d.senior.name;
+      const last = d.recentActivity[0];
+      const lastTime = last ? formatRelTime(last.timestamp) : "No activity yet";
+      document.getElementById("statusLine").textContent = `Last activity: ${lastTime}`;
+
+      const hasAlerts = d.stats.activeAlerts > 0;
+      document.getElementById("statusBanner").className = `status-banner ${hasAlerts ? "status-alert" : "status-ok"}`;
+      const dot = document.getElementById("statusDot");
+      dot.className = `status-dot ${hasAlerts ? "dot-red" : "dot-green"}`;
+
+      document.getElementById("callBtn").onclick = () => showToast("No phone number on file for " + d.senior.name);
+
+      document.getElementById("statMeds").textContent = `${d.stats.medicationsTaken}/${d.stats.medicationsTotal}`;
+      const adh = d.stats.adherence;
+      document.getElementById("statAdh").textContent = `${adh}%`;
+      const bar = document.getElementById("adhBar");
+      bar.style.width = `${adh}%`;
+      bar.className = `progress-fill ${adh >= 80 ? "fill-green" : adh >= 50 ? "fill-yellow" : "fill-red"}`;
+
+      document.getElementById("statAlerts").textContent = d.stats.activeAlerts;
+      document.getElementById("statConvo").textContent = d.stats.conversationsToday;
+
+      renderMeds(d.medications);
+      renderActivity(d.recentActivity);
+      renderAlerts(d.alerts);
+      await loadConversations();
+
+    } catch (e) {
+      console.error("Dashboard load error:", e);
+    }
+  }
+
+  function renderMeds(meds) {
+    const el = document.getElementById("medList");
+    if (!meds || meds.length === 0) {
+      el.innerHTML = `<p class="empty">No medications added yet. Use the + button below to add one.</p>`;
+      return;
+    }
+    el.innerHTML = meds.map(m => `
+      <div class="med-row">
+        <div class="med-info">
+          <div class="med-name">${m.name}</div>
+          <div class="med-detail">${m.dose ? m.dose + " · " : ""}${m.time}${m.withFood ? " · with food" : ""}</div>
+        </div>
+        <div class="med-status ${m.takenToday ? "med-taken" : "med-pending"}">
+          ${m.takenToday ? "✓ Taken" : "⏳ Pending"}
+        </div>
+      </div>`).join("");
+  }
+
+  function renderActivity(activity) {
+    const el = document.getElementById("activityList");
+    if (!activity || activity.length === 0) {
+      el.innerHTML = `<p class="empty">No activity recorded yet.</p>`;
+      return;
+    }
+    const icons = { wake:"⏰", meal:"🍽️", medication_taken:"💊", conversation:"💬", emergency:"🚨", medication_added:"💊", system:"🛡️" };
+    el.innerHTML = activity.map(a => `
+      <div class="activity-item">
+        <div class="activity-dot"></div>
+        <div class="activity-text">${icons[a.type] || "•"} ${a.description}</div>
+        <div class="activity-time">${formatRelTime(a.timestamp)}</div>
+      </div>`).join("");
+  }
+
+  function renderAlerts(alerts) {
+    const el = document.getElementById("alertList");
+    if (!alerts || alerts.length === 0) {
+      el.innerHTML = `<p class="no-alerts">✅ No unresolved alerts</p>`;
+      return;
+    }
+    el.innerHTML = alerts.map(a => `
+      <div class="alert-item">
+        <div>
+          <div class="alert-msg">${a.message}</div>
+          <div class="alert-time">${formatRelTime(a.createdAt)}</div>
+        </div>
+        <button class="resolve-btn" onclick="resolveAlert('${a._id}')">Resolve</button>
+      </div>`).join("");
+  }
+
+  async function loadConversations() {
+    const res = await fetch(`/api/conversations/${seniorId}`);
+    const sessions = await res.json();
+    const el = document.getElementById("convoList");
+    if (!sessions || sessions.length === 0) {
+      el.innerHTML = `<p class="empty">No conversations yet. ${seniorName} hasn't talked to Sage today.</p>`;
+      return;
+    }
+    const allMessages = sessions.flatMap(s => s.messages).slice(-20);
+    renderConvos(allMessages);
+  }
+
+  async function resolveAlert(id) {
+    await fetch(`/api/alerts/${id}/resolve`, { method: "POST" });
+    showToast("Alert resolved");
+    await loadDashboard();
+  }
+
+  function renderConvos(messages) {
+    const el = document.getElementById("convoList");
+    if (!messages || messages.length === 0) {
+      el.innerHTML = `<p class="empty">No conversations yet.</p>`;
+      return;
+    }
+    el.innerHTML = messages.map(m => `
+      <div class="convo-item" style="${m.role === "user" ? "justify-content:flex-end" : "justify-content:flex-start"}">
+        <div>
+          <div class="convo-label">${m.role === "user" ? seniorName : "Sage"}</div>
+          <div class="convo-bubble ${m.role === "user" ? "convo-user" : "convo-sage"}">${m.content}</div>
+        </div>
+      </div>`).join("");
+  }
+
+  function toggleAddMed() {
+    document.getElementById("addMedForm").classList.toggle("open");
+  }
+
+  async function addMedication() {
+    const name     = document.getElementById("medName").value.trim();
+    const dose     = document.getElementById("medDosage").value.trim();
+    const time     = document.getElementById("medTime1").value;
+    const withFood = document.getElementById("medFood").value === "1";
+    if (!name) { showToast("Please enter a medication name"); return; }
+
+    await fetch("/api/medications", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ seniorId, name, dose, time, withFood })
+    });
+
+    document.getElementById("medName").value = "";
+    document.getElementById("medDosage").value = "";
+    document.getElementById("addMedForm").classList.remove("open");
+    showToast(`✓ ${name} added`);
+    await loadDashboard();
+  }
+
+  function showTab(name, btn) {
+    ["meds","activity","alerts","convo","doctorq","visits","calendar"].forEach(t => {
+      document.getElementById(`tab-${t}`).style.display = "none";
+    });
+    document.querySelectorAll(".tab").forEach(b => b.classList.remove("active"));
+    document.getElementById(`tab-${name}`).style.display = "block";
+    btn.classList.add("active");
+    activeTab = name;
+    if (name === "doctorq")  loadDoctorQuestions();
+    if (name === "visits")   loadVisits();
+    if (name === "calendar") loadCalendar();
+  }
+
+  // ── Calendar ────────────────────────────────────────────────────────────────
+  async function loadCalendar() {
+    const el = document.getElementById("calendarList");
+    try {
+      const res = await fetch(`/api/appointments/${seniorId}`);
+      const appts = await res.json();
+
+      if (!appts || appts.length === 0) {
+        el.innerHTML = `<p style="color:var(--muted);font-style:italic;font-size:15px;">No upcoming appointments. ${seniorName} can add them by voice or photo scan in the Sage app.</p>`;
+        return;
+      }
+
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+
+      // Group by date
+      const groups = {};
+      appts.forEach(a => {
+        const d = a.date || "Unknown date";
+        if (!groups[d]) groups[d] = [];
+        groups[d].push(a);
+      });
+
+      let html = "";
+      Object.keys(groups).sort().forEach(dateKey => {
+        const apptDate = new Date(dateKey + "T00:00:00");
+        const isToday  = apptDate.toDateString() === today.toDateString();
+        const isPast   = apptDate < today;
+        const label    = isToday ? "Today" : apptDate.toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric" });
+
+        html += `
+          <div style="margin-bottom:18px;">
+            <div style="font-size:13px;font-weight:700;letter-spacing:.05em;text-transform:uppercase;
+              color:${isToday ? "var(--teal)" : isPast ? "var(--muted)" : "var(--navy)"};
+              margin-bottom:8px;display:flex;align-items:center;gap:6px;">
+              ${isToday ? "📍" : isPast ? "✓" : "📅"} ${label}
+            </div>`;
+
+        groups[dateKey].forEach(a => {
+          html += `
+            <div style="display:flex;align-items:flex-start;gap:12px;padding:12px 14px;
+              background:${isToday ? "#F0FDF4" : isPast ? "#F8FAFC" : "#FAFAFA"};
+              border:1px solid ${isToday ? "#BBF7D0" : "var(--border)"};
+              border-radius:12px;margin-bottom:8px;opacity:${isPast ? "0.65" : "1"};">
+              <div style="flex:1;">
+                <div style="font-size:15px;font-weight:700;color:var(--text);">${escHtml(a.title)}</div>
+                ${a.time ? `<div style="font-size:13px;color:var(--navy);font-weight:600;margin-top:2px;">⏰ ${escHtml(a.time)}</div>` : ""}
+                ${a.location ? `<div style="font-size:13px;color:var(--muted);margin-top:2px;">📍 ${escHtml(a.location)}</div>` : ""}
+                ${a.notes ? `<div style="font-size:13px;color:var(--muted);margin-top:4px;font-style:italic;">${escHtml(a.notes)}</div>` : ""}
+              </div>
+              ${a.source ? `<span style="font-size:11px;font-weight:700;color:var(--muted);padding:3px 8px;background:var(--bg);border-radius:6px;white-space:nowrap;align-self:flex-start;">${escHtml(a.source)}</span>` : ""}
+            </div>`;
+        });
+
+        html += `</div>`;
+      });
+
+      el.innerHTML = html;
+    } catch (e) {
+      el.innerHTML = `<p style="color:var(--muted);">Couldn't load appointments.</p>`;
+    }
+  }
+
+  // ── Doctor Questions ────────────────────────────────────────────────────────
+  async function loadDoctorQuestions() {
+    const el = document.getElementById("doctorqList");
+    try {
+      const res = await fetch(`/api/doctor-questions/${seniorId}`);
+      const questions = await res.json();
+
+      if (!questions || questions.length === 0) {
+        el.innerHTML = `<p style="color:var(--muted);font-style:italic;font-size:16px;">No doctor questions yet. They'll appear here when ${seniorName} adds them through Sage.</p>`;
+        return;
+      }
+
+      const pending = questions.filter(q => !q.asked);
+      const asked   = questions.filter(q => q.asked);
+
+      let html = "";
+      if (pending.length > 0) {
+        html += `<div style="font-size:13px;font-weight:700;color:var(--muted);letter-spacing:.05em;text-transform:uppercase;margin-bottom:10px;">Pending (${pending.length})</div>`;
+        html += pending.map(q => `
+          <div style="display:flex;align-items:flex-start;gap:12px;padding:12px 0;border-bottom:1px solid var(--border);">
+            <span style="font-size:18px;margin-top:2px;color:var(--navy);">❓</span>
+            <div style="flex:1;">
+              <div style="font-size:16px;line-height:1.5;color:var(--text);">${escHtml(q.question)}</div>
+              <div style="font-size:13px;color:var(--muted);margin-top:3px;">${formatRelTime(q.createdAt)}</div>
+            </div>
+          </div>
+        `).join("");
+      }
+      if (asked.length > 0) {
+        html += `<div style="font-size:13px;font-weight:700;color:var(--muted);letter-spacing:.05em;text-transform:uppercase;margin:16px 0 10px;">Already Asked (${asked.length})</div>`;
+        html += asked.map(q => `
+          <div style="display:flex;align-items:flex-start;gap:12px;padding:12px 0;border-bottom:1px solid var(--border);opacity:0.6;">
+            <span style="font-size:18px;margin-top:2px;color:var(--green);">✓</span>
+            <div style="font-size:16px;line-height:1.5;text-decoration:line-through;color:var(--muted);">${escHtml(q.question)}</div>
+          </div>
+        `).join("");
+      }
+
+      el.innerHTML = html;
+    } catch (e) {
+      el.innerHTML = `<p style="color:var(--muted);">Couldn't load questions.</p>`;
+    }
+  }
+
+  // ── Doctor Visit Transcripts ────────────────────────────────────────────────
+  async function loadVisits() {
+    const el = document.getElementById("visitsList");
+    try {
+      const res = await fetch(`/api/doctor-visits/${seniorId}`);
+      const visits = await res.json();
+
+      if (!visits || visits.length === 0) {
+        el.innerHTML = `<p style="color:var(--muted);font-style:italic;font-size:16px;">No visit recordings yet. ${seniorName} can record doctor visits using the Sage companion app at <strong>/doctor</strong>.</p>`;
+        return;
+      }
+
+      el.innerHTML = visits.map((v, i) => {
+        const date = new Date(v.createdAt).toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric", year: "numeric" });
+        const time = new Date(v.createdAt).toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" });
+        const preview = v.transcript.length > 300 ? v.transcript.slice(0, 300) + "…" : v.transcript;
+        return `
+          <div style="border:1px solid var(--border);border-radius:14px;padding:18px;margin-bottom:14px;background:#F8FAFC;">
+            <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:10px;flex-wrap:wrap;gap:8px;">
+              <div>
+                <div style="font-size:16px;font-weight:700;color:var(--navy);">🩺 ${date}</div>
+                <div style="font-size:14px;color:var(--muted);margin-top:2px;">${time}${v.doctorName ? ` · Dr. ${escHtml(v.doctorName)}` : ""} · ${v.wordCount} words</div>
+              </div>
+              <span style="background:#EEF4FF;color:var(--navy);border-radius:8px;padding:4px 10px;font-size:13px;font-weight:700;">Transcript</span>
+            </div>
+            <div id="visit-text-${i}" style="font-size:15px;line-height:1.7;color:var(--text);white-space:pre-wrap;max-height:140px;overflow:hidden;position:relative;">${escHtml(preview)}</div>
+            ${v.transcript.length > 300 ? `
+              <button onclick="expandVisit(${i}, \`${escHtml(v.transcript)}\`)" id="expand-btn-${i}"
+                style="background:none;border:none;color:var(--navy);font-size:14px;font-weight:700;cursor:pointer;margin-top:8px;padding:0;">
+                Read full transcript ↓
+              </button>` : ""}
+            ${v.notes ? `<div style="margin-top:10px;padding-top:10px;border-top:1px solid var(--border);font-size:14px;color:var(--muted);"><strong>Notes:</strong> ${escHtml(v.notes)}</div>` : ""}
+          </div>
+        `;
+      }).join("");
+    } catch (e) {
+      el.innerHTML = `<p style="color:var(--muted);">Couldn't load visit transcripts.</p>`;
+    }
+  }
+
+  function expandVisit(i, fullText) {
+    document.getElementById(`visit-text-${i}`).style.maxHeight = "none";
+    document.getElementById(`visit-text-${i}`).textContent = fullText;
+    const btn = document.getElementById(`expand-btn-${i}`);
+    if (btn) btn.style.display = "none";
+  }
+
+  function escHtml(s) {
+    return String(s).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;");
+  }
+
+  function formatRelTime(ts) {
+    if (!ts) return "";
+    const d = new Date(ts);
+    const diff = Math.floor((Date.now() - d.getTime()) / 1000);
+    if (diff < 60)    return "just now";
+    if (diff < 3600)  return `${Math.floor(diff / 60)}m ago`;
+    if (diff < 86400) return `${Math.floor(diff / 3600)}h ago`;
+    return d.toLocaleDateString();
+  }
+
+  function showToast(msg) {
+    const t = document.getElementById("toast");
+    t.textContent = msg;
+    t.classList.add("show");
+    setTimeout(() => t.classList.remove("show"), 3000);
+  }
+
+  function logout() {
+    localStorage.removeItem("familySeniorId");
+    localStorage.removeItem("familySeniorName");
+    location.reload();
+  }
+
+  if (seniorId) showDashboard();
+</script>
+</body>
+</html>

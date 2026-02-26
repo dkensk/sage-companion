@@ -1,0 +1,1210 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>Sage — Your Companion</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --navy:   #1E3A8A;
+      --teal:   #0F766E;
+      --bg:     #F1F5F9;
+      --white:  #FFFFFF;
+      --text:   #0F172A;
+      --muted:  #64748B;
+      --border: #E2E8F0;
+      --red:    #DC2626;
+      --green:  #16A34A;
+      --ease:   cubic-bezier(0.25, 0.46, 0.45, 0.94);
+      --shadow: 0 2px 12px rgba(0,0,0,0.07), 0 1px 3px rgba(0,0,0,0.05);
+      --shadow-lg: 0 8px 32px rgba(0,0,0,0.12), 0 2px 8px rgba(0,0,0,0.06);
+    }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      font-size: 20px;
+      min-height: 100vh;
+      padding-bottom: 120px;
+      -webkit-font-smoothing: antialiased;
+    }
+
+    /* ── HEADER ──────────────────────────────────────────── */
+    header {
+      background: linear-gradient(135deg, var(--navy) 0%, #1E4DA0 100%);
+      color: white;
+      padding: 20px 24px 24px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      position: sticky;
+      top: 0;
+      z-index: 100;
+      box-shadow: 0 2px 16px rgba(30,58,138,0.25);
+    }
+
+    .logo {
+      font-size: 24px;
+      font-weight: 900;
+      letter-spacing: -0.5px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .logo-shield { font-size: 22px; }
+
+    .greeting {
+      font-size: 16px;
+      opacity: 0.8;
+      margin-top: 3px;
+      font-weight: 500;
+    }
+
+    .header-time {
+      text-align: right;
+      font-size: 13px;
+      opacity: 0.7;
+      font-weight: 500;
+      line-height: 1.5;
+    }
+
+    /* ── MAIN ────────────────────────────────────────────── */
+    .main {
+      padding: 20px 18px;
+      max-width: 580px;
+      margin: 0 auto;
+    }
+
+    /* ── CARDS ───────────────────────────────────────────── */
+    .card {
+      background: var(--white);
+      border-radius: 20px;
+      padding: 22px 20px;
+      margin-bottom: 16px;
+      box-shadow: var(--shadow);
+      opacity: 0;
+      transform: translateY(16px);
+      animation: fadeUp 0.5s var(--ease) forwards;
+    }
+
+    .card:nth-child(1) { animation-delay: 0.05s; }
+    .card:nth-child(2) { animation-delay: 0.12s; }
+    .card:nth-child(3) { animation-delay: 0.19s; }
+    .card:nth-child(4) { animation-delay: 0.26s; }
+
+    @keyframes fadeUp {
+      to { opacity: 1; transform: translateY(0); }
+    }
+
+    .section-title {
+      font-size: 17px;
+      font-weight: 700;
+      color: var(--muted);
+      letter-spacing: 0.04em;
+      text-transform: uppercase;
+      margin-bottom: 16px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    /* ── TALK BUTTON ─────────────────────────────────────── */
+    #talkBtn {
+      width: 100%;
+      background: linear-gradient(145deg, var(--navy), #2D4EAA);
+      color: white;
+      border: none;
+      border-radius: 18px;
+      padding: 28px 20px;
+      font-size: 24px;
+      font-weight: 800;
+      letter-spacing: 1px;
+      cursor: pointer;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 10px;
+      margin-bottom: 16px;
+      transition: transform 0.15s var(--ease), box-shadow 0.15s var(--ease);
+      box-shadow: 0 6px 24px rgba(30,58,138,0.35);
+      min-height: 120px;
+      -webkit-tap-highlight-color: transparent;
+      position: relative;
+      overflow: hidden;
+    }
+
+    #talkBtn::before {
+      content: '';
+      position: absolute; inset: 0;
+      background: linear-gradient(145deg, rgba(255,255,255,0.08), transparent);
+      border-radius: inherit;
+    }
+
+    #talkBtn:active { transform: scale(0.97); box-shadow: 0 2px 10px rgba(30,58,138,0.3); }
+
+    #talkBtn.listening {
+      background: linear-gradient(145deg, var(--teal), #0D9488);
+      box-shadow: 0 6px 24px rgba(15,118,110,0.4);
+      animation: listenPulse 1.5s ease-in-out infinite;
+    }
+
+    @keyframes listenPulse {
+      0%, 100% { box-shadow: 0 6px 24px rgba(15,118,110,0.4); }
+      50% { box-shadow: 0 6px 40px rgba(15,118,110,0.65), 0 0 0 8px rgba(15,118,110,0.12); }
+    }
+
+    .mic-wrap {
+      position: relative;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    #micIcon { font-size: 44px; line-height: 1; }
+
+    #talkBtnLabel {
+      font-size: 20px;
+      font-weight: 800;
+      letter-spacing: 2px;
+      opacity: 0.95;
+    }
+
+    /* ── CHAT AREA ───────────────────────────────────────── */
+    #chatArea {
+      max-height: 280px;
+      overflow-y: auto;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      padding: 2px 0 4px;
+      scroll-behavior: smooth;
+    }
+
+    #chatArea::-webkit-scrollbar { width: 4px; }
+    #chatArea::-webkit-scrollbar-track { background: transparent; }
+    #chatArea::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
+
+    .bubble {
+      padding: 13px 17px;
+      border-radius: 18px;
+      max-width: 86%;
+      font-size: 19px;
+      line-height: 1.5;
+      animation: bubbleIn 0.2s var(--ease);
+    }
+
+    @keyframes bubbleIn {
+      from { opacity: 0; transform: scale(0.95) translateY(6px); }
+      to   { opacity: 1; transform: scale(1) translateY(0); }
+    }
+
+    .bubble.user {
+      background: var(--navy);
+      color: white;
+      align-self: flex-end;
+      border-bottom-right-radius: 5px;
+    }
+
+    .bubble.assistant {
+      background: #EEF4FF;
+      color: var(--text);
+      align-self: flex-start;
+      border-bottom-left-radius: 5px;
+      border: 1px solid #DBEAFE;
+    }
+
+    .bubble.thinking {
+      background: #F1F5F9;
+      color: var(--muted);
+      font-style: italic;
+      align-self: flex-start;
+      border-bottom-left-radius: 5px;
+    }
+
+    .dots { display: inline-flex; gap: 4px; }
+    .dots span {
+      width: 6px; height: 6px;
+      border-radius: 50%;
+      background: var(--muted);
+      animation: dot 1.2s ease-in-out infinite;
+    }
+    .dots span:nth-child(2) { animation-delay: 0.2s; }
+    .dots span:nth-child(3) { animation-delay: 0.4s; }
+    @keyframes dot { 0%,80%,100%{opacity:0.3;transform:scale(0.8)} 40%{opacity:1;transform:scale(1)} }
+
+    /* ── TYPE INPUT ──────────────────────────────────────── */
+    .type-row {
+      display: flex;
+      gap: 10px;
+      margin-top: 14px;
+    }
+
+    .type-row input {
+      flex: 1;
+      border: 2px solid var(--border);
+      border-radius: 14px;
+      padding: 14px 16px;
+      font-size: 18px;
+      outline: none;
+      background: var(--bg);
+      transition: border-color 0.15s;
+      color: var(--text);
+    }
+
+    .type-row input:focus { border-color: var(--navy); background: white; }
+
+    /* ── LIVE LISTEN STATUS ──────────────────────────────────── */
+    #listenStatus {
+      display: none;
+      background: #F0FDF4;
+      border: 1.5px solid #BBF7D0;
+      border-radius: 14px;
+      padding: 13px 16px;
+      font-size: 18px;
+      color: var(--text);
+      line-height: 1.5;
+      margin-bottom: 12px;
+      min-height: 48px;
+      font-style: italic;
+      color: var(--muted);
+      animation: fadeUp 0.2s var(--ease);
+    }
+
+    /* ── ASK DOCTOR BUTTON ───────────────────────────────────── */
+    .ask-doctor-btn {
+      align-self: flex-start;
+      background: #F0FDF4;
+      color: var(--green);
+      border: 1.5px solid #BBF7D0;
+      border-radius: 12px;
+      padding: 10px 16px;
+      font-size: 16px;
+      font-weight: 700;
+      cursor: pointer;
+      margin-top: 2px;
+      transition: background 0.15s, transform 0.15s;
+      -webkit-tap-highlight-color: transparent;
+    }
+    .ask-doctor-btn:hover { background: #DCFCE7; }
+    .ask-doctor-btn:active { transform: scale(0.97); }
+    .ask-doctor-btn:disabled { cursor: default; }
+
+    .type-row button {
+      background: var(--teal);
+      color: white;
+      border: none;
+      border-radius: 14px;
+      padding: 14px 22px;
+      font-size: 18px;
+      font-weight: 700;
+      cursor: pointer;
+      white-space: nowrap;
+      transition: transform 0.15s var(--ease), background 0.15s;
+      -webkit-tap-highlight-color: transparent;
+    }
+
+    .type-row button:active { transform: scale(0.96); background: #0D9488; }
+
+    /* ── QUICK ACTIONS ───────────────────────────────────── */
+    .actions {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 12px;
+      margin-bottom: 16px;
+    }
+
+    .action-btn {
+      background: var(--white);
+      border: 2px solid var(--border);
+      border-radius: 18px;
+      padding: 20px 12px;
+      font-size: 17px;
+      font-weight: 700;
+      color: var(--text);
+      cursor: pointer;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 8px;
+      min-height: 88px;
+      box-shadow: var(--shadow);
+      transition: transform 0.15s var(--ease), box-shadow 0.15s var(--ease), border-color 0.15s;
+      -webkit-tap-highlight-color: transparent;
+      opacity: 0;
+      animation: fadeUp 0.5s var(--ease) 0.25s forwards;
+    }
+
+    .action-btn:active { transform: scale(0.96); }
+    .action-btn:hover { border-color: var(--navy); box-shadow: var(--shadow-lg); }
+    .action-btn .icon { font-size: 30px; }
+
+    /* ── MEDICATIONS ─────────────────────────────────────── */
+    .med-item {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 16px 0;
+      border-bottom: 1px solid var(--border);
+      gap: 12px;
+    }
+
+    .med-item:last-child { border-bottom: none; }
+
+    .med-name {
+      font-size: 20px;
+      font-weight: 700;
+      color: var(--text);
+    }
+
+    .med-detail {
+      font-size: 16px;
+      color: var(--muted);
+      margin-top: 3px;
+    }
+
+    .take-btn {
+      background: var(--green);
+      color: white;
+      border: none;
+      border-radius: 14px;
+      padding: 13px 22px;
+      font-size: 18px;
+      font-weight: 700;
+      cursor: pointer;
+      white-space: nowrap;
+      min-width: 88px;
+      min-height: 52px;
+      flex-shrink: 0;
+      transition: transform 0.15s var(--ease), background 0.15s;
+      box-shadow: 0 3px 10px rgba(22,163,74,0.3);
+      -webkit-tap-highlight-color: transparent;
+    }
+
+    .take-btn:active { transform: scale(0.95); background: #15803D; }
+
+    .taken-badge {
+      background: #DCFCE7;
+      color: var(--green);
+      border-radius: 12px;
+      padding: 11px 18px;
+      font-size: 17px;
+      font-weight: 700;
+      flex-shrink: 0;
+      border: 1.5px solid #BBF7D0;
+    }
+
+    /* ── EMERGENCY BAR ───────────────────────────────────── */
+    .emergency-bar {
+      position: fixed;
+      bottom: 0; left: 0; right: 0;
+      background: white;
+      border-top: 1px solid var(--border);
+      padding: 12px 18px calc(12px + env(safe-area-inset-bottom));
+      box-shadow: 0 -4px 20px rgba(0,0,0,0.08);
+    }
+
+    #emergencyBtn {
+      width: 100%;
+      background: linear-gradient(135deg, #DC2626, #B91C1C);
+      color: white;
+      border: none;
+      border-radius: 16px;
+      padding: 20px;
+      font-size: 26px;
+      font-weight: 900;
+      letter-spacing: 3px;
+      cursor: pointer;
+      user-select: none;
+      transition: transform 0.15s var(--ease), box-shadow 0.15s;
+      min-height: 68px;
+      box-shadow: 0 4px 16px rgba(220,38,38,0.35);
+      -webkit-tap-highlight-color: transparent;
+    }
+
+    #emergencyBtn:active {
+      transform: scale(0.98);
+      background: linear-gradient(135deg, #B91C1C, #991B1B);
+      box-shadow: 0 2px 8px rgba(220,38,38,0.3);
+    }
+
+    /* ── EMERGENCY MODAL ─────────────────────────────────── */
+    #emergencyModal {
+      display: none;
+      position: fixed; inset: 0;
+      background: rgba(0,0,0,0.6);
+      backdrop-filter: blur(6px);
+      z-index: 1000;
+      align-items: center;
+      justify-content: center;
+      padding: 24px;
+    }
+
+    #emergencyModal.show { display: flex; }
+
+    .modal-box {
+      background: white;
+      border-radius: 24px;
+      padding: 36px 28px;
+      max-width: 360px;
+      width: 100%;
+      text-align: center;
+      box-shadow: 0 24px 64px rgba(0,0,0,0.25);
+      animation: modalIn 0.25s var(--ease);
+    }
+
+    @keyframes modalIn {
+      from { opacity: 0; transform: scale(0.92) translateY(16px); }
+      to   { opacity: 1; transform: scale(1) translateY(0); }
+    }
+
+    .modal-icon { font-size: 52px; margin-bottom: 12px; }
+    .modal-box h2 { font-size: 28px; font-weight: 900; color: var(--red); margin-bottom: 10px; }
+    .modal-box p { font-size: 19px; color: var(--text); margin-bottom: 28px; line-height: 1.5; }
+
+    .modal-btns { display: flex; flex-direction: column; gap: 12px; }
+
+    .modal-btns button {
+      padding: 18px;
+      border-radius: 14px;
+      font-size: 19px;
+      font-weight: 700;
+      border: none;
+      cursor: pointer;
+      transition: transform 0.15s var(--ease);
+      -webkit-tap-highlight-color: transparent;
+    }
+
+    .modal-btns button:active { transform: scale(0.97); }
+    .modal-btns .call911 { background: var(--red); color: white; box-shadow: 0 4px 14px rgba(220,38,38,0.3); }
+    .modal-btns .family-only { background: #FEF3C7; color: #92400E; }
+    .modal-btns .cancel-btn { background: var(--bg); color: var(--muted); }
+
+    /* ── TOAST ───────────────────────────────────────────── */
+    #toast {
+      position: fixed;
+      top: 24px;
+      left: 50%;
+      transform: translateX(-50%) translateY(-8px);
+      background: #0F172A;
+      color: white;
+      padding: 13px 22px;
+      border-radius: 100px;
+      font-size: 17px;
+      font-weight: 600;
+      opacity: 0;
+      transition: opacity 0.25s var(--ease), transform 0.25s var(--ease);
+      z-index: 999;
+      pointer-events: none;
+      white-space: nowrap;
+    }
+
+    #toast.show {
+      opacity: 1;
+      transform: translateX(-50%) translateY(0);
+    }
+  </style>
+</head>
+<body>
+
+<header>
+  <div>
+    <div class="logo"><span class="logo-shield">🌿</span> Sage</div>
+    <div class="greeting" id="headerGreeting">Good morning!</div>
+  </div>
+  <div class="header-time" id="headerTime"></div>
+</header>
+
+<div class="main">
+
+  <!-- Talk to Sage -->
+  <div class="card">
+    <div class="section-title">💬 Talk to Sage</div>
+
+    <button id="talkBtn" onclick="toggleVoice()">
+      <div class="mic-wrap">
+        <span id="micIcon">🎙️</span>
+      </div>
+      <span id="talkBtnLabel">TAP TO TALK</span>
+    </button>
+
+    <!-- Live transcript while listening -->
+    <div id="listenStatus"></div>
+
+    <div id="chatArea"></div>
+
+    <div class="type-row">
+      <input type="text" id="typeInput" placeholder="Or type here…" onkeydown="if(event.key==='Enter') sendMessage()" />
+      <button onclick="sendMessage()">Send</button>
+    </div>
+  </div>
+
+  <!-- Quick actions -->
+  <div class="actions">
+    <button class="action-btn" onclick="showSection('meds')">
+      <span class="icon">💊</span>
+      <span>My Pills</span>
+    </button>
+    <button class="action-btn" onclick="window.location.href='/calendar'">
+      <span class="icon">📅</span>
+      <span>My Calendar</span>
+    </button>
+    <button class="action-btn" onclick="window.location.href='/doctor'">
+      <span class="icon">🩺</span>
+      <span>Doctor Visit</span>
+    </button>
+    <button class="action-btn" onclick="showSection('doctorQ')">
+      <span class="icon">❓</span>
+      <span>My Questions</span>
+    </button>
+  </div>
+
+  <!-- Medications -->
+  <div class="card" id="medsSection">
+    <div class="section-title">💊 My Medications</div>
+    <div id="medList">Loading…</div>
+  </div>
+
+  <!-- Doctor Questions -->
+  <div class="card" id="doctorQSection">
+    <div class="section-title">❓ Questions for My Doctor</div>
+    <div id="doctorQList">Loading…</div>
+
+    <!-- Voice add button -->
+    <button id="addQVoiceBtn" onclick="toggleQuestionVoice()" style="
+      width:100%; margin-top:16px;
+      background: linear-gradient(145deg, var(--navy), #2D4EAA);
+      color:white; border:none; border-radius:16px;
+      padding:22px 16px; font-size:20px; font-weight:800;
+      letter-spacing:1px; cursor:pointer;
+      display:flex; flex-direction:column; align-items:center; gap:8px;
+      box-shadow: 0 4px 16px rgba(30,58,138,0.3);
+      transition: transform 0.15s var(--ease);
+      -webkit-tap-highlight-color: transparent;
+    ">
+      <span id="addQIcon" style="font-size:34px;line-height:1;">🎙️</span>
+      <span id="addQLabel">TAP TO SPEAK A QUESTION</span>
+    </button>
+
+    <!-- Live transcript while recording -->
+    <div id="qListenStatus" style="
+      display:none; margin-top:10px;
+      background:#F0FDF4; border:1.5px solid #BBF7D0;
+      border-radius:12px; padding:13px 16px;
+      font-size:18px; color:var(--muted); font-style:italic; line-height:1.5;
+    ">Listening…</div>
+
+    <!-- Text fallback -->
+    <div style="margin-top:10px; display:flex; gap:10px;">
+      <input type="text" id="newQuestionInput" placeholder="Or type a question…"
+        style="flex:1;border:2px solid var(--border);border-radius:12px;padding:12px 14px;font-size:18px;outline:none;background:var(--bg);color:var(--text);transition:border-color 0.15s;"
+        onfocus="this.style.borderColor='var(--navy)'" onblur="this.style.borderColor='var(--border)'"
+        onkeydown="if(event.key==='Enter') addDoctorQuestion()" />
+      <button onclick="addDoctorQuestion()"
+        style="background:var(--teal);color:white;border:none;border-radius:12px;padding:12px 20px;font-size:18px;font-weight:700;cursor:pointer;-webkit-tap-highlight-color:transparent;">
+        Add
+      </button>
+    </div>
+  </div>
+
+</div>
+
+<!-- Emergency bar -->
+<div class="emergency-bar">
+  <button id="emergencyBtn" onclick="showEmergencyModal()">🆘 HELP</button>
+</div>
+
+<!-- Emergency modal -->
+<div id="emergencyModal">
+  <div class="modal-box">
+    <div class="modal-icon">🚨</div>
+    <h2>Emergency</h2>
+    <p>Your family will be notified right away. Do you also want to call 911?</p>
+    <div class="modal-btns">
+      <button class="call911" onclick="confirmEmergency(true)">📞 Call 911 + Alert Family</button>
+      <button class="family-only" onclick="confirmEmergency(false)">Alert Family Only</button>
+      <button class="cancel-btn" onclick="closeEmergencyModal()">I'm okay — cancel</button>
+    </div>
+  </div>
+</div>
+
+<div id="toast"></div>
+
+<script>
+  // ── State ─────────────────────────────────────────────────────────────────────
+  const SENIOR_ID = "senior_margaret_001";
+  let seniorName = "Margaret";
+  let isListening = false;
+  let recognition = null;
+
+  // ── Clock ─────────────────────────────────────────────────────────────────────
+  function updateClock() {
+    const now = new Date();
+    const time = now.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" });
+    const date = now.toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" });
+    document.getElementById("headerTime").innerHTML = `${time}<br>${date}`;
+  }
+  updateClock();
+  setInterval(updateClock, 30000);
+
+  // ── Init ──────────────────────────────────────────────────────────────────────
+  async function init() {
+    const hour = new Date().getHours();
+    const part = hour < 12 ? "morning" : hour < 17 ? "afternoon" : "evening";
+    document.getElementById("headerGreeting").textContent = `Good ${part}, ${seniorName}!`;
+
+    await loadMedications();
+    await loadDoctorQuestions();
+    setupVoice();
+    setupQuestionVoice();
+
+    if (!sessionStorage.getItem("sageGreeted")) {
+      setTimeout(() => {
+        addBubble("assistant", `Good ${part}, ${seniorName}! I'm Sage, your AI companion. You can tap the button to talk, or type below. How are you feeling today?`);
+        speak(`Good ${part}, ${seniorName}. I'm Sage. How are you feeling today?`);
+        sessionStorage.setItem("sageGreeted", "1");
+      }, 700);
+    }
+  }
+
+  // ── Medications ───────────────────────────────────────────────────────────────
+  async function loadMedications() {
+    const res = await fetch(`/api/medications/${SENIOR_ID}`);
+    const meds = await res.json();
+    const el = document.getElementById("medList");
+
+    if (!meds || meds.length === 0) {
+      el.innerHTML = `<p style="color:var(--muted);font-size:18px;padding:8px 0;">No medications added yet.</p>`;
+      return;
+    }
+
+    el.innerHTML = meds.map(m => `
+      <div class="med-item">
+        <div>
+          <div class="med-name">${m.name}</div>
+          <div class="med-detail">${m.dose ? m.dose + " · " : ""}${m.time}${m.withFood ? " · with food" : ""}</div>
+        </div>
+        ${m.takenToday
+          ? `<div class="taken-badge">✓ Taken</div>`
+          : `<button class="take-btn" onclick="takeMed('${m._id}','${m.name}')">Take</button>`
+        }
+      </div>`).join("");
+  }
+
+  async function takeMed(id, name) {
+    await fetch(`/api/medications/${id}/taken`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ confirmedBy: "button" })
+    });
+    showToast(`✓ ${name} marked as taken`);
+    speak(`Great job taking your ${name}!`);
+    await loadMedications();
+  }
+
+  // ── Chat ──────────────────────────────────────────────────────────────────────
+  function addBubble(role, text) {
+    const el = document.getElementById("chatArea");
+    const div = document.createElement("div");
+    div.className = `bubble ${role}`;
+    div.textContent = text;
+    el.appendChild(div);
+    el.scrollTop = el.scrollHeight;
+    return div;
+  }
+
+  function addAskDoctorBtn(question) {
+    const el = document.getElementById("chatArea");
+    const btn = document.createElement("button");
+    btn.className = "ask-doctor-btn";
+    btn.innerHTML = `📋 Add to my doctor questions`;
+    btn.onclick = async () => {
+      await saveDoctorQuestion(question);
+      btn.textContent = "✓ Added to your doctor questions!";
+      btn.disabled = true;
+      btn.style.opacity = "0.6";
+      speak("I added that to your list of questions for your doctor.");
+      loadDoctorQuestions();
+    };
+    el.appendChild(btn);
+    el.scrollTop = el.scrollHeight;
+  }
+
+  async function sendMessage(text) {
+    const input = document.getElementById("typeInput");
+    const msg = text || input.value.trim();
+    if (!msg) return;
+    input.value = "";
+
+    addBubble("user", msg);
+
+    // Animated thinking dots
+    const thinking = document.createElement("div");
+    thinking.className = "bubble thinking";
+    thinking.id = "thinking";
+    thinking.innerHTML = `<div class="dots"><span></span><span></span><span></span></div>`;
+    document.getElementById("chatArea").appendChild(thinking);
+    document.getElementById("chatArea").scrollTop = 999999;
+
+    try {
+      const res = await fetch("/api/chat", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ seniorId: SENIOR_ID, message: msg })
+      });
+      const data = await res.json();
+      document.getElementById("thinking")?.remove();
+
+      if (data.reply) {
+        addBubble("assistant", data.reply);
+        speak(data.reply);
+        // If Sage suggested a doctor question, show the Add button
+        if (data.suggestedQuestion) {
+          addAskDoctorBtn(data.suggestedQuestion);
+        }
+      } else {
+        addBubble("assistant", data.error || "Sorry, I couldn't understand that.");
+      }
+    } catch (err) {
+      document.getElementById("thinking")?.remove();
+      addBubble("assistant", "I'm having trouble connecting right now. Please try again.");
+    }
+  }
+
+  function askSage(msg) {
+    sendMessage(msg);
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  }
+
+  // ── Doctor Questions ───────────────────────────────────────────────────────────
+  async function loadDoctorQuestions() {
+    const res = await fetch(`/api/doctor-questions/${SENIOR_ID}`);
+    const questions = await res.json();
+    const el = document.getElementById("doctorQList");
+    const pending = questions.filter(q => !q.asked);
+
+    if (pending.length === 0) {
+      el.innerHTML = `<p style="color:var(--muted);font-size:18px;padding:4px 0;">No questions yet — Sage will help you add them!</p>`;
+      return;
+    }
+
+    el.innerHTML = pending.map(q => `
+      <div style="display:flex;align-items:flex-start;gap:12px;padding:12px 0;border-bottom:1px solid var(--border);">
+        <span style="font-size:20px;margin-top:2px;">❓</span>
+        <div style="flex:1;font-size:19px;line-height:1.5;">${escHtml(q.question)}</div>
+        <button onclick="deleteDoctorQuestion('${q._id}')"
+          style="background:none;border:none;color:var(--muted);font-size:22px;cursor:pointer;padding:2px 6px;">✕</button>
+      </div>
+    `).join("");
+  }
+
+  async function addDoctorQuestion() {
+    const input = document.getElementById("newQuestionInput");
+    const q = input.value.trim();
+    if (!q) return;
+    input.value = "";
+    await saveDoctorQuestion(q);
+    showToast("✓ Question added!");
+    loadDoctorQuestions();
+  }
+
+  async function saveDoctorQuestion(question) {
+    await fetch("/api/doctor-questions", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ seniorId: SENIOR_ID, question })
+    });
+  }
+
+  async function deleteDoctorQuestion(id) {
+    await fetch(`/api/doctor-questions/${id}`, { method: "DELETE" });
+    loadDoctorQuestions();
+  }
+
+  function escHtml(s) {
+    return String(s).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;");
+  }
+
+  // ── Voice ─────────────────────────────────────────────────────────────────────
+  let finalTranscript = "";
+  let silenceTimer    = null;
+  const SILENCE_MS    = 1800; // auto-send after 1.8s of silence
+
+  function setupVoice() {
+    const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+    if (!SR) {
+      document.getElementById("talkBtn").querySelector("#talkBtnLabel").textContent = "TYPE BELOW TO CHAT";
+      return;
+    }
+
+    recognition = new SR();
+    recognition.continuous    = true;   // keep listening until user taps again
+    recognition.interimResults = true;  // show words appearing in real-time
+    recognition.lang          = "en-US";
+    recognition.maxAlternatives = 1;
+
+    recognition.onresult = (e) => {
+      clearTimeout(silenceTimer);
+      let interim = "";
+      for (let i = e.resultIndex; i < e.results.length; i++) {
+        if (e.results[i].isFinal) {
+          finalTranscript += e.results[i][0].transcript + " ";
+        } else {
+          interim += e.results[i][0].transcript;
+        }
+      }
+      // Show live transcript so user knows it's hearing them
+      const display = (finalTranscript + interim).trim();
+      document.getElementById("listenStatus").textContent = display || "Listening…";
+
+      // Auto-send after a natural pause
+      if (finalTranscript.trim()) {
+        silenceTimer = setTimeout(() => {
+          const msg = finalTranscript.trim();
+          finalTranscript = "";
+          stopListening();
+          sendMessage(msg);
+        }, SILENCE_MS);
+      }
+    };
+
+    recognition.onerror = (e) => {
+      if (e.error === "not-allowed" || e.error === "permission-denied") {
+        showToast("Microphone blocked — please allow mic access in your browser settings.");
+      } else if (e.error === "no-speech") {
+        // Just a pause — don't show error
+        return;
+      } else if (e.error === "aborted") {
+        return; // user stopped intentionally
+      } else {
+        showToast("Couldn't hear anything — please try again.");
+      }
+      stopListening();
+    };
+
+    // If recognition stops on its own (e.g. browser timeout), restart it
+    recognition.onend = () => {
+      if (isListening) {
+        try { recognition.start(); } catch(e) { /* already starting */ }
+      }
+    };
+  }
+
+  function toggleVoice() {
+    if (isListening) {
+      // Manual stop — send whatever was captured
+      clearTimeout(silenceTimer);
+      const msg = finalTranscript.trim();
+      finalTranscript = "";
+      stopListening();
+      if (msg) sendMessage(msg);
+    } else {
+      startListening();
+    }
+  }
+
+  function startListening() {
+    if (!recognition) { showToast("Voice not supported — please type below."); return; }
+
+    // Stop Sage speaking before opening the mic
+    if (currentAudio) { currentAudio.pause(); currentAudio.src = ""; currentAudio = null; }
+    if (window.speechSynthesis) window.speechSynthesis.cancel();
+
+    isListening     = true;
+    finalTranscript = "";
+
+    try { recognition.start(); } catch(e) { /* already running */ }
+
+    document.getElementById("talkBtn").classList.add("listening");
+    document.getElementById("micIcon").textContent     = "🔴";
+    document.getElementById("talkBtnLabel").textContent = "TAP TO SEND";
+    const status = document.getElementById("listenStatus");
+    status.textContent  = "Listening…";
+    status.style.display = "block";
+  }
+
+  function stopListening() {
+    isListening = false;
+    clearTimeout(silenceTimer);
+    if (recognition) try { recognition.stop(); } catch(e) {}
+
+    document.getElementById("talkBtn").classList.remove("listening");
+    document.getElementById("micIcon").textContent     = "🎙️";
+    document.getElementById("talkBtnLabel").textContent = "TAP TO TALK";
+    const status = document.getElementById("listenStatus");
+    status.style.display = "none";
+    status.textContent   = "";
+  }
+
+  // ── TTS ───────────────────────────────────────────────────────────────────────
+  let currentAudio = null;
+
+  // Strip emojis, markdown, and anything that sounds wrong when spoken aloud
+  function cleanForSpeech(text) {
+    return text
+      .replace(/[\u{1F000}-\u{1FFFF}]/gu, "")
+      .replace(/[\u{2600}-\u{26FF}]/gu, "")
+      .replace(/[\u{2700}-\u{27BF}]/gu, "")
+      .replace(/[\u{FE00}-\u{FE0F}]/gu, "")
+      .replace(/[\u{1F900}-\u{1F9FF}]/gu, "")
+      .replace(/[\u{1FA00}-\u{1FAFF}]/gu, "")
+      .replace(/\*\*(.*?)\*\*/g, "$1")
+      .replace(/\*(.*?)\*/g, "$1")
+      .replace(/^#+\s/gm, "")
+      .replace(/\[([^\]]+)\]\([^)]+\)/g, "$1")
+      .replace(/\[|\]/g, "")
+      .replace(/\n+/g, " ")
+      .replace(/\s{2,}/g, " ")
+      .trim();
+  }
+
+  async function speak(text) {
+    const clean = cleanForSpeech(text);
+    if (!clean) return;
+
+    // Stop anything currently playing
+    if (currentAudio) {
+      currentAudio.pause();
+      currentAudio.src = "";
+      currentAudio = null;
+    }
+    if (window.speechSynthesis) window.speechSynthesis.cancel();
+
+    // Try ElevenLabs via server first (natural-sounding voice)
+    try {
+      const res = await fetch("/api/tts", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ text: clean }),
+      });
+      if (res.ok) {
+        const blob = await res.blob();
+        const url = URL.createObjectURL(blob);
+        currentAudio = new Audio(url);
+        currentAudio.onended = () => { URL.revokeObjectURL(url); currentAudio = null; };
+        currentAudio.onerror = () => speakBrowser(clean);
+        await currentAudio.play().catch(() => speakBrowser(clean));
+        return;
+      }
+    } catch (e) {
+      // ElevenLabs not configured — fall through
+    }
+
+    // Fallback: best available browser voice
+    speakBrowser(clean);
+  }
+
+  function speakBrowser(text) {
+    if (!window.speechSynthesis) return;
+    const utter = new SpeechSynthesisUtterance(text);
+    utter.rate = 0.85;
+    utter.pitch = 1.0;
+    const voices = window.speechSynthesis.getVoices();
+    // Prefer Enhanced voices (much more natural on Mac)
+    const pick =
+      voices.find(v => v.name.includes("Enhanced") && v.lang.startsWith("en")) ||
+      voices.find(v => v.name === "Samantha" && v.lang.startsWith("en")) ||
+      voices.find(v => (v.name.includes("Samantha") || v.name.includes("Karen") || v.name.includes("Serena")) && v.lang.startsWith("en")) ||
+      voices.find(v => v.lang.startsWith("en-US") && !v.name.toLowerCase().includes("google"));
+    if (pick) utter.voice = pick;
+    window.speechSynthesis.speak(utter);
+  }
+
+  // Trigger voice list load (browsers load voices async)
+  if (window.speechSynthesis) window.speechSynthesis.getVoices();
+
+  // ── Emergency ─────────────────────────────────────────────────────────────────
+  function showEmergencyModal() {
+    document.getElementById("emergencyModal").classList.add("show");
+  }
+
+  function closeEmergencyModal() {
+    document.getElementById("emergencyModal").classList.remove("show");
+  }
+
+  async function confirmEmergency(call911) {
+    closeEmergencyModal();
+    await fetch("/api/emergency", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ seniorId: SENIOR_ID })
+    });
+    if (call911) {
+      showToast("🚨 Calling 911 and alerting your family…");
+      speak("Calling 911 and alerting your family now.");
+      setTimeout(() => { window.location.href = "tel:911"; }, 1200);
+    } else {
+      showToast("🚨 Your family has been alerted!");
+      speak("Your family has been alerted and is on their way.");
+    }
+  }
+
+  // ── Doctor Question Voice Input ────────────────────────────────────────────────
+  let qRecognition   = null;
+  let qListening     = false;
+  let qFinal         = "";
+  let qSilenceTimer  = null;
+  const Q_SILENCE_MS = 2000; // slightly longer pause before saving — gives time to finish thought
+
+  function setupQuestionVoice() {
+    const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+    if (!SR) return;
+
+    qRecognition = new SR();
+    qRecognition.continuous     = true;
+    qRecognition.interimResults = true;
+    qRecognition.lang           = "en-US";
+
+    qRecognition.onresult = (e) => {
+      clearTimeout(qSilenceTimer);
+      let interim = "";
+      for (let i = e.resultIndex; i < e.results.length; i++) {
+        if (e.results[i].isFinal) {
+          qFinal += e.results[i][0].transcript + " ";
+        } else {
+          interim += e.results[i][0].transcript;
+        }
+      }
+      const display = (qFinal + interim).trim();
+      const status = document.getElementById("qListenStatus");
+      status.textContent = display || "Listening…";
+      status.style.color = display ? "var(--text)" : "var(--muted)";
+
+      // Auto-save after pause
+      if (qFinal.trim()) {
+        qSilenceTimer = setTimeout(() => {
+          const q = qFinal.trim();
+          qFinal = "";
+          stopQuestionVoice();
+          confirmAndSaveQuestion(q);
+        }, Q_SILENCE_MS);
+      }
+    };
+
+    qRecognition.onerror = (e) => {
+      if (e.error === "not-allowed") {
+        showToast("Microphone blocked — please allow mic access in browser settings.");
+      } else if (e.error === "no-speech" || e.error === "aborted") {
+        return;
+      }
+      stopQuestionVoice();
+    };
+
+    qRecognition.onend = () => {
+      if (qListening) {
+        try { qRecognition.start(); } catch(e) {}
+      }
+    };
+  }
+
+  function toggleQuestionVoice() {
+    if (qListening) {
+      // Manual tap to stop — save what was captured
+      clearTimeout(qSilenceTimer);
+      const q = qFinal.trim();
+      qFinal = "";
+      stopQuestionVoice();
+      if (q) confirmAndSaveQuestion(q);
+    } else {
+      startQuestionVoice();
+    }
+  }
+
+  function startQuestionVoice() {
+    if (!qRecognition) { showToast("Voice not supported — please type your question."); return; }
+
+    // Stop Sage speaking
+    if (currentAudio) { currentAudio.pause(); currentAudio.src = ""; currentAudio = null; }
+    if (window.speechSynthesis) window.speechSynthesis.cancel();
+
+    // Stop main chat listening if active
+    if (isListening) stopListening();
+
+    qListening = true;
+    qFinal = "";
+    try { qRecognition.start(); } catch(e) {}
+
+    const btn = document.getElementById("addQVoiceBtn");
+    btn.style.background = "linear-gradient(145deg, var(--teal), #0D9488)";
+    btn.style.boxShadow  = "0 4px 20px rgba(15,118,110,0.4)";
+    btn.style.animation  = "listenPulse 1.5s ease-in-out infinite";
+    document.getElementById("addQIcon").textContent  = "🔴";
+    document.getElementById("addQLabel").textContent = "LISTENING — TAP TO SAVE";
+
+    const status = document.getElementById("qListenStatus");
+    status.textContent  = "Listening…";
+    status.style.display = "block";
+    status.style.color   = "var(--muted)";
+  }
+
+  function stopQuestionVoice() {
+    qListening = false;
+    clearTimeout(qSilenceTimer);
+    if (qRecognition) try { qRecognition.stop(); } catch(e) {}
+
+    const btn = document.getElementById("addQVoiceBtn");
+    btn.style.background = "linear-gradient(145deg, var(--navy), #2D4EAA)";
+    btn.style.boxShadow  = "0 4px 16px rgba(30,58,138,0.3)";
+    btn.style.animation  = "none";
+    document.getElementById("addQIcon").textContent  = "🎙️";
+    document.getElementById("addQLabel").textContent = "TAP TO SPEAK A QUESTION";
+
+    document.getElementById("qListenStatus").style.display = "none";
+  }
+
+  async function confirmAndSaveQuestion(question) {
+    // Show what was heard and let them confirm before saving
+    const status = document.getElementById("qListenStatus");
+    status.style.display = "block";
+    status.style.color   = "var(--text)";
+    status.style.fontStyle = "normal";
+    status.innerHTML = `
+      <div style="margin-bottom:10px;font-size:17px;">"${escHtml(question)}"</div>
+      <div style="display:flex;gap:10px;">
+        <button onclick="saveSpokenQuestion('${escHtml(question).replace(/'/g,"&#39;")}')" style="
+          flex:1;background:var(--green);color:white;border:none;border-radius:10px;
+          padding:13px;font-size:17px;font-weight:700;cursor:pointer;">
+          Yes, save it
+        </button>
+        <button onclick="discardSpokenQuestion()" style="
+          flex:1;background:var(--bg);color:var(--muted);border:2px solid var(--border);
+          border-radius:10px;padding:13px;font-size:17px;font-weight:600;cursor:pointer;">
+          Try again
+        </button>
+      </div>`;
+    speak("I heard: " + question + ". Should I save that?");
+  }
+
+  async function saveSpokenQuestion(question) {
+    await saveDoctorQuestion(question);
+    document.getElementById("qListenStatus").style.display = "none";
+    showToast("Question saved!");
+    speak("Got it, I saved your question for the doctor.");
+    loadDoctorQuestions();
+  }
+
+  function discardSpokenQuestion() {
+    document.getElementById("qListenStatus").style.display = "none";
+    speak("No problem. Tap the button and try again whenever you're ready.");
+  }
+
+  // ── Utilities ─────────────────────────────────────────────────────────────────
+  function showSection(name) {
+    if (name === "meds") document.getElementById("medsSection").scrollIntoView({ behavior: "smooth" });
+    if (name === "doctorQ") document.getElementById("doctorQSection").scrollIntoView({ behavior: "smooth" });
+  }
+
+  function showToast(msg, duration = 3000) {
+    const t = document.getElementById("toast");
+    t.textContent = msg;
+    t.classList.add("show");
+    setTimeout(() => t.classList.remove("show"), duration);
+  }
+
+  init();
+</script>
+</body>
+</html>
