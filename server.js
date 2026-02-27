@@ -609,7 +609,7 @@ app.post("/api/tts", rateLimit(60000, 30), async (req, res) => {
           instructions: "Speak in a warm, caring, gentle tone — like a kind friend checking in. Natural pace, not rushed. Calm and reassuring.",
         } : {}),
         response_format: "mp3",
-        speed: 1.0,
+        speed: 1.05,
       });
 
       const options = {
