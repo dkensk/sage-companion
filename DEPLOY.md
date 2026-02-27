@@ -39,7 +39,7 @@ In your Railway project → **Variables** tab, add each of these:
 | Variable | Value |
 |----------|-------|
 | `ANTHROPIC_API_KEY` | Your Anthropic key (from .env) |
-| `ELEVENLABS_API_KEY` | Your ElevenLabs key (from .env) |
+| `OPENAI_API_KEY` | Your OpenAI key (for TTS voice) |
 | `SUPABASE_URL` | From Step 1 |
 | `SUPABASE_SERVICE_ROLE_KEY` | From Step 1 |
 | `ADMIN_PASSWORD` | Choose a strong password |
@@ -90,7 +90,7 @@ Seniors will see an "Enable Reminders" button in the app — when they tap it, t
 1. Visit `https://your-app-url/` — you should see the Sage home screen
 2. Visit `https://your-app-url/admin` — log in with your `ADMIN_PASSWORD`
 3. Tap **Get Started** and create a test profile to verify Supabase is connected
-4. Try talking to Sage to verify Anthropic + ElevenLabs are working
+4. Try talking to Sage to verify Anthropic + OpenAI TTS are working
 
 ---
 

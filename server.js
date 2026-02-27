@@ -288,7 +288,7 @@ app.post("/api/medications/scan", upload.single("image"), async (req, res) => {
     const mime = req.file.mimetype;
 
     const response = await anthropic.messages.create({
-      model: "claude-opus-4-5-20251101",
+      model: "claude-sonnet-4-5-20250929",
       max_tokens: 600,
       messages: [{ role: "user", content: [
         { type: "image", source: { type: "base64", media_type: mime, data: b64 } },
@@ -439,6 +439,14 @@ When ${seniorName} asks about symptoms, medications, medical concerns, or anythi
 
 For true emergencies like chest pain, difficulty breathing, or a fall: Always say to call 911 or press the emergency button right away.
 
+APPOINTMENTS & CALENDAR:
+When ${seniorName} mentions an upcoming appointment, event, or anything that should go on a calendar (doctor visits, lunch plans, birthdays, errands, etc.):
+1. Confirm what you heard back to them warmly, for example: "Got it, I've added your dentist appointment on Thursday at 2 PM to your calendar!"
+2. At the very END of your response, add a structured tag: [APPOINTMENT: {"title": "...", "date": "YYYY-MM-DD", "time": "2:00 PM" or null, "location": "..." or null, "notes": "..." or null}]
+3. Use the current date/time context below to figure out the correct YYYY-MM-DD date. For example, if today is Monday Feb 27 and they say "this Thursday", that is March 2.
+4. If they do NOT give enough info to determine a date (just "sometime" or "eventually"), ask them gently what day it is, do NOT output the tag.
+5. The tag is machine-parsed and NEVER read aloud — the user only hears your friendly confirmation.
+
 Today's medication status:
 ${medSummary || "No medications scheduled today"}
 
@@ -447,17 +455,57 @@ Today: ${timezone ? new Date().toLocaleDateString("en-US", { weekday: "long", mo
 ${location ? `User's location: ${location}` : ""}
 ${weatherInfo ? `Current weather: ${weatherInfo}` : ""}`;
 
+    // Haiku is 10-20x faster than Opus — ideal for conversational voice responses
+    const chatModel = process.env.CHAT_MODEL || "claude-haiku-4-5-20251001";
     const response = await anthropic.messages.create({
-      model: "claude-opus-4-5-20251101",
-      max_tokens: 350,
+      model: chatModel,
+      max_tokens: 500,
       system: systemPrompt,
       messages,
     });
 
     const rawReply = response.content[0].text;
+
+    // Extract structured tags before cleaning reply
     const askDoctorMatch = rawReply.match(/\[ASK_DOCTOR:\s*(.+?)\]/s);
     const suggestedQuestion = askDoctorMatch ? askDoctorMatch[1].trim() : null;
-    const aiReply = rawReply.replace(/\[ASK_DOCTOR:\s*.+?\]/s, "").trim();
+
+    const appointmentMatch = rawReply.match(/\[APPOINTMENT:\s*(\{[\s\S]*?\})\]/);
+    let savedAppointment = null;
+    if (appointmentMatch) {
+      try {
+        const apptData = JSON.parse(appointmentMatch[1]);
+        if (apptData.title && apptData.date) {
+          const { data: appt } = await supabase.from("appointments").insert({
+            senior_id: effectiveSeniorId,
+            title: apptData.title,
+            date: apptData.date,
+            time: apptData.time || null,
+            location: apptData.location || "",
+            notes: apptData.notes || "",
+            source: "voice",
+            google_event_id: null,
+          }).select().single();
+          if (appt) {
+            savedAppointment = { id: appt.id, title: apptData.title, date: apptData.date, time: apptData.time || null, location: apptData.location || null };
+            await supabase.from("activity").insert({
+              senior_id: effectiveSeniorId, type: "appointment_added",
+              description: `Voice appointment: ${apptData.title} on ${apptData.date}`,
+              timestamp: new Date().toISOString(),
+            });
+            await trackUsage(effectiveSeniorId, "appointments_added");
+          }
+        }
+      } catch (parseErr) {
+        console.error("Appointment parse error:", parseErr.message);
+      }
+    }
+
+    // Clean all tags from the spoken reply
+    const aiReply = rawReply
+      .replace(/\[ASK_DOCTOR:\s*.+?\]/s, "")
+      .replace(/\[APPOINTMENT:\s*\{[\s\S]*?\}\]/, "")
+      .trim();
 
     const sid = sessionId || uuidv4();
     await supabase.from("conversations").insert([
@@ -471,7 +519,7 @@ ${weatherInfo ? `Current weather: ${weatherInfo}` : ""}`;
     });
     await trackUsage(effectiveSeniorId, "chat_messages");
 
-    res.json({ reply: aiReply, sessionId: sid, suggestedQuestion });
+    res.json({ reply: aiReply, sessionId: sid, suggestedQuestion, appointment: savedAppointment });
   } catch (e) {
     console.error("Chat error:", e.message);
     res.status(500).json({ error: e.message });
@@ -479,82 +527,115 @@ ${weatherInfo ? `Current weather: ${weatherInfo}` : ""}`;
 });
 
 // ─────────────────────────────────────────────────────────────────────────────
-// TEXT-TO-SPEECH (ElevenLabs)
+// TEXT-TO-SPEECH (OpenAI TTS)
 // ─────────────────────────────────────────────────────────────────────────────
 
-// Quick status check — hit /api/tts/status to confirm key is loaded
+// Quick status check — hit /api/tts/status to confirm TTS is configured
 app.get("/api/tts/status", (req, res) => {
-  const key = (process.env.ELEVENLABS_API_KEY || "").trim();
+  const openaiKey = (process.env.OPENAI_API_KEY || "").trim();
+  const isPlaceholder = !openaiKey || openaiKey.startsWith("YOUR_") || openaiKey.length < 20;
   res.json({
-    configured: !!key,
-    keyPrefix: key ? key.slice(0, 8) + "…" : null,
-    voiceId: (process.env.ELEVENLABS_VOICE_ID || "21m00Tcm4TlvDq8ikWAM"),
+    configured: !isPlaceholder,
+    provider: "openai",
+    keyPrefix: openaiKey && !isPlaceholder ? openaiKey.slice(0, 12) + "…" : null,
+    voice: process.env.TTS_VOICE || "nova",
+    issue: isPlaceholder ? "OPENAI_API_KEY is missing or still a placeholder — set it in Railway Variables" : null,
   });
+});
+
+// Live test endpoint — makes a real 1-word TTS call to verify the full pipeline
+app.get("/api/tts/test", async (req, res) => {
+  const apiKey = (process.env.OPENAI_API_KEY || "").trim();
+  if (!apiKey || apiKey.startsWith("YOUR_") || apiKey.length < 20) {
+    return res.json({ ok: false, error: "OPENAI_API_KEY not set or is a placeholder", keyLength: apiKey.length, keyPrefix: apiKey.slice(0, 10) });
+  }
+  const https = require("https");
+  try {
+    const result = await new Promise((resolve, reject) => {
+      const payload = JSON.stringify({ model: "tts-1", input: "Hello", voice: "nova", response_format: "mp3" });
+      const ttsReq = https.request({
+        hostname: "api.openai.com", path: "/v1/audio/speech", method: "POST",
+        headers: { "Authorization": `Bearer ${apiKey}`, "Content-Type": "application/json", "Content-Length": Buffer.byteLength(payload) },
+      }, (ttsRes) => {
+        let body = [];
+        ttsRes.on("data", d => body.push(d));
+        ttsRes.on("end", () => {
+          const totalBytes = Buffer.concat(body).length;
+          if (ttsRes.statusCode === 200) {
+            resolve({ ok: true, status: 200, audioBytes: totalBytes, contentType: ttsRes.headers["content-type"] });
+          } else {
+            resolve({ ok: false, status: ttsRes.statusCode, error: Buffer.concat(body).toString().slice(0, 200) });
+          }
+        });
+      });
+      ttsReq.on("error", e => reject(e));
+      ttsReq.write(payload);
+      ttsReq.end();
+    });
+    res.json(result);
+  } catch (e) {
+    res.json({ ok: false, error: e.message });
+  }
 });
 
 app.post("/api/tts", rateLimit(60000, 30), async (req, res) => {
   const { text } = req.body;
   if (!text) return res.status(400).json({ error: "text required" });
 
-  const apiKey  = (process.env.ELEVENLABS_API_KEY  || "").trim();
-  const voiceId = (process.env.ELEVENLABS_VOICE_ID || "21m00Tcm4TlvDq8ikWAM").trim(); // Rachel — reliable free tier voice
-  if (!apiKey) {
-    console.warn("TTS: ELEVENLABS_API_KEY not set");
-    return res.status(503).json({ error: "ElevenLabs not configured" });
+  const apiKey = (process.env.OPENAI_API_KEY || "").trim();
+  if (!apiKey || apiKey.startsWith("YOUR_") || apiKey.length < 20) {
+    console.warn("TTS: OPENAI_API_KEY not set or placeholder");
+    return res.status(503).json({ error: "OpenAI TTS not configured — add OPENAI_API_KEY to Railway Variables" });
   }
 
-  const https   = require("https");
+  // Voices: alloy, echo, fable, onyx, nova, shimmer — nova is warm & friendly
+  const voice = (process.env.TTS_VOICE || "nova").trim();
+  const cleanText = text.slice(0, 4096); // OpenAI max is 4096 chars
 
-  // Try with requested voice first, fall back to Rachel if it fails
-  const tryVoice = (vid) => new Promise((resolve, reject) => {
-    const payload = JSON.stringify({
-      text: text.slice(0, 800),
-      model_id: "eleven_flash_v2_5",
-      voice_settings: { stability: 0.55, similarity_boost: 0.80, style: 0.10, use_speaker_boost: true },
-    });
-    const options = {
-      hostname: "api.elevenlabs.io",
-      path: `/v1/text-to-speech/${vid}`,
-      method: "POST",
-      headers: {
-        "xi-api-key":     apiKey,
-        "Content-Type":   "application/json",
-        "Accept":         "audio/mpeg",
-        "Content-Length": Buffer.byteLength(payload),
-      },
-    };
-    const ttsReq = https.request(options, (ttsRes) => {
-      if (ttsRes.statusCode === 200) {
-        resolve(ttsRes);
-      } else {
-        // Capture error body for logging
-        let errBody = "";
-        ttsRes.on("data", d => errBody += d);
-        ttsRes.on("end", () => {
-          console.error(`ElevenLabs ${ttsRes.statusCode} for voice ${vid}:`, errBody.slice(0, 200));
-          reject(new Error(`ElevenLabs ${ttsRes.statusCode}`));
-        });
-      }
-    });
-    ttsReq.on("error", reject);
-    ttsReq.write(payload);
-    ttsReq.end();
-  });
+  console.log(`TTS request: voice=${voice}, text length=${cleanText.length}`);
+
+  const https = require("https");
 
   try {
-    // Try the configured voice
-    const FALLBACK_VOICE = "21m00Tcm4TlvDq8ikWAM"; // Rachel
-    let audioStream;
-    try {
-      audioStream = await tryVoice(voiceId);
-    } catch (e) {
-      if (voiceId !== FALLBACK_VOICE) {
-        console.warn(`Voice ${voiceId} failed, trying fallback Rachel...`);
-        audioStream = await tryVoice(FALLBACK_VOICE);
-      } else {
-        throw e;
-      }
-    }
+    const audioStream = await new Promise((resolve, reject) => {
+      const payload = JSON.stringify({
+        model: "tts-1",        // tts-1 = optimised for speed; tts-1-hd = higher quality
+        input: cleanText,
+        voice: voice,
+        response_format: "mp3",
+        speed: 0.95,           // slightly slower — easier for seniors
+      });
+
+      const options = {
+        hostname: "api.openai.com",
+        path: "/v1/audio/speech",
+        method: "POST",
+        headers: {
+          "Authorization":  `Bearer ${apiKey}`,
+          "Content-Type":   "application/json",
+          "Content-Length":  Buffer.byteLength(payload),
+        },
+      };
+
+      const ttsReq = https.request(options, (ttsRes) => {
+        if (ttsRes.statusCode === 200) {
+          console.log(`TTS success: ${ttsRes.headers["content-type"]}`);
+          resolve(ttsRes);
+        } else {
+          let errBody = "";
+          ttsRes.on("data", d => errBody += d);
+          ttsRes.on("end", () => {
+            console.error(`OpenAI TTS ${ttsRes.statusCode}: ${errBody.slice(0, 300)}`);
+            reject(new Error(`OpenAI TTS ${ttsRes.statusCode}: ${errBody.slice(0, 150)}`));
+          });
+        }
+      });
+
+      ttsReq.on("error", reject);
+      ttsReq.write(payload);
+      ttsReq.end();
+    });
+
     res.setHeader("Content-Type", "audio/mpeg");
     res.setHeader("Cache-Control", "no-cache");
     audioStream.pipe(res);
@@ -767,7 +848,7 @@ app.post("/api/appointments/parse", async (req, res) => {
     if (!text) return res.status(400).json({ error: "text required" });
     const today = new Date().toLocaleDateString("en-US", { weekday: "long", year: "numeric", month: "long", day: "numeric" });
     const response = await anthropic.messages.create({
-      model: "claude-opus-4-5-20251101", max_tokens: 300,
+      model: "claude-haiku-4-5-20251001", max_tokens: 300,
       messages: [{ role: "user", content: `Today is ${today}. Parse this appointment into JSON. Return ONLY valid JSON.\n\nInput: "${text}"\n\nReturn: { "title": string, "date": "YYYY-MM-DD", "time": "2:00 PM or null", "location": string or null, "notes": string or null }` }],
     });
     const match = response.content[0].text.match(/\{[\s\S]*\}/);
@@ -783,7 +864,7 @@ app.post("/api/appointments/ocr", upload.single("image"), async (req, res) => {
     const mime = req.file.mimetype;
     const today = new Date().toLocaleDateString("en-US", { year: "numeric", month: "long" });
     const response = await anthropic.messages.create({
-      model: "claude-opus-4-5-20251101", max_tokens: 1500,
+      model: "claude-sonnet-4-5-20250929", max_tokens: 1500,
       messages: [{ role: "user", content: [
         { type: "image", source: { type: "base64", media_type: mime, data: b64 } },
         { type: "text", text: `This is a photo of a paper calendar. Today's month/year: ${today}.\nExtract every appointment, event, or note.\nReturn ONLY a JSON array:\n[ { "title": "event name", "date": "YYYY-MM-DD", "time": "2:00 PM or null", "notes": "extra detail or null" } ]` }
@@ -1225,6 +1306,9 @@ async function start() {
   }
   if (!process.env.ANTHROPIC_API_KEY) {
     console.warn("⚠️  ANTHROPIC_API_KEY not set — chat will not work.");
+  }
+  if (!process.env.OPENAI_API_KEY) {
+    console.warn("⚠️  OPENAI_API_KEY not set — voice TTS will fall back to browser speech.");
   }
   app.listen(PORT, () => {
     console.log("\n🌿  Sage Companion LLC is running!\n");

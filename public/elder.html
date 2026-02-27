@@ -867,6 +867,24 @@
     el.scrollTop = el.scrollHeight;
   }
 
+  function addAppointmentCard(appt) {
+    const el = document.getElementById("chatArea");
+    const card = document.createElement("div");
+    card.style.cssText = "background:linear-gradient(135deg,#e8f5e9,#f1f8e9);border-radius:16px;padding:16px 18px;margin:8px 0 4px;border:1px solid #c8e6c9;max-width:340px;";
+    const dateObj = new Date(appt.date + "T12:00:00");
+    const dateStr = dateObj.toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric" });
+    const timeStr = appt.time ? ` at ${appt.time}` : "";
+    const locStr  = appt.location ? `<div style="color:#555;font-size:15px;margin-top:4px;">${escHtml(appt.location)}</div>` : "";
+    card.innerHTML = `
+      <div style="font-size:14px;font-weight:600;color:#2e7d32;text-transform:uppercase;letter-spacing:0.5px;margin-bottom:6px;">Added to Calendar</div>
+      <div style="font-size:18px;font-weight:600;color:#1b5e20;">${escHtml(appt.title)}</div>
+      <div style="color:#444;font-size:16px;margin-top:2px;">${dateStr}${timeStr}</div>
+      ${locStr}
+    `;
+    el.appendChild(card);
+    el.scrollTop = el.scrollHeight;
+  }
+
   async function sendMessage(text) {
     unlockAudio(); // ensure audio is unlocked whenever a message is sent
     const input = document.getElementById("typeInput");
@@ -902,6 +920,10 @@
       if (data.reply) {
         addBubble("assistant", data.reply);
         speak(data.reply);
+        // If an appointment was saved, show confirmation card
+        if (data.appointment) {
+          addAppointmentCard(data.appointment);
+        }
         // If Sage suggested a doctor question, show the Add button
         if (data.suggestedQuestion) {
           addAskDoctorBtn(data.suggestedQuestion);
@@ -1085,12 +1107,12 @@
   // synchronous call stack of a user gesture — and changing src resets it.
   // After two async fetches (chat API + TTS API) the gesture context is lost.
   //
-  // SOLUTION: Use Web Audio API (AudioContext) for ElevenLabs playback.
+  // SOLUTION: Use Web Audio API (AudioContext) for OpenAI TTS playback.
   // AudioContext.resume() only needs ONE call during a user gesture, then
   // it stays unlocked for the entire session. We decode the MP3 into an
   // AudioBuffer and play it through the context — works from any async code.
   let audioUnlocked = false;
-  let ttsAudioCtx   = null; // persistent AudioContext for ElevenLabs playback
+  let ttsAudioCtx   = null; // persistent AudioContext for OpenAI TTS playback
   let currentSource  = null; // currently playing AudioBufferSourceNode
 
   function unlockAudio() {
@@ -1162,51 +1184,71 @@
     // Show speaking indicator on mic button
     setSpeakingIndicator(true);
 
-    // Try ElevenLabs via server → Web Audio API playback
+    // ── Strategy 1: OpenAI TTS via server → Web Audio API ───────────────────
     try {
-      console.log("[tts] Fetching ElevenLabs audio…");
+      console.log("[tts] Fetching OpenAI TTS audio…");
+      const controller = new AbortController();
+      const timeout = setTimeout(() => controller.abort(), 8000);
+
       const res = await fetch("/api/tts", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ text: clean }),
+        signal: controller.signal,
       });
+      clearTimeout(timeout);
 
-      if (res.ok && ttsAudioCtx) {
-        // Ensure context is running (may be suspended if tab was backgrounded)
-        if (ttsAudioCtx.state === "suspended") {
-          await ttsAudioCtx.resume();
-        }
-
+      if (res.ok) {
         const arrayBuf = await res.arrayBuffer();
-        console.log("[tts] Got", arrayBuf.byteLength, "bytes, decoding…");
+        console.log("[tts] Got", arrayBuf.byteLength, "bytes from server");
 
-        const audioBuf = await ttsAudioCtx.decodeAudioData(arrayBuf);
-        console.log("[tts] Decoded OK, duration:", audioBuf.duration.toFixed(1), "s. Playing…");
+        if (arrayBuf.byteLength > 0) {
+          // Try Web Audio API first (works best on mobile)
+          if (ttsAudioCtx) {
+            try {
+              if (ttsAudioCtx.state === "suspended") await ttsAudioCtx.resume();
+              const audioBuf = await ttsAudioCtx.decodeAudioData(arrayBuf.slice(0)); // slice to copy
+              console.log("[tts] WebAudio decoded, duration:", audioBuf.duration.toFixed(1), "s");
+              const source = ttsAudioCtx.createBufferSource();
+              source.buffer = audioBuf;
+              source.connect(ttsAudioCtx.destination);
+              source.onended = () => { currentSource = null; currentAudio = null; setSpeakingIndicator(false); };
+              source.start(0);
+              currentSource = source;
+              currentAudio = "webapi";
+              return;
+            } catch (decodeErr) {
+              console.warn("[tts] WebAudio decode failed:", decodeErr.message, "— trying HTMLAudio…");
+            }
+          }
 
-        const source = ttsAudioCtx.createBufferSource();
-        source.buffer = audioBuf;
-        source.connect(ttsAudioCtx.destination);
-        source.onended = () => {
-          currentSource = null;
-          currentAudio = null;
-          setSpeakingIndicator(false);
-        };
-        source.start(0);
-        currentSource = source;
-        currentAudio = "webapi"; // flag so stopCurrentAudio knows what to stop
-        return;
-      } else if (!res.ok) {
-        const err = await res.json().catch(() => ({ error: `HTTP ${res.status}` }));
-        console.warn("[tts] ElevenLabs error:", res.status, err);
-        showToast(`Voice error (${res.status}): ${err.error || "unknown"}`);
+          // Fallback: HTMLAudioElement with blob URL (works on desktop)
+          try {
+            const blob = new Blob([arrayBuf], { type: "audio/mpeg" });
+            const url  = URL.createObjectURL(blob);
+            const audio = new Audio(url);
+            audio.onended = () => { URL.revokeObjectURL(url); currentAudio = null; setSpeakingIndicator(false); };
+            audio.onerror = () => { URL.revokeObjectURL(url); console.warn("[tts] HTMLAudio playback error"); speakBrowser(clean); };
+            await audio.play();
+            currentAudio = "htmlaudio";
+            console.log("[tts] Playing via HTMLAudioElement");
+            return;
+          } catch (audioErr) {
+            console.warn("[tts] HTMLAudio failed:", audioErr.message);
+          }
+        } else {
+          console.warn("[tts] Server returned 200 but empty body");
+        }
       } else {
-        console.warn("[tts] AudioContext not available, falling back to browser voice");
+        const errText = await res.text().catch(() => "");
+        console.warn("[tts] Server error:", res.status, errText.slice(0, 100));
       }
     } catch (e) {
-      console.warn("[tts] ElevenLabs/WebAudio failed:", e.message);
+      console.warn("[tts] TTS fetch failed:", e.message);
     }
 
-    // Fallback: best available browser voice
+    // ── Strategy 2: Browser speech synthesis (always available, no network) ──
+    console.log("[tts] Falling back to browser voice");
     speakBrowser(clean);
   }
 
@@ -1215,8 +1257,9 @@
       try { currentSource.stop(); } catch(e) {}
       currentSource = null;
     }
+    // Stop any playing HTMLAudioElements
+    document.querySelectorAll("audio").forEach(a => { try { a.pause(); a.currentTime = 0; } catch(e) {} });
     if (window.speechSynthesis && window.speechSynthesis.speaking) {
-      // Only cancel browser speech, not all speech
       window.speechSynthesis.cancel();
     }
     currentAudio = null;
