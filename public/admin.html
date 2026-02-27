@@ -463,12 +463,49 @@
     .sev-medium { background: #FEF3C7; color: var(--amber); }
     .sev-low    { background: #F0FDF4; color: var(--green); }
 
+    /* ── MOBILE TOP BAR ────────────────────────────────────────── */
+    .mobile-bar {
+      display: none;
+      background: var(--navy);
+      color: white;
+      padding: 14px 16px;
+      align-items: center;
+      justify-content: space-between;
+    }
+    .mobile-bar .mob-title { font-size: 17px; font-weight: 800; }
+    .mobile-tabs {
+      display: none;
+      background: white;
+      border-bottom: 1px solid var(--border);
+      padding: 0 12px;
+      gap: 0;
+      overflow-x: auto;
+    }
+    .mob-tab {
+      padding: 12px 16px;
+      font-size: 13px;
+      font-weight: 700;
+      color: var(--muted);
+      cursor: pointer;
+      white-space: nowrap;
+      border-bottom: 3px solid transparent;
+      transition: color 0.15s, border-color 0.15s;
+      background: none;
+      border-top: none; border-left: none; border-right: none;
+    }
+    .mob-tab.active { color: var(--navy); border-bottom-color: var(--navy); }
+
     /* ── RESPONSIVE ────────────────────────────────────────────── */
     @media (max-width: 768px) {
       .sidebar { display: none; }
+      .mobile-bar { display: flex; }
+      .mobile-tabs { display: flex; }
       .main { padding: 20px 16px; }
       .stats-grid { grid-template-columns: 1fr 1fr; }
       .detail-panel { width: 100vw; }
+      .page-header { flex-wrap: wrap; gap: 10px; }
+      .table-toolbar { flex-wrap: wrap; }
+      .search-wrap { max-width: 100%; }
     }
   </style>
 </head>
@@ -495,6 +532,17 @@
 <!-- ── APP ───────────────────────────────────────────────────── -->
 <div id="app">
   <div class="layout">
+
+    <!-- Mobile top bar (visible < 768px) -->
+    <div class="mobile-bar" id="mobileBar">
+      <span class="mob-title">🌿 Sage Admin</span>
+      <button class="logout-btn" onclick="doLogout()" style="width:auto;padding:6px 10px;font-size:12px;">↩ Sign Out</button>
+    </div>
+    <div class="mobile-tabs" id="mobileTabs">
+      <button class="mob-tab active" onclick="showPage('overview',this)" data-page="overview">📊 Overview</button>
+      <button class="mob-tab" onclick="showPage('users',this)" data-page="users">👥 Users</button>
+      <button class="mob-tab" onclick="showPage('alerts',this)" data-page="alerts">🚨 Alerts</button>
+    </div>
 
     <!-- Sidebar -->
     <nav class="sidebar">
@@ -702,11 +750,18 @@
   }
 
   // ── Page navigation ───────────────────────────────────────────────────────
-  function showPage(id) {
+  function showPage(id, mobBtn) {
     document.querySelectorAll(".page").forEach(p => p.classList.remove("active"));
     document.querySelectorAll(".nav-item").forEach(n => n.classList.remove("active"));
+    document.querySelectorAll(".mob-tab").forEach(t => t.classList.remove("active"));
     document.getElementById("page-" + id).classList.add("active");
-    document.getElementById("nav-" + id).classList.add("active");
+    const navItem = document.getElementById("nav-" + id);
+    if (navItem) navItem.classList.add("active");
+    if (mobBtn) mobBtn.classList.add("active");
+    else {
+      const mt = document.querySelector(`.mob-tab[data-page="${id}"]`);
+      if (mt) mt.classList.add("active");
+    }
   }
 
   // ── Helpers ───────────────────────────────────────────────────────────────

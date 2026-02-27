@@ -191,7 +191,35 @@ async function checkMedicationReminders() {
 }
 
 // ── Middleware ────────────────────────────────────────────────────────────────
-app.use(express.json());
+app.use(express.json({ limit: "1mb" }));
+
+// Security headers
+app.use((req, res, next) => {
+  res.setHeader("X-Content-Type-Options", "nosniff");
+  res.setHeader("X-Frame-Options", "SAMEORIGIN");
+  res.setHeader("X-XSS-Protection", "1; mode=block");
+  res.setHeader("Referrer-Policy", "strict-origin-when-cross-origin");
+  next();
+});
+
+// Simple in-memory rate limiter for expensive AI endpoints
+const rateBuckets = new Map();
+function rateLimit(windowMs, maxHits) {
+  return (req, res, next) => {
+    const ip = req.ip || req.connection.remoteAddress || "unknown";
+    const key = `${req.route?.path || req.path}:${ip}`;
+    const now = Date.now();
+    const bucket = rateBuckets.get(key) || { count: 0, resetAt: now + windowMs };
+    if (now > bucket.resetAt) { bucket.count = 0; bucket.resetAt = now + windowMs; }
+    bucket.count++;
+    rateBuckets.set(key, bucket);
+    if (bucket.count > maxHits) {
+      return res.status(429).json({ error: "Too many requests — please wait a moment." });
+    }
+    next();
+  };
+}
+
 app.use(express.static(path.join(__dirname, "public")));
 
 // ── Seed demo data on first run ───────────────────────────────────────────────
@@ -336,7 +364,7 @@ app.post("/api/emergency", async (req, res) => {
 // CHAT
 // ─────────────────────────────────────────────────────────────────────────────
 
-app.post("/api/chat", async (req, res) => {
+app.post("/api/chat", rateLimit(60000, 20), async (req, res) => {
   try {
     const { seniorId, message, sessionId, clientTime, timezone, location } = req.body;
     if (!message) return res.status(400).json({ error: "Message required" });
@@ -464,7 +492,7 @@ app.get("/api/tts/status", (req, res) => {
   });
 });
 
-app.post("/api/tts", async (req, res) => {
+app.post("/api/tts", rateLimit(60000, 30), async (req, res) => {
   const { text } = req.body;
   if (!text) return res.status(400).json({ error: "text required" });
 
@@ -1169,36 +1197,6 @@ app.post("/api/push/test", async (req, res) => {
 });
 
 // ─────────────────────────────────────────────────────────────────────────────
-// UNSPLASH PHOTO RESOLVER  (public — no API key needed via oembed)
-// ─────────────────────────────────────────────────────────────────────────────
-const unsplashCache = new Map(); // cache resolved URLs for the process lifetime
-
-app.get("/api/unsplash/:photoId", async (req, res) => {
-  const { photoId } = req.params;
-  const w = parseInt(req.query.w) || 800;
-
-  // Serve from in-process cache to avoid hammering oembed
-  const cacheKey = `${photoId}-${w}`;
-  if (unsplashCache.has(cacheKey)) {
-    return res.json({ url: unsplashCache.get(cacheKey) });
-  }
-
-  try {
-    const oembedUrl = `https://oembed.unsplash.com/?url=https://unsplash.com/photos/${photoId}`;
-    const r = await fetch(oembedUrl);
-    if (!r.ok) return res.status(404).json({ error: "photo not found" });
-    const data = await r.json();
-    const base = data.thumbnail_url && data.thumbnail_url.split("?")[0];
-    if (!base) return res.status(404).json({ error: "no cdn url" });
-    const final = `${base}?auto=format&fit=crop&w=${w}&q=85`;
-    unsplashCache.set(cacheKey, final);
-    res.json({ url: final });
-  } catch (e) {
-    res.status(500).json({ error: e.message });
-  }
-});
-
-// ─────────────────────────────────────────────────────────────────────────────
 // STATIC ROUTES
 // ─────────────────────────────────────────────────────────────────────────────
 app.get("/elder",    (req, res) => res.sendFile(path.join(__dirname, "public", "elder.html")));
@@ -1213,10 +1211,20 @@ app.get("/",         (req, res) => res.sendFile(path.join(__dirname, "public", "
 // START
 // ─────────────────────────────────────────────────────────────────────────────
 async function start() {
+  // ── Production safety checks ────────────────────────────────────────────────
   if (!process.env.SUPABASE_URL || process.env.SUPABASE_URL === "YOUR_SUPABASE_URL") {
     console.warn("\n⚠️  SUPABASE_URL not configured — see .env file for setup instructions.\n");
   } else {
     await seedIfEmpty();
+  }
+  if (!process.env.ADMIN_PASSWORD || process.env.ADMIN_PASSWORD === "admin123") {
+    console.warn("⚠️  ADMIN_PASSWORD is using the default — set a strong password in env vars!");
+  }
+  if (!process.env.JWT_SECRET || process.env.JWT_SECRET === "sage-family-secret-dev") {
+    console.warn("⚠️  JWT_SECRET is using the default — set a unique secret in env vars!");
+  }
+  if (!process.env.ANTHROPIC_API_KEY) {
+    console.warn("⚠️  ANTHROPIC_API_KEY not set — chat will not work.");
   }
   app.listen(PORT, () => {
     console.log("\n🌿  Sage Companion LLC is running!\n");
