@@ -459,7 +459,7 @@ ${weatherInfo ? `Current weather: ${weatherInfo}` : ""}`;
     const chatModel = process.env.CHAT_MODEL || "claude-haiku-4-5-20251001";
     const response = await anthropic.messages.create({
       model: chatModel,
-      max_tokens: 500,
+      max_tokens: 300,
       system: systemPrompt,
       messages,
     });
@@ -552,7 +552,7 @@ app.get("/api/tts/test", async (req, res) => {
   const https = require("https");
   try {
     const result = await new Promise((resolve, reject) => {
-      const payload = JSON.stringify({ model: "tts-1", input: "Hello", voice: "nova", response_format: "mp3" });
+      const payload = JSON.stringify({ model: "tts-1", input: "Hello", voice: "nova", response_format: "aac" });
       const ttsReq = https.request({
         hostname: "api.openai.com", path: "/v1/audio/speech", method: "POST",
         headers: { "Authorization": `Bearer ${apiKey}`, "Content-Type": "application/json", "Content-Length": Buffer.byteLength(payload) },
@@ -602,8 +602,8 @@ app.post("/api/tts", rateLimit(60000, 30), async (req, res) => {
         model: "tts-1",        // tts-1 = optimised for speed; tts-1-hd = higher quality
         input: cleanText,
         voice: voice,
-        response_format: "mp3",
-        speed: 0.95,           // slightly slower — easier for seniors
+        response_format: "aac",   // aac is smaller than mp3 & supported on all devices including iOS
+        speed: 1.15,              // slightly faster — snappier feel
       });
 
       const options = {
@@ -619,7 +619,6 @@ app.post("/api/tts", rateLimit(60000, 30), async (req, res) => {
 
       const ttsReq = https.request(options, (ttsRes) => {
         if (ttsRes.statusCode === 200) {
-          console.log(`TTS success: ${ttsRes.headers["content-type"]}`);
           resolve(ttsRes);
         } else {
           let errBody = "";
@@ -636,7 +635,7 @@ app.post("/api/tts", rateLimit(60000, 30), async (req, res) => {
       ttsReq.end();
     });
 
-    res.setHeader("Content-Type", "audio/mpeg");
+    res.setHeader("Content-Type", "audio/aac");
     res.setHeader("Cache-Control", "no-cache");
     audioStream.pipe(res);
   } catch (e) {

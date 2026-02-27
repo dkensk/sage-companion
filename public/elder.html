@@ -1224,7 +1224,8 @@
 
           // Fallback: HTMLAudioElement with blob URL (works on desktop)
           try {
-            const blob = new Blob([arrayBuf], { type: "audio/mpeg" });
+            const ctype = res.headers.get("content-type") || "audio/ogg";
+            const blob = new Blob([arrayBuf], { type: ctype });
             const url  = URL.createObjectURL(blob);
             const audio = new Audio(url);
             audio.onended = () => { URL.revokeObjectURL(url); currentAudio = null; setSpeakingIndicator(false); };
