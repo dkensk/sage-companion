@@ -16,6 +16,8 @@
   <style>
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
+    html { overflow-x: hidden; }
+
     :root {
       --navy:   #1E3A8A;
       --teal:   #0F766E;
@@ -37,6 +39,10 @@
       background: var(--bg);
       color: var(--text);
       min-height: 100vh;
+      width: 100%;
+      max-width: 100vw;
+      overflow-x: hidden;
+      padding-bottom: 40px;
       -webkit-font-smoothing: antialiased;
     }
 
@@ -48,9 +54,11 @@
       display: flex;
       align-items: center;
       justify-content: space-between;
+      gap: 12px;
       position: sticky;
       top: 0;
       z-index: 100;
+      width: 100%;
       box-shadow: 0 2px 16px rgba(30,58,138,0.25);
     }
 
@@ -288,7 +296,10 @@
       padding: 13px 0;
       border-bottom: 1px solid var(--border);
       gap: 12px;
+      min-width: 0;
     }
+
+    .med-info { min-width: 0; flex: 1; overflow-wrap: break-word; word-break: break-word; }
 
     .med-row:last-child { border-bottom: none; }
     .med-name { font-size: 16px; font-weight: 700; }
@@ -323,6 +334,11 @@
       flex-shrink: 0;
       margin-top: 6px;
     }
+
+    .activity-dot.dot-med    { background: var(--green); }
+    .activity-dot.dot-alert  { background: var(--red); }
+    .activity-dot.dot-chat   { background: var(--navy); }
+    .activity-dot.dot-system { background: var(--muted); }
 
     .activity-text { font-size: 14px; color: var(--text); flex: 1; line-height: 1.4; }
     .activity-time { font-size: 12px; color: var(--muted); white-space: nowrap; font-weight: 500; }
@@ -448,7 +464,9 @@
       transition: opacity 0.25s var(--ease), transform 0.25s var(--ease);
       z-index: 999;
       pointer-events: none;
-      white-space: nowrap;
+      max-width: calc(100vw - 32px);
+      white-space: normal;
+      text-align: center;
     }
 
     #toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
@@ -461,6 +479,11 @@
     @media (max-width: 480px) {
       .stats { grid-template-columns: 1fr 1fr; }
       #dashboard { padding: 16px 14px; }
+      header { padding: 14px 16px; }
+      .header-btn { padding: 7px 11px; font-size: 12px; }
+      .logo { font-size: 18px; }
+      .status-banner { flex-wrap: wrap; }
+      .call-btn { width: 100%; text-align: center; }
     }
   </style>
   <script>
@@ -622,19 +645,40 @@
   let seniorId = localStorage.getItem("familySeniorId");
   let seniorName = "";
   let activeTab = "meds";
+  let refreshInterval = null;
 
   async function joinFamily() {
     const code = document.getElementById("codeInput").value.trim().toUpperCase();
     if (!code) return;
 
-    const res = await fetch("/api/family/login", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ familyCode: code }),
-    });
+    const btn = document.querySelector(".login-card button");
+    btn.textContent = "Connecting…";
+    btn.disabled = true;
+    btn.style.opacity = "0.7";
+    document.getElementById("loginError").style.display = "none";
+
+    let res;
+    try {
+      res = await fetch("/api/family/login", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ familyCode: code }),
+      });
+    } catch (e) {
+      document.getElementById("loginError").textContent = "Connection failed. Please check your internet.";
+      document.getElementById("loginError").style.display = "block";
+      btn.textContent = "Connect →";
+      btn.disabled = false;
+      btn.style.opacity = "1";
+      return;
+    }
 
     if (!res.ok) {
+      document.getElementById("loginError").textContent = "Code not found. Please check and try again.";
       document.getElementById("loginError").style.display = "block";
+      btn.textContent = "Connect →";
+      btn.disabled = false;
+      btn.style.opacity = "1";
       return;
     }
 
@@ -656,7 +700,8 @@
     seniorName = localStorage.getItem("familySeniorName") || seniorName;
     document.getElementById("headerSub").textContent = `Monitoring ${seniorName}`;
     await loadDashboard();
-    setInterval(loadDashboard, 30000);
+    if (refreshInterval) clearInterval(refreshInterval);
+    refreshInterval = setInterval(loadDashboard, 30000);
   }
 
   async function loadDashboard() {
@@ -722,9 +767,15 @@
       return;
     }
     const icons = { wake:"⏰", meal:"🍽️", medication_taken:"💊", conversation:"💬", emergency:"🚨", medication_added:"💊", system:"🛡️" };
+    const dotClass = (type) => {
+      if (type === "medication_taken" || type === "medication_added") return "dot-med";
+      if (type === "emergency") return "dot-alert";
+      if (type === "conversation") return "dot-chat";
+      return "dot-system";
+    };
     el.innerHTML = activity.map(a => `
       <div class="activity-item">
-        <div class="activity-dot"></div>
+        <div class="activity-dot ${dotClass(a.type)}"></div>
         <div class="activity-text">${icons[a.type] || "•"} ${a.description}</div>
         <div class="activity-time">${formatRelTime(a.timestamp)}</div>
       </div>`).join("");
@@ -811,6 +862,7 @@
     document.getElementById(`tab-${name}`).style.display = "block";
     btn.classList.add("active");
     activeTab = name;
+    if (name === "convo")    loadConversations();
     if (name === "doctorq")  loadDoctorQuestions();
     if (name === "visits")   loadVisits();
     if (name === "calendar") loadCalendar();
@@ -936,6 +988,8 @@
       }
 
       el.innerHTML = visits.map((v, i) => {
+        // Store full transcript safely for expand
+        visitTranscripts[i] = v.transcript;
         const date = new Date(v.createdAt).toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric", year: "numeric" });
         const time = new Date(v.createdAt).toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" });
         const preview = v.transcript.length > 300 ? v.transcript.slice(0, 300) + "…" : v.transcript;
@@ -950,7 +1004,7 @@
             </div>
             <div id="visit-text-${i}" style="font-size:15px;line-height:1.7;color:var(--text);white-space:pre-wrap;max-height:140px;overflow:hidden;position:relative;">${escHtml(preview)}</div>
             ${v.transcript.length > 300 ? `
-              <button onclick="expandVisit(${i}, \`${escHtml(v.transcript)}\`)" id="expand-btn-${i}"
+              <button onclick="expandVisit(${i})" id="expand-btn-${i}"
                 style="background:none;border:none;color:var(--navy);font-size:14px;font-weight:700;cursor:pointer;margin-top:8px;padding:0;">
                 Read full transcript ↓
               </button>` : ""}
@@ -963,9 +1017,13 @@
     }
   }
 
-  function expandVisit(i, fullText) {
-    document.getElementById(`visit-text-${i}`).style.maxHeight = "none";
-    document.getElementById(`visit-text-${i}`).textContent = fullText;
+  // Store full transcripts safely (avoids XSS from inline onclick)
+  const visitTranscripts = {};
+
+  function expandVisit(i) {
+    const el = document.getElementById(`visit-text-${i}`);
+    el.style.maxHeight = "none";
+    el.textContent = visitTranscripts[i] || "";
     const btn = document.getElementById(`expand-btn-${i}`);
     if (btn) btn.style.display = "none";
   }
