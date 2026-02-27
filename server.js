@@ -280,15 +280,28 @@ app.post("/api/medications/:id/taken", async (req, res) => {
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
+// GET /api/medications/scan/status — diagnostic check for scan pipeline
+app.get("/api/medications/scan/status", (req, res) => {
+  const apiKey = (process.env.ANTHROPIC_API_KEY || "").trim();
+  res.json({
+    configured: !!apiKey && apiKey.length > 10,
+    keyPrefix: apiKey ? apiKey.substring(0, 10) + "…" : null,
+    scanModel: process.env.SCAN_MODEL || "claude-sonnet-4-5-20250929",
+    maxFileSize: "15MB",
+  });
+});
+
 // POST /api/medications/scan — Claude Vision reads a medication bottle label
 app.post("/api/medications/scan", upload.single("image"), async (req, res) => {
   try {
     if (!req.file) return res.status(400).json({ error: "No image provided" });
     const b64  = req.file.buffer.toString("base64");
     const mime = req.file.mimetype;
+    console.log(`[MedScan] Received image: ${(req.file.size / 1024).toFixed(1)}KB, ${mime}`);
 
+    const scanModel = process.env.SCAN_MODEL || "claude-sonnet-4-5-20250929";
     const response = await anthropic.messages.create({
-      model: "claude-sonnet-4-5-20250929",
+      model: scanModel,
       max_tokens: 600,
       messages: [{ role: "user", content: [
         { type: "image", source: { type: "base64", media_type: mime, data: b64 } },
@@ -305,10 +318,17 @@ Fields:
       ]}],
     });
 
-    const match = response.content[0].text.match(/\{[\s\S]*\}/);
+    const rawText = response.content[0].text;
+    console.log(`[MedScan] Claude response: ${rawText.substring(0, 200)}`);
+    const match = rawText.match(/\{[\s\S]*\}/);
     if (!match) return res.status(400).json({ error: "Could not read label — try a clearer photo" });
-    res.json(JSON.parse(match[0]));
-  } catch (e) { res.status(500).json({ error: e.message }); }
+    const parsed = JSON.parse(match[0]);
+    console.log(`[MedScan] Parsed medication: ${parsed.name}`);
+    res.json(parsed);
+  } catch (e) {
+    console.error("[MedScan] Error:", e.message);
+    res.status(500).json({ error: e.message });
+  }
 });
 
 // POST /api/medications — add medication (family or scan)
@@ -708,12 +728,17 @@ app.get("/api/doctor-visits/:seniorId", async (req, res) => {
 app.post("/api/doctor-visits", async (req, res) => {
   try {
     const { seniorId, transcript, doctorName, notes } = req.body;
+    console.log(`[DoctorVisit] Save request — seniorId: ${seniorId}, words: ${transcript ? transcript.trim().split(/\s+/).length : 0}`);
     if (!seniorId || !transcript) return res.status(400).json({ error: "seniorId and transcript required" });
-    const { data: visit } = await supabase.from("doctor_visits").insert({
+    const { data: visit, error: insertErr } = await supabase.from("doctor_visits").insert({
       senior_id: seniorId, transcript: transcript.trim(),
       doctor_name: doctorName || "", notes: notes || "",
       word_count: transcript.trim().split(/\s+/).length,
     }).select().single();
+    if (insertErr) {
+      console.error("[DoctorVisit] Supabase insert error:", insertErr.message);
+      return res.status(500).json({ error: insertErr.message });
+    }
     await supabase.from("activity").insert({
       senior_id: seniorId, type: "doctor_visit",
       description: `Doctor visit recorded${doctorName ? " with Dr. " + doctorName : ""}`,

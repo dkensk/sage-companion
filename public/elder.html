@@ -806,37 +806,46 @@
 
   // ── Medications ───────────────────────────────────────────────────────────────
   async function loadMedications() {
-    const res = await fetch(`/api/medications/${SENIOR_ID}`);
-    const meds = await res.json();
-    const el = document.getElementById("medList");
+    try {
+      const res = await fetch(`/api/medications/${SENIOR_ID}`);
+      if (!res.ok) { console.error("[Meds] Load failed:", res.status); return; }
+      const meds = await res.json();
+      const el = document.getElementById("medList");
 
-    if (!meds || meds.length === 0) {
-      el.innerHTML = `<p style="color:var(--muted);font-size:18px;padding:8px 0;">No medications added yet.</p>`;
-      return;
-    }
+      if (!meds || meds.length === 0) {
+        el.innerHTML = `<p style="color:var(--muted);font-size:18px;padding:8px 0;">No medications added yet.</p>`;
+        return;
+      }
 
-    el.innerHTML = meds.map(m => `
-      <div class="med-item">
-        <div>
-          <div class="med-name">${m.name}</div>
-          <div class="med-detail">${m.dose ? m.dose + " · " : ""}${m.time}${m.withFood ? " · with food" : ""}</div>
-        </div>
-        ${m.takenToday
-          ? `<div class="taken-badge">✓ Taken</div>`
-          : `<button class="take-btn" onclick="takeMed('${m._id}','${m.name}')">Take</button>`
-        }
-      </div>`).join("");
+      el.innerHTML = meds.map(m => `
+        <div class="med-item">
+          <div>
+            <div class="med-name">${m.name}</div>
+            <div class="med-detail">${m.dose ? m.dose + " · " : ""}${m.time}${m.withFood ? " · with food" : ""}</div>
+          </div>
+          ${m.takenToday
+            ? `<div class="taken-badge">✓ Taken</div>`
+            : `<button class="take-btn" onclick="takeMed('${m._id}','${m.name}')">Take</button>`
+          }
+        </div>`).join("");
+    } catch (e) { console.error("[Meds] Load error:", e); }
   }
 
   async function takeMed(id, name) {
-    await fetch(`/api/medications/${id}/taken`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ confirmedBy: "button" })
-    });
-    showToast(`✓ ${name} marked as taken`);
-    speak(`Great job taking your ${name}!`);
-    await loadMedications();
+    try {
+      const res = await fetch(`/api/medications/${id}/taken`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ confirmedBy: "button" })
+      });
+      if (!res.ok) { showToast("Couldn't record — try again."); return; }
+      showToast(`✓ ${name} marked as taken`);
+      speak(`Great job taking your ${name}!`);
+      await loadMedications();
+    } catch (e) {
+      showToast("Connection error — try again.");
+      console.error("[Meds] Take error:", e);
+    }
   }
 
   // ── Chat ──────────────────────────────────────────────────────────────────────
@@ -944,24 +953,27 @@
 
   // ── Doctor Questions ───────────────────────────────────────────────────────────
   async function loadDoctorQuestions() {
-    const res = await fetch(`/api/doctor-questions/${SENIOR_ID}`);
-    const questions = await res.json();
-    const el = document.getElementById("doctorQList");
-    const pending = questions.filter(q => !q.asked);
+    try {
+      const res = await fetch(`/api/doctor-questions/${SENIOR_ID}`);
+      if (!res.ok) { console.error("[DoctorQ] Load failed:", res.status); return; }
+      const questions = await res.json();
+      const el = document.getElementById("doctorQList");
+      const pending = questions.filter(q => !q.asked);
 
-    if (pending.length === 0) {
-      el.innerHTML = `<p style="color:var(--muted);font-size:18px;padding:4px 0;">No questions yet — Sage will help you add them!</p>`;
-      return;
-    }
+      if (pending.length === 0) {
+        el.innerHTML = `<p style="color:var(--muted);font-size:18px;padding:4px 0;">No questions yet — Sage will help you add them!</p>`;
+        return;
+      }
 
-    el.innerHTML = pending.map(q => `
-      <div style="display:flex;align-items:flex-start;gap:12px;padding:12px 0;border-bottom:1px solid var(--border);">
-        <span style="font-size:20px;margin-top:2px;">❓</span>
-        <div style="flex:1;font-size:19px;line-height:1.5;">${escHtml(q.question)}</div>
-        <button onclick="deleteDoctorQuestion('${q._id}')"
-          style="background:none;border:none;color:var(--muted);font-size:22px;cursor:pointer;padding:2px 6px;">✕</button>
-      </div>
-    `).join("");
+      el.innerHTML = pending.map(q => `
+        <div style="display:flex;align-items:flex-start;gap:12px;padding:12px 0;border-bottom:1px solid var(--border);">
+          <span style="font-size:20px;margin-top:2px;">❓</span>
+          <div style="flex:1;font-size:19px;line-height:1.5;">${escHtml(q.question)}</div>
+          <button onclick="deleteDoctorQuestion('${q._id}')"
+            style="background:none;border:none;color:var(--muted);font-size:22px;cursor:pointer;padding:2px 6px;">✕</button>
+        </div>
+      `).join("");
+    } catch (e) { console.error("[DoctorQ] Load error:", e); }
   }
 
   async function addDoctorQuestion() {
@@ -975,11 +987,14 @@
   }
 
   async function saveDoctorQuestion(question) {
-    await fetch("/api/doctor-questions", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ seniorId: SENIOR_ID, question })
-    });
+    try {
+      const res = await fetch("/api/doctor-questions", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ seniorId: SENIOR_ID, question })
+      });
+      if (!res.ok) console.error("[DoctorQ] Save failed:", res.status);
+    } catch (e) { console.error("[DoctorQ] Save error:", e); }
   }
 
   async function deleteDoctorQuestion(id) {
@@ -1517,9 +1532,17 @@
 
     try {
       const res = await fetch("/api/medications/scan", { method: "POST", body: formData });
+      if (!res.ok) {
+        const errData = await res.json().catch(() => ({}));
+        console.error("[MedScan] Server error:", res.status, errData);
+        showToast(errData.error || "Couldn't read the label. Try a clearer photo.");
+        speak("I had trouble reading that label. Could you try again with a clearer photo, maybe with better lighting?");
+        resetScanBtn();
+        return;
+      }
       const data = await res.json();
 
-      if (!res.ok || !data.name) {
+      if (!data.name) {
         showToast("Couldn't read the label. Try a clearer photo.");
         speak("I had trouble reading that label. Could you try again with a clearer photo, maybe with better lighting?");
         resetScanBtn();
@@ -1538,7 +1561,8 @@
 
       speak(`I found ${data.name}${data.dose ? ", " + data.dose : ""}. Please confirm the details and tap Save.`);
     } catch (e) {
-      showToast("Scan failed — please try again.");
+      console.error("[MedScan] Fetch error:", e);
+      showToast("Scan failed — check your connection and try again.");
       speak("Something went wrong. Please try again.");
     }
 
@@ -1559,16 +1583,26 @@
     const time     = document.getElementById("scanTime").value.trim();
     if (!name) { showToast("Please enter the medication name."); return; }
 
-    await fetch("/api/medications", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ seniorId: SENIOR_ID, name, dose, time: time || "8:00 AM", withFood: false }),
-    });
-
-    cancelScan();
-    showToast("✓ " + name + " added to your medications!");
-    speak(`Great, I've added ${name} to your medication list.`);
-    await loadMedications();
+    try {
+      const res = await fetch("/api/medications", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ seniorId: SENIOR_ID, name, dose, time: time || "8:00 AM", withFood: false }),
+      });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        console.error("[MedScan] Save failed:", res.status, err);
+        showToast("Couldn't save medication — try again.");
+        return;
+      }
+      cancelScan();
+      showToast("✓ " + name + " added to your medications!");
+      speak(`Great, I've added ${name} to your medication list.`);
+      await loadMedications();
+    } catch (e) {
+      console.error("[MedScan] Save error:", e);
+      showToast("Connection error — try again.");
+    }
   }
 
   function cancelScan() {

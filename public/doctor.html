@@ -339,7 +339,7 @@
 <div id="toast"></div>
 
 <script>
-  const SENIOR_ID = localStorage.getItem("sageSeniorId") || "senior_margaret_001";
+  const SENIOR_ID = localStorage.getItem("sageSeniorId") || "00000000-0000-0000-0000-000000000001";
   let isRecording = false;
   let recognition = null;
   let transcript = "";
@@ -478,11 +478,20 @@
     btn.textContent = "Saving…";
 
     try {
+      console.log("[DoctorVisit] Saving with seniorId:", SENIOR_ID);
       const res = await fetch("/api/doctor-visits", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ seniorId: SENIOR_ID, transcript, doctorName, notes }),
       });
+      if (!res.ok) {
+        const errData = await res.json().catch(() => ({}));
+        console.error("[DoctorVisit] Server error:", res.status, errData);
+        showToast(errData.error || "Error saving — please try again.");
+        btn.disabled = false;
+        btn.textContent = "💾 Save & Share with Family";
+        return;
+      }
       const data = await res.json();
       if (data.success) {
         showToast("✅ Visit saved! Family can now see it.");
@@ -496,6 +505,7 @@
         btn.textContent = "💾 Save & Share with Family";
       }
     } catch (e) {
+      console.error("[DoctorVisit] Connection error:", e);
       showToast("Connection error — please try again.");
       btn.disabled = false;
       btn.textContent = "💾 Save & Share with Family";
