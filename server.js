@@ -552,7 +552,7 @@ app.get("/api/tts/test", async (req, res) => {
   const https = require("https");
   try {
     const result = await new Promise((resolve, reject) => {
-      const payload = JSON.stringify({ model: "tts-1", input: "Hello", voice: "nova", response_format: "aac" });
+      const payload = JSON.stringify({ model: "gpt-4o-mini-tts", input: "Hello there, how are you doing today?", voice: "coral", response_format: "mp3" });
       const ttsReq = https.request({
         hostname: "api.openai.com", path: "/v1/audio/speech", method: "POST",
         headers: { "Authorization": `Bearer ${apiKey}`, "Content-Type": "application/json", "Content-Length": Buffer.byteLength(payload) },
@@ -588,8 +588,9 @@ app.post("/api/tts", rateLimit(60000, 30), async (req, res) => {
     return res.status(503).json({ error: "OpenAI TTS not configured — add OPENAI_API_KEY to Railway Variables" });
   }
 
-  // Voices: alloy, echo, fable, onyx, nova, shimmer — nova is warm & friendly
-  const voice = (process.env.TTS_VOICE || "nova").trim();
+  // gpt-4o-mini-tts voices: alloy, ash, ballad, coral, echo, fable, nova, onyx, sage, shimmer, verse
+  // coral = cheerful & warm, sage = calm & thoughtful — both great for elder care
+  const voice = (process.env.TTS_VOICE || "coral").trim();
   const cleanText = text.slice(0, 4096); // OpenAI max is 4096 chars
 
   console.log(`TTS request: voice=${voice}, text length=${cleanText.length}`);
@@ -598,12 +599,17 @@ app.post("/api/tts", rateLimit(60000, 30), async (req, res) => {
 
   try {
     const audioStream = await new Promise((resolve, reject) => {
+      const ttsModel = (process.env.TTS_MODEL || "gpt-4o-mini-tts").trim();
       const payload = JSON.stringify({
-        model: "tts-1",        // tts-1 = optimised for speed; tts-1-hd = higher quality
+        model: ttsModel,
         input: cleanText,
         voice: voice,
-        response_format: "aac",   // aac is smaller than mp3 & supported on all devices including iOS
-        speed: 1.15,              // slightly faster — snappier feel
+        ...(ttsModel === "gpt-4o-mini-tts" ? {
+          // gpt-4o-mini-tts supports natural language instructions for tone/style
+          instructions: "Speak in a warm, caring, gentle tone — like a kind friend checking in. Natural pace, not rushed. Calm and reassuring.",
+        } : {}),
+        response_format: "mp3",
+        speed: 1.0,
       });
 
       const options = {
@@ -635,7 +641,7 @@ app.post("/api/tts", rateLimit(60000, 30), async (req, res) => {
       ttsReq.end();
     });
 
-    res.setHeader("Content-Type", "audio/aac");
+    res.setHeader("Content-Type", "audio/mpeg");
     res.setHeader("Cache-Control", "no-cache");
     audioStream.pipe(res);
   } catch (e) {

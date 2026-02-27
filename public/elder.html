@@ -1224,7 +1224,7 @@
 
           // Fallback: HTMLAudioElement with blob URL (works on desktop)
           try {
-            const ctype = res.headers.get("content-type") || "audio/ogg";
+            const ctype = res.headers.get("content-type") || "audio/mpeg";
             const blob = new Blob([arrayBuf], { type: ctype });
             const url  = URL.createObjectURL(blob);
             const audio = new Audio(url);
