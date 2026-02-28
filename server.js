@@ -154,7 +154,10 @@ function seniorAuth(req, res, next) {
 
   const token = req.headers["x-senior-token"];
   const payload = verifySeniorToken(token);
-  if (!payload) return res.status(401).json({ error: "Please log in to continue" });
+  if (!payload) {
+    console.log(`[Auth] seniorAuth REJECTED — path: ${req.path}, hasToken: ${!!token}, tokenPreview: ${token ? token.substring(0, 20) : "NONE"}`);
+    return res.status(401).json({ error: "Please log in to continue" });
+  }
   req.seniorId = payload.seniorId;
   next();
 }
@@ -851,7 +854,7 @@ app.get("/api/doctor-visits/:seniorId", seniorAuth, validateUUID("seniorId"), as
 app.post("/api/doctor-visits", seniorAuth, async (req, res) => {
   try {
     const { seniorId, transcript, doctorName, notes } = req.body;
-    console.log(`[DoctorVisit] Save request — seniorId: ${seniorId}, words: ${transcript ? transcript.trim().split(/\s+/).length : 0}`);
+    console.log(`[DoctorVisit] Save request — seniorId: ${seniorId}, tokenSeniorId: ${req.seniorId}, words: ${transcript ? transcript.trim().split(/\s+/).length : 0}, hasTranscript: ${!!transcript}`);
     if (!seniorId || !transcript) return res.status(400).json({ error: "seniorId and transcript required" });
     const { data: visit, error: insertErr } = await supabase.from("doctor_visits").insert({
       senior_id: seniorId, transcript: transcript.trim(),

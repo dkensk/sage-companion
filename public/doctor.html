@@ -587,16 +587,20 @@
     btn.textContent = "Saving…";
 
     try {
-      console.log("[DoctorVisit] Saving with seniorId:", SENIOR_ID);
+      const token = getSeniorToken();
+      console.log("[DoctorVisit] Saving — seniorId:", SENIOR_ID, "| token:", token ? token.substring(0, 20) + "…" : "NONE");
+      const payload = { seniorId: SENIOR_ID, transcript, doctorName, notes };
+      console.log("[DoctorVisit] Payload size:", JSON.stringify(payload).length, "bytes");
       const res = await apiCall("/api/doctor-visits", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ seniorId: SENIOR_ID, transcript, doctorName, notes }),
+        body: JSON.stringify(payload),
       });
+      console.log("[DoctorVisit] Response status:", res.status);
       if (!res.ok) {
         const errData = await res.json().catch(() => ({}));
         console.error("[DoctorVisit] Server error:", res.status, errData);
-        showToast(errData.error || "Error saving — please try again.");
+        showToast(errData.error || "Error saving (status " + res.status + ") — please try again.");
         btn.disabled = false;
         btn.textContent = "💾 Save & Share with Family";
         return;
@@ -615,8 +619,8 @@
       }
     } catch (e) {
       if (e.message === "Session expired") return; // apiCall handles redirect
-      console.error("[DoctorVisit] Connection error:", e);
-      showToast("Connection error — please try again.");
+      console.error("[DoctorVisit] Save failed:", e.message, e.stack);
+      showToast("Save failed: " + e.message);
       btn.disabled = false;
       btn.textContent = "💾 Save & Share with Family";
     }
