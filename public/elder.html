@@ -556,7 +556,7 @@
 <body>
 
 <!-- Login Screen -->
-<div id="loginScreen" style="display:none; position:fixed; inset:0; background:var(--bg); z-index:200; display:flex; align-items:center; justify-content:center; padding:24px;">
+<div id="loginScreen" style="display:none; position:fixed; inset:0; background:var(--bg); z-index:200; align-items:center; justify-content:center; padding:24px;">
   <div style="background:white; border-radius:24px; padding:40px 28px; max-width:400px; width:100%; text-align:center; box-shadow:0 8px 32px rgba(0,0,0,0.12);">
     <div style="font-size:56px; margin-bottom:16px;">🌿</div>
     <h2 style="font-size:28px; font-weight:900; color:var(--navy); margin-bottom:8px;">Welcome to Sage</h2>
@@ -782,6 +782,7 @@
       localStorage.setItem("sageSeniorToken", token);
       localStorage.setItem("sageSeniorId", senior._id);
       localStorage.setItem("sageSeniorName", senior.name);
+      localStorage.setItem("sageFamilyCode", code);
       location.reload();
     } catch (e) {
       errEl.textContent = "Connection error — please try again.";
@@ -789,7 +790,7 @@
     }
   }
 
-  function checkSeniorAuth() {
+  async function checkSeniorAuth() {
     const token = getSeniorToken();
     const seniorId = localStorage.getItem("sageSeniorId");
     // Allow demo mode through without token
@@ -798,6 +799,23 @@
       return true;
     }
     if (!token) {
+      // Try auto-login with stored family code (for users who set up before auth was deployed)
+      const storedCode = localStorage.getItem("sageFamilyCode");
+      if (storedCode) {
+        try {
+          const res = await fetch("/api/senior/login", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ familyCode: storedCode }),
+          });
+          if (res.ok) {
+            const data = await res.json();
+            localStorage.setItem("sageSeniorToken", data.token);
+            document.getElementById("loginScreen").style.display = "none";
+            return true;
+          }
+        } catch (e) { /* fall through to login screen */ }
+      }
       document.getElementById("loginScreen").style.display = "flex";
       return false;
     }
@@ -837,10 +855,10 @@
   let recognition = null;
   let userLocation = localStorage.getItem("sageLocation") || null;
 
-  // Check auth on load — show login if needed
-  if (!checkSeniorAuth()) {
-    // Don't initialize anything until logged in
-  }
+  // Check auth on load — show login if needed, then init
+  checkSeniorAuth().then(authed => {
+    if (authed) init();
+  });
 
   // Get location once and cache it
   function initLocation() {
@@ -872,8 +890,6 @@
 
   // ── Init ──────────────────────────────────────────────────────────────────────
   async function init() {
-    // Check auth first
-    if (!checkSeniorAuth()) return;
 
     // Request microphone permission once upfront — prevents re-prompting on each Talk tap
     try {

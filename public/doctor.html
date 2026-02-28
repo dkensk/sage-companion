@@ -371,17 +371,36 @@
     return res;
   }
 
-  function checkAuth() {
+  async function checkAuth() {
     const id = localStorage.getItem("sageSeniorId");
-    if (id === "00000000-0000-0000-0000-000000000001" || localStorage.getItem("sageDemo")) return;
+    if (id === "00000000-0000-0000-0000-000000000001" || localStorage.getItem("sageDemo")) return true;
     if (!getSeniorToken()) {
+      // Try auto-login with stored family code
+      const code = localStorage.getItem("sageFamilyCode");
+      if (code) {
+        try {
+          const res = await fetch("/api/senior/login", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ familyCode: code }),
+          });
+          if (res.ok) {
+            const data = await res.json();
+            localStorage.setItem("sageSeniorToken", data.token);
+            return true;
+          }
+        } catch (e) { /* fall through */ }
+      }
       window.location.href = "/elder";
+      return false;
     }
+    return true;
   }
-  checkAuth();
 
   // ── Init ──────────────────────────────────────────────────────────────────
   async function init() {
+    const authed = await checkAuth();
+    if (!authed) return;
     setupRecognition();
     await loadDoctorNames();
     await loadQuestions();
