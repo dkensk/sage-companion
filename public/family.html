@@ -647,6 +647,28 @@
   let activeTab = "meds";
   let refreshInterval = null;
 
+  function getFamilyToken() { return localStorage.getItem("familyToken"); }
+
+  // Wrapper for authenticated API calls
+  async function familyApiCall(url, opts = {}) {
+    const token = getFamilyToken();
+    if (token) {
+      opts.headers = opts.headers || {};
+      opts.headers["x-family-token"] = token;
+    }
+    const res = await fetch(url, opts);
+    if (res.status === 401) {
+      localStorage.removeItem("familyToken");
+      localStorage.removeItem("familySeniorId");
+      localStorage.removeItem("familySeniorName");
+      document.getElementById("dashboard").style.display = "none";
+      document.getElementById("loginScreen").style.display = "flex";
+      if (refreshInterval) clearInterval(refreshInterval);
+      throw new Error("Session expired — please log in again.");
+    }
+    return res;
+  }
+
   async function joinFamily() {
     const code = document.getElementById("codeInput").value.trim().toUpperCase();
     if (!code) return;
@@ -707,7 +729,7 @@
   async function loadDashboard() {
     if (!seniorId) return;
     try {
-      const res = await fetch(`/api/dashboard/${seniorId}`);
+      const res = await familyApiCall(`/api/dashboard/${seniorId}`);
       const d = await res.json();
 
       document.getElementById("seniorNameDisplay").textContent = d.senior.name;
@@ -798,7 +820,7 @@
   }
 
   async function loadConversations() {
-    const res = await fetch(`/api/conversations/${seniorId}`);
+    const res = await familyApiCall(`/api/conversations/${seniorId}`);
     const sessions = await res.json();
     const el = document.getElementById("convoList");
     if (!sessions || sessions.length === 0) {
@@ -810,7 +832,7 @@
   }
 
   async function resolveAlert(id) {
-    await fetch(`/api/alerts/${id}/resolve`, { method: "POST" });
+    await familyApiCall(`/api/alerts/${id}/resolve`, { method: "POST" });
     showToast("Alert resolved");
     await loadDashboard();
   }
@@ -841,7 +863,7 @@
     const withFood = document.getElementById("medFood").value === "1";
     if (!name) { showToast("Please enter a medication name"); return; }
 
-    await fetch("/api/medications", {
+    await familyApiCall("/api/medications", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ seniorId, name, dose, time, withFood })
@@ -872,7 +894,7 @@
   async function loadCalendar() {
     const el = document.getElementById("calendarList");
     try {
-      const res = await fetch(`/api/appointments/${seniorId}`);
+      const res = await familyApiCall(`/api/appointments/${seniorId}`);
       const appts = await res.json();
 
       if (!appts || appts.length === 0) {
@@ -935,7 +957,7 @@
   async function loadDoctorQuestions() {
     const el = document.getElementById("doctorqList");
     try {
-      const res = await fetch(`/api/doctor-questions/${seniorId}`);
+      const res = await familyApiCall(`/api/doctor-questions/${seniorId}`);
       const questions = await res.json();
 
       if (!questions || questions.length === 0) {
@@ -979,7 +1001,7 @@
   async function loadVisits() {
     const el = document.getElementById("visitsList");
     try {
-      const res = await fetch(`/api/doctor-visits/${seniorId}`);
+      const res = await familyApiCall(`/api/doctor-visits/${seniorId}`);
       const visits = await res.json();
 
       if (!visits || visits.length === 0) {
@@ -1056,7 +1078,7 @@
     location.reload();
   }
 
-  if (seniorId) showDashboard();
+  if (seniorId && getFamilyToken()) showDashboard();
 </script>
 </body>
 </html>

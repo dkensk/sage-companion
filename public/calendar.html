@@ -253,6 +253,36 @@
   let parsedAppt     = null;
   let ocrEvents      = [];
 
+  // ── Auth ─────────────────────────────────────────────────────────────────
+  function getSeniorToken() { return localStorage.getItem("sageSeniorToken"); }
+
+  async function apiCall(url, opts = {}) {
+    const token = getSeniorToken();
+    if (token) {
+      opts.headers = opts.headers || {};
+      if (typeof opts.headers === "object" && !(opts.headers instanceof Headers)) {
+        opts.headers["x-senior-token"] = token;
+      }
+    }
+    const res = await fetch(url, opts);
+    if (res.status === 401) {
+      localStorage.removeItem("sageSeniorToken");
+      showToast("Session expired — redirecting to login…");
+      setTimeout(() => window.location.href = "/elder", 1500);
+      throw new Error("Session expired");
+    }
+    return res;
+  }
+
+  function checkAuth() {
+    const id = localStorage.getItem("sageSeniorId");
+    if (id === "00000000-0000-0000-0000-000000000001" || localStorage.getItem("sageDemo")) return;
+    if (!getSeniorToken()) {
+      window.location.href = "/elder";
+    }
+  }
+  checkAuth();
+
   // ── Init ────────────────────────────────────────────────────────────────────
   async function init() {
     setupVoice();
@@ -269,7 +299,7 @@
 
   // ── Load Appointments ───────────────────────────────────────────────────────
   async function loadAppointments() {
-    const res   = await fetch(`/api/appointments/${SENIOR_ID}`);
+    const res   = await apiCall(`/api/appointments/${SENIOR_ID}`);
     const appts = await res.json();
     renderAppointments(appts);
   }
@@ -319,7 +349,7 @@
   }
 
   async function deleteAppt(id) {
-    await fetch(`/api/appointments/${id}`, { method: "DELETE" });
+    await apiCall(`/api/appointments/${id}`, { method: "DELETE" });
     showToast("Appointment removed");
     await loadAppointments();
   }
@@ -415,7 +445,7 @@
     document.getElementById("voiceStatus").style.color = "var(--muted)";
 
     try {
-      const res  = await fetch("/api/appointments/parse", {
+      const res  = await apiCall("/api/appointments/parse", {
         method: "POST", headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ text }),
       });
@@ -440,7 +470,7 @@
   async function saveVoiceAppointment() {
     if (!parsedAppt) return;
     document.getElementById("voiceConfirm").style.display = "none";
-    await fetch("/api/appointments", {
+    await apiCall("/api/appointments", {
       method: "POST", headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ seniorId: SENIOR_ID, ...parsedAppt, source: "voice" }),
     });
@@ -467,7 +497,7 @@
     form.append("image", file);
 
     try {
-      const res  = await fetch("/api/appointments/ocr", { method: "POST", body: form });
+      const res  = await apiCall("/api/appointments/ocr", { method: "POST", body: form });
       const data = await res.json();
       label.textContent = "TAKE A PHOTO OF YOUR CALENDAR";
       input.value = "";
@@ -518,12 +548,12 @@
     for (const ev of checked) {
       try {
         // Parse the date string through our API
-        const parseRes = await fetch("/api/appointments/parse", {
+        const parseRes = await apiCall("/api/appointments/parse", {
           method: "POST", headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ text: `${ev.title} on ${ev.date}${ev.time ? " at " + ev.time : ""}` }),
         });
         const parsed = await parseRes.json();
-        await fetch("/api/appointments", {
+        await apiCall("/api/appointments", {
           method: "POST", headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ seniorId: SENIOR_ID, title: parsed.title || ev.title, date: parsed.date || ev.date, time: ev.time || parsed.time, notes: ev.notes || "", source: "ocr" }),
         });
@@ -543,7 +573,7 @@
   // ── Google Calendar ─────────────────────────────────────────────────────────
   async function checkGoogleStatus() {
     try {
-      const res  = await fetch(`/api/google/status/${SENIOR_ID}`);
+      const res  = await apiCall(`/api/google/status/${SENIOR_ID}`);
       const data = await res.json();
       const statusEl = document.getElementById("googleStatus");
       const subEl    = document.getElementById("googleSub");
@@ -564,7 +594,7 @@
   }
 
   async function handleGoogleSync() {
-    const res  = await fetch(`/api/google/status/${SENIOR_ID}`);
+    const res  = await apiCall(`/api/google/status/${SENIOR_ID}`);
     const data = await res.json();
     if (!data.configured) {
       alert("Google Calendar needs to be set up first.\n\nSee the .env file setup instructions.");
@@ -581,7 +611,7 @@
     const btn = document.getElementById("googleBtn");
     btn.innerHTML = btn.innerHTML.replace("🗓️", '<span class="spinner" style="border-top-color:var(--navy)"></span>');
     try {
-      const res  = await fetch(`/api/google/sync/${SENIOR_ID}`, { method: "POST" });
+      const res  = await apiCall(`/api/google/sync/${SENIOR_ID}`, { method: "POST" });
       const data = await res.json();
       if (data.success) {
         showToast(`Synced! ${data.pulled} new from Google, ${data.pushed} sent to Google`);

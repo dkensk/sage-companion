@@ -93,10 +93,13 @@ function adminAuth(req, res, next) {
 
 // ── Family auth (HMAC token tied to seniorId) ─────────────────────────────────
 const JWT_SECRET = process.env.JWT_SECRET || "sage-family-secret-dev";
+const FAMILY_TOKEN_DAYS = 30;
 
 function makeFamilyToken(seniorId) {
-  const payload = Buffer.from(JSON.stringify({ seniorId, iat: Date.now() })).toString("base64url");
-  const sig     = crypto.createHmac("sha256", JWT_SECRET).update(payload).digest("hex");
+  const iat = Date.now();
+  const exp = iat + FAMILY_TOKEN_DAYS * 24 * 60 * 60 * 1000;
+  const payload = Buffer.from(JSON.stringify({ seniorId, iat, exp, type: "family" })).toString("base64url");
+  const sig = crypto.createHmac("sha256", JWT_SECRET).update(payload).digest("hex");
   return `${payload}.${sig}`;
 }
 
@@ -106,16 +109,82 @@ function verifyFamilyToken(token) {
     if (!payload || !sig) return null;
     const expected = crypto.createHmac("sha256", JWT_SECRET).update(payload).digest("hex");
     if (sig !== expected) return null;
-    return JSON.parse(Buffer.from(payload, "base64url").toString());
+    const data = JSON.parse(Buffer.from(payload, "base64url").toString());
+    if (data.exp && data.exp < Date.now()) return null; // expired
+    return data;
   } catch { return null; }
 }
 
 function familyAuth(req, res, next) {
-  const token   = req.headers["x-family-token"];
+  const token = req.headers["x-family-token"];
   const payload = verifyFamilyToken(token);
   if (!payload) return res.status(401).json({ error: "Family authentication required" });
   req.seniorId = payload.seniorId;
   next();
+}
+
+// ── Senior auth (long-lived 90-day tokens for elderly users) ──────────────────
+const SENIOR_TOKEN_SECRET = process.env.SENIOR_TOKEN_SECRET || "sage-senior-secret-dev";
+const SENIOR_TOKEN_DAYS = 90;
+
+function makeSeniorToken(seniorId) {
+  const iat = Date.now();
+  const exp = iat + SENIOR_TOKEN_DAYS * 24 * 60 * 60 * 1000;
+  const payload = Buffer.from(JSON.stringify({ seniorId, iat, exp, type: "senior" })).toString("base64url");
+  const sig = crypto.createHmac("sha256", SENIOR_TOKEN_SECRET).update(payload).digest("hex");
+  return `${payload}.${sig}`;
+}
+
+function verifySeniorToken(token) {
+  try {
+    const [payload, sig] = (token || "").split(".");
+    if (!payload || !sig) return null;
+    const expected = crypto.createHmac("sha256", SENIOR_TOKEN_SECRET).update(payload).digest("hex");
+    if (sig !== expected) return null;
+    const data = JSON.parse(Buffer.from(payload, "base64url").toString());
+    if (data.exp && data.exp < Date.now()) return null;
+    return data;
+  } catch { return null; }
+}
+
+function seniorAuth(req, res, next) {
+  // Allow demo senior through without a token
+  const seniorId = req.params.seniorId || req.body?.seniorId;
+  if (seniorId === DEMO_SENIOR_ID) { req.seniorId = DEMO_SENIOR_ID; return next(); }
+
+  const token = req.headers["x-senior-token"];
+  const payload = verifySeniorToken(token);
+  if (!payload) return res.status(401).json({ error: "Please log in to continue" });
+  req.seniorId = payload.seniorId;
+  next();
+}
+
+// ── Auth that accepts EITHER senior or family tokens ──────────────────────────
+function anyAuth(req, res, next) {
+  const seniorId = req.params.seniorId || req.body?.seniorId;
+  if (seniorId === DEMO_SENIOR_ID) { req.seniorId = DEMO_SENIOR_ID; return next(); }
+
+  const sToken = req.headers["x-senior-token"];
+  const fToken = req.headers["x-family-token"];
+  const sPayload = verifySeniorToken(sToken);
+  const fPayload = verifyFamilyToken(fToken);
+  if (sPayload) { req.seniorId = sPayload.seniorId; return next(); }
+  if (fPayload) { req.seniorId = fPayload.seniorId; return next(); }
+  return res.status(401).json({ error: "Authentication required" });
+}
+
+// ── UUID validation ───────────────────────────────────────────────────────────
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+function validateUUID(...paramNames) {
+  return (req, res, next) => {
+    for (const p of paramNames) {
+      const val = req.params[p] || req.body?.[p];
+      if (val && !UUID_RE.test(val)) {
+        return res.status(400).json({ error: `Invalid ${p} format` });
+      }
+    }
+    next();
+  };
 }
 
 // ── Medication reminder cron (runs every minute) ──────────────────────────────
@@ -193,12 +262,22 @@ async function checkMedicationReminders() {
 // ── Middleware ────────────────────────────────────────────────────────────────
 app.use(express.json({ limit: "1mb" }));
 
-// Security headers
+// Security headers + CORS
 app.use((req, res, next) => {
   res.setHeader("X-Content-Type-Options", "nosniff");
   res.setHeader("X-Frame-Options", "SAMEORIGIN");
   res.setHeader("X-XSS-Protection", "1; mode=block");
   res.setHeader("Referrer-Policy", "strict-origin-when-cross-origin");
+  // CORS
+  const origin = req.headers.origin;
+  const allowed = process.env.FRONTEND_URL || "";
+  if (origin && (origin === allowed || allowed === "*" || !allowed)) {
+    res.setHeader("Access-Control-Allow-Origin", origin);
+    res.setHeader("Access-Control-Allow-Credentials", "true");
+  }
+  res.setHeader("Access-Control-Allow-Methods", "GET,POST,PATCH,DELETE,OPTIONS");
+  res.setHeader("Access-Control-Allow-Headers", "Content-Type,x-senior-token,x-family-token,x-admin-token");
+  if (req.method === "OPTIONS") return res.sendStatus(204);
   next();
 });
 
@@ -233,7 +312,7 @@ async function seedIfEmpty() {
 // SENIOR
 // ─────────────────────────────────────────────────────────────────────────────
 
-app.get("/api/senior/:id", async (req, res) => {
+app.get("/api/senior/:id", seniorAuth, validateUUID("id"), async (req, res) => {
   try {
     const { data, error } = await supabase.from("seniors").select("*")
       .eq("id", req.params.id).single();
@@ -246,7 +325,7 @@ app.get("/api/senior/:id", async (req, res) => {
 // MEDICATIONS
 // ─────────────────────────────────────────────────────────────────────────────
 
-app.get("/api/medications/:seniorId", async (req, res) => {
+app.get("/api/medications/:seniorId", seniorAuth, validateUUID("seniorId"), async (req, res) => {
   try {
     const { data: meds } = await supabase.from("medications").select("*")
       .eq("senior_id", req.params.seniorId).eq("active", true);
@@ -261,7 +340,7 @@ app.get("/api/medications/:seniorId", async (req, res) => {
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
-app.post("/api/medications/:id/taken", async (req, res) => {
+app.post("/api/medications/:id/taken", seniorAuth, validateUUID("id"), async (req, res) => {
   try {
     const { data: med } = await supabase.from("medications").select("*")
       .eq("id", req.params.id).single();
@@ -292,7 +371,7 @@ app.get("/api/medications/scan/status", (req, res) => {
 });
 
 // POST /api/medications/scan — Claude Vision reads a medication bottle label
-app.post("/api/medications/scan", upload.single("image"), async (req, res) => {
+app.post("/api/medications/scan", upload.single("image"), seniorAuth, async (req, res) => {
   try {
     if (!req.file) return res.status(400).json({ error: "No image provided" });
     const b64  = req.file.buffer.toString("base64");
@@ -332,7 +411,7 @@ Fields:
 });
 
 // POST /api/medications — add medication (family or scan)
-app.post("/api/medications", async (req, res) => {
+app.post("/api/medications", seniorAuth, async (req, res) => {
   try {
     const { seniorId, name, dose, time, withFood } = req.body;
     if (!seniorId || !name) return res.status(400).json({ error: "seniorId and name required" });
@@ -351,7 +430,7 @@ app.post("/api/medications", async (req, res) => {
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
-app.delete("/api/medications/:id", async (req, res) => {
+app.delete("/api/medications/:id", seniorAuth, validateUUID("id"), async (req, res) => {
   try {
     await supabase.from("medications").update({ active: false }).eq("id", req.params.id);
     res.json({ success: true });
@@ -362,7 +441,7 @@ app.delete("/api/medications/:id", async (req, res) => {
 // EMERGENCY
 // ─────────────────────────────────────────────────────────────────────────────
 
-app.post("/api/emergency", async (req, res) => {
+app.post("/api/emergency", seniorAuth, async (req, res) => {
   try {
     const { seniorId, message } = req.body;
     const { data: alert } = await supabase.from("alerts").insert({
@@ -384,7 +463,7 @@ app.post("/api/emergency", async (req, res) => {
 // CHAT
 // ─────────────────────────────────────────────────────────────────────────────
 
-app.post("/api/chat", rateLimit(60000, 20), async (req, res) => {
+app.post("/api/chat", seniorAuth, rateLimit(60000, 20), async (req, res) => {
   try {
     const { seniorId, message, sessionId, clientTime, timezone, location } = req.body;
     if (!message) return res.status(400).json({ error: "Message required" });
@@ -598,7 +677,7 @@ app.get("/api/tts/test", async (req, res) => {
   }
 });
 
-app.post("/api/tts", rateLimit(60000, 30), async (req, res) => {
+app.post("/api/tts", seniorAuth, rateLimit(60000, 30), async (req, res) => {
   const { text } = req.body;
   if (!text) return res.status(400).json({ error: "text required" });
 
@@ -674,7 +753,7 @@ app.post("/api/tts", rateLimit(60000, 30), async (req, res) => {
 // DOCTOR QUESTIONS
 // ─────────────────────────────────────────────────────────────────────────────
 
-app.get("/api/doctor-questions/:seniorId", async (req, res) => {
+app.get("/api/doctor-questions/:seniorId", seniorAuth, validateUUID("seniorId"), async (req, res) => {
   try {
     const { data } = await supabase.from("doctor_questions").select("*")
       .eq("senior_id", req.params.seniorId).order("created_at", { ascending: false });
@@ -682,7 +761,7 @@ app.get("/api/doctor-questions/:seniorId", async (req, res) => {
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
-app.post("/api/doctor-questions", async (req, res) => {
+app.post("/api/doctor-questions", seniorAuth, async (req, res) => {
   try {
     const { seniorId, question } = req.body;
     if (!seniorId || !question) return res.status(400).json({ error: "seniorId and question required" });
@@ -698,7 +777,7 @@ app.post("/api/doctor-questions", async (req, res) => {
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
-app.patch("/api/doctor-questions/:id/asked", async (req, res) => {
+app.patch("/api/doctor-questions/:id/asked", seniorAuth, validateUUID("id"), async (req, res) => {
   try {
     await supabase.from("doctor_questions")
       .update({ asked: true, asked_at: new Date().toISOString() }).eq("id", req.params.id);
@@ -706,7 +785,7 @@ app.patch("/api/doctor-questions/:id/asked", async (req, res) => {
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
-app.delete("/api/doctor-questions/:id", async (req, res) => {
+app.delete("/api/doctor-questions/:id", seniorAuth, validateUUID("id"), async (req, res) => {
   try {
     await supabase.from("doctor_questions").delete().eq("id", req.params.id);
     res.json({ success: true });
@@ -717,7 +796,7 @@ app.delete("/api/doctor-questions/:id", async (req, res) => {
 // DOCTOR VISITS
 // ─────────────────────────────────────────────────────────────────────────────
 
-app.get("/api/doctor-visits/:seniorId", async (req, res) => {
+app.get("/api/doctor-visits/:seniorId", seniorAuth, validateUUID("seniorId"), async (req, res) => {
   try {
     const { data } = await supabase.from("doctor_visits").select("*")
       .eq("senior_id", req.params.seniorId).order("created_at", { ascending: false });
@@ -725,7 +804,7 @@ app.get("/api/doctor-visits/:seniorId", async (req, res) => {
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
-app.post("/api/doctor-visits", async (req, res) => {
+app.post("/api/doctor-visits", seniorAuth, async (req, res) => {
   try {
     const { seniorId, transcript, doctorName, notes } = req.body;
     console.log(`[DoctorVisit] Save request — seniorId: ${seniorId}, words: ${transcript ? transcript.trim().split(/\s+/).length : 0}`);
@@ -770,7 +849,7 @@ app.get("/api/senior/by-code/:code", async (req, res) => {
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
-app.get("/api/dashboard/:seniorId", async (req, res) => {
+app.get("/api/dashboard/:seniorId", familyAuth, validateUUID("seniorId"), async (req, res) => {
   try {
     const { seniorId } = req.params;
     const { data: senior } = await supabase.from("seniors").select("*").eq("id", seniorId).single();
@@ -810,7 +889,7 @@ app.get("/api/dashboard/:seniorId", async (req, res) => {
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
-app.post("/api/alerts/:id/resolve", async (req, res) => {
+app.post("/api/alerts/:id/resolve", familyAuth, validateUUID("id"), async (req, res) => {
   try {
     await supabase.from("alerts")
       .update({ resolved: true, resolved_at: new Date().toISOString() }).eq("id", req.params.id);
@@ -818,7 +897,7 @@ app.post("/api/alerts/:id/resolve", async (req, res) => {
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
-app.get("/api/conversations/:seniorId", async (req, res) => {
+app.get("/api/conversations/:seniorId", anyAuth, validateUUID("seniorId"), async (req, res) => {
   try {
     const { data: rows } = await supabase.from("conversations").select("*")
       .eq("senior_id", req.params.seniorId).order("timestamp", { ascending: true }).limit(200);
@@ -839,7 +918,7 @@ app.get("/api/conversations/:seniorId", async (req, res) => {
 // CALENDAR
 // ─────────────────────────────────────────────────────────────────────────────
 
-app.get("/api/appointments/:seniorId", async (req, res) => {
+app.get("/api/appointments/:seniorId", anyAuth, validateUUID("seniorId"), async (req, res) => {
   try {
     const { data } = await supabase.from("appointments").select("*")
       .eq("senior_id", req.params.seniorId).order("date", { ascending: true });
@@ -847,7 +926,7 @@ app.get("/api/appointments/:seniorId", async (req, res) => {
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
-app.post("/api/appointments", async (req, res) => {
+app.post("/api/appointments", seniorAuth, async (req, res) => {
   try {
     const { seniorId, title, date, time, location, notes, source } = req.body;
     if (!seniorId || !title || !date) return res.status(400).json({ error: "seniorId, title, date required" });
@@ -865,14 +944,14 @@ app.post("/api/appointments", async (req, res) => {
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
-app.delete("/api/appointments/:id", async (req, res) => {
+app.delete("/api/appointments/:id", seniorAuth, validateUUID("id"), async (req, res) => {
   try {
     await supabase.from("appointments").delete().eq("id", req.params.id);
     res.json({ success: true });
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
-app.post("/api/appointments/parse", async (req, res) => {
+app.post("/api/appointments/parse", seniorAuth, async (req, res) => {
   try {
     const { text } = req.body;
     if (!text) return res.status(400).json({ error: "text required" });
@@ -887,7 +966,7 @@ app.post("/api/appointments/parse", async (req, res) => {
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
-app.post("/api/appointments/ocr", upload.single("image"), async (req, res) => {
+app.post("/api/appointments/ocr", upload.single("image"), seniorAuth, async (req, res) => {
   try {
     if (!req.file) return res.status(400).json({ error: "No image provided" });
     const b64  = req.file.buffer.toString("base64");
@@ -958,14 +1037,14 @@ app.get("/api/google/callback", async (req, res) => {
   } catch (e) { res.status(500).send("Google auth failed: " + e.message); }
 });
 
-app.get("/api/google/status/:seniorId", async (req, res) => {
+app.get("/api/google/status/:seniorId", anyAuth, validateUUID("seniorId"), async (req, res) => {
   try {
     const { data } = await supabase.from("seniors").select("google_tokens").eq("id", req.params.seniorId).single();
     res.json({ connected: !!(data?.google_tokens), configured: !!process.env.GOOGLE_CLIENT_ID });
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
-app.post("/api/google/sync/:seniorId", async (req, res) => {
+app.post("/api/google/sync/:seniorId", anyAuth, validateUUID("seniorId"), async (req, res) => {
   try {
     const { seniorId } = req.params;
     const { data: senior } = await supabase.from("seniors").select("*").eq("id", seniorId).single();
@@ -1196,10 +1275,30 @@ app.get("/api/admin/alerts", adminAuth, async (req, res) => {
 });
 
 // ─────────────────────────────────────────────────────────────────────────────
-// FAMILY AUTH
+// AUTH ENDPOINTS
 // ─────────────────────────────────────────────────────────────────────────────
 
-// Family login — exchange family code for a session token
+// Senior login — exchange family code for a 90-day senior token
+app.post("/api/senior/login", async (req, res) => {
+  try {
+    const { familyCode } = req.body;
+    if (!familyCode) return res.status(400).json({ error: "Family code required" });
+
+    const { data: senior } = await supabase
+      .from("seniors")
+      .select("*")
+      .eq("family_code", familyCode.trim().toUpperCase())
+      .single();
+
+    if (!senior) return res.status(401).json({ error: "Invalid code. Please check and try again." });
+
+    const token = makeSeniorToken(senior.id);
+    console.log(`✅ Senior login: ${senior.name} (${senior.id})`);
+    res.json({ token, senior: norm(senior), expiresInDays: SENIOR_TOKEN_DAYS });
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+// Family login — exchange family code for a 30-day family token
 app.post("/api/family/login", async (req, res) => {
   try {
     const { familyCode } = req.body;
@@ -1214,7 +1313,8 @@ app.post("/api/family/login", async (req, res) => {
     if (!senior) return res.status(401).json({ error: "Invalid family code" });
 
     const token = makeFamilyToken(senior.id);
-    res.json({ token, senior: norm(senior) });
+    console.log(`✅ Family login for: ${senior.name}`);
+    res.json({ token, senior: norm(senior), expiresInDays: FAMILY_TOKEN_DAYS });
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
@@ -1228,7 +1328,7 @@ app.get("/api/push/key", (req, res) => {
 });
 
 // Save a push subscription for a senior
-app.post("/api/push/subscribe", async (req, res) => {
+app.post("/api/push/subscribe", seniorAuth, async (req, res) => {
   try {
     const { subscription, seniorId, deviceLabel } = req.body;
     if (!subscription || !seniorId) return res.status(400).json({ error: "subscription and seniorId required" });
@@ -1260,7 +1360,7 @@ app.post("/api/push/subscribe", async (req, res) => {
 });
 
 // Remove a push subscription
-app.post("/api/push/unsubscribe", async (req, res) => {
+app.post("/api/push/unsubscribe", seniorAuth, async (req, res) => {
   try {
     const { seniorId } = req.body;
     if (!seniorId) return res.status(400).json({ error: "seniorId required" });
@@ -1270,7 +1370,7 @@ app.post("/api/push/unsubscribe", async (req, res) => {
 });
 
 // Send a test push notification
-app.post("/api/push/test", async (req, res) => {
+app.post("/api/push/test", seniorAuth, async (req, res) => {
   try {
     const { seniorId } = req.body;
     if (!seniorId) return res.status(400).json({ error: "seniorId required" });

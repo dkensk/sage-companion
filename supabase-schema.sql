@@ -193,3 +193,17 @@ CREATE TABLE IF NOT EXISTS reminder_snooze (
 );
 
 CREATE INDEX IF NOT EXISTS idx_reminder_snooze_senior ON reminder_snooze(senior_id);
+
+-- ── Senior Tokens (session audit trail) ─────────────────────────────────────
+CREATE TABLE IF NOT EXISTS senior_tokens (
+  id         UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  senior_id  UUID NOT NULL REFERENCES seniors(id) ON DELETE CASCADE,
+  token_hash TEXT NOT NULL,
+  issued_at  TIMESTAMPTZ DEFAULT NOW(),
+  expires_at TIMESTAMPTZ NOT NULL,
+  revoked    BOOLEAN DEFAULT FALSE,
+  device     TEXT DEFAULT 'unknown'
+);
+
+CREATE INDEX IF NOT EXISTS idx_senior_tokens_senior ON senior_tokens(senior_id);
+CREATE INDEX IF NOT EXISTS idx_senior_tokens_hash   ON senior_tokens(token_hash);

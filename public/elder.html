@@ -555,12 +555,32 @@
 </head>
 <body>
 
+<!-- Login Screen -->
+<div id="loginScreen" style="display:none; position:fixed; inset:0; background:var(--bg); z-index:200; display:flex; align-items:center; justify-content:center; padding:24px;">
+  <div style="background:white; border-radius:24px; padding:40px 28px; max-width:400px; width:100%; text-align:center; box-shadow:0 8px 32px rgba(0,0,0,0.12);">
+    <div style="font-size:56px; margin-bottom:16px;">🌿</div>
+    <h2 style="font-size:28px; font-weight:900; color:var(--navy); margin-bottom:8px;">Welcome to Sage</h2>
+    <p style="font-size:16px; color:var(--muted); margin-bottom:32px; line-height:1.55;">Enter your family code to get started.</p>
+    <input type="text" id="seniorLoginCode" placeholder="FAMILY CODE" maxlength="10"
+      oninput="this.value=this.value.toUpperCase()"
+      onkeydown="if(event.key==='Enter') seniorLogin()"
+      style="width:100%; border:2px solid var(--border); border-radius:14px; padding:18px; font-size:22px; text-align:center; letter-spacing:6px; font-weight:800; outline:none; margin-bottom:14px; text-transform:uppercase; color:var(--text);" />
+    <button onclick="seniorLogin()" style="width:100%; background:linear-gradient(135deg, var(--navy), #2D4EAA); color:white; border:none; border-radius:14px; padding:17px; font-size:17px; font-weight:700; cursor:pointer; box-shadow:0 4px 16px rgba(30,58,138,0.3);">
+      Continue →
+    </button>
+    <div id="seniorLoginError" style="color:var(--red); font-size:14px; margin-top:12px; display:none; font-weight:500;"></div>
+  </div>
+</div>
+
 <header>
   <div>
     <div class="logo"><span class="logo-shield">🌿</span> Sage</div>
     <div class="greeting" id="headerGreeting">Good morning!</div>
   </div>
-  <div class="header-time" id="headerTime"></div>
+  <div style="text-align:right;">
+    <div class="header-time" id="headerTime"></div>
+    <button onclick="seniorLogout()" style="margin-top:6px; background:rgba(255,255,255,0.15); border:1px solid rgba(255,255,255,0.25); color:white; padding:5px 12px; border-radius:8px; font-size:12px; font-weight:600; cursor:pointer;">Sign out</button>
+  </div>
 </header>
 
 <div class="main">
@@ -739,6 +759,72 @@
 <div id="toast"></div>
 
 <script>
+  // ── Auth ──────────────────────────────────────────────────────────────────────
+  function getSeniorToken() { return localStorage.getItem("sageSeniorToken"); }
+
+  async function seniorLogin() {
+    const code = document.getElementById("seniorLoginCode").value.trim().toUpperCase();
+    if (!code) return;
+    const errEl = document.getElementById("seniorLoginError");
+    errEl.style.display = "none";
+    try {
+      const res = await fetch("/api/senior/login", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ familyCode: code }),
+      });
+      if (!res.ok) {
+        errEl.textContent = "Code not found. Please check and try again.";
+        errEl.style.display = "block";
+        return;
+      }
+      const { token, senior } = await res.json();
+      localStorage.setItem("sageSeniorToken", token);
+      localStorage.setItem("sageSeniorId", senior._id);
+      localStorage.setItem("sageSeniorName", senior.name);
+      location.reload();
+    } catch (e) {
+      errEl.textContent = "Connection error — please try again.";
+      errEl.style.display = "block";
+    }
+  }
+
+  function checkSeniorAuth() {
+    const token = getSeniorToken();
+    const seniorId = localStorage.getItem("sageSeniorId");
+    // Allow demo mode through without token
+    if (seniorId === "00000000-0000-0000-0000-000000000001" || localStorage.getItem("sageDemo")) {
+      document.getElementById("loginScreen").style.display = "none";
+      return true;
+    }
+    if (!token) {
+      document.getElementById("loginScreen").style.display = "flex";
+      return false;
+    }
+    document.getElementById("loginScreen").style.display = "none";
+    return true;
+  }
+
+  // Wrapper for authenticated API calls
+  async function apiCall(url, opts = {}) {
+    const token = getSeniorToken();
+    if (token) {
+      opts.headers = opts.headers || {};
+      if (opts.headers instanceof Headers) {
+        opts.headers.set("x-senior-token", token);
+      } else {
+        opts.headers["x-senior-token"] = token;
+      }
+    }
+    const res = await fetch(url, opts);
+    if (res.status === 401) {
+      localStorage.removeItem("sageSeniorToken");
+      document.getElementById("loginScreen").style.display = "flex";
+      throw new Error("Session expired — please log in again.");
+    }
+    return res;
+  }
+
   // ── State ─────────────────────────────────────────────────────────────────────
   const SENIOR_ID = localStorage.getItem("sageSeniorId") || "00000000-0000-0000-0000-000000000001";
   let seniorName = localStorage.getItem("sageSeniorName") || "Margaret";
@@ -750,6 +836,11 @@
   let isListening = false;
   let recognition = null;
   let userLocation = localStorage.getItem("sageLocation") || null;
+
+  // Check auth on load — show login if needed
+  if (!checkSeniorAuth()) {
+    // Don't initialize anything until logged in
+  }
 
   // Get location once and cache it
   function initLocation() {
@@ -781,6 +872,19 @@
 
   // ── Init ──────────────────────────────────────────────────────────────────────
   async function init() {
+    // Check auth first
+    if (!checkSeniorAuth()) return;
+
+    // Request microphone permission once upfront — prevents re-prompting on each Talk tap
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      // Stop tracks immediately — we just needed the permission grant
+      stream.getTracks().forEach(t => t.stop());
+      console.log("[mic] Permission granted upfront");
+    } catch (e) {
+      console.log("[mic] Permission not granted:", e.message);
+    }
+
     const hour = new Date().getHours();
     const part = hour < 12 ? "morning" : hour < 17 ? "afternoon" : "evening";
     document.getElementById("headerGreeting").textContent = `Good ${part}, ${seniorName}!`;
@@ -807,7 +911,7 @@
   // ── Medications ───────────────────────────────────────────────────────────────
   async function loadMedications() {
     try {
-      const res = await fetch(`/api/medications/${SENIOR_ID}`);
+      const res = await apiCall(`/api/medications/${SENIOR_ID}`);
       if (!res.ok) { console.error("[Meds] Load failed:", res.status); return; }
       const meds = await res.json();
       const el = document.getElementById("medList");
@@ -833,7 +937,7 @@
 
   async function takeMed(id, name) {
     try {
-      const res = await fetch(`/api/medications/${id}/taken`, {
+      const res = await apiCall(`/api/medications/${id}/taken`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ confirmedBy: "button" })
@@ -912,7 +1016,7 @@
     document.getElementById("chatArea").scrollTop = 999999;
 
     try {
-      const res = await fetch("/api/chat", {
+      const res = await apiCall("/api/chat", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -954,7 +1058,7 @@
   // ── Doctor Questions ───────────────────────────────────────────────────────────
   async function loadDoctorQuestions() {
     try {
-      const res = await fetch(`/api/doctor-questions/${SENIOR_ID}`);
+      const res = await apiCall(`/api/doctor-questions/${SENIOR_ID}`);
       if (!res.ok) { console.error("[DoctorQ] Load failed:", res.status); return; }
       const questions = await res.json();
       const el = document.getElementById("doctorQList");
@@ -988,7 +1092,7 @@
 
   async function saveDoctorQuestion(question) {
     try {
-      const res = await fetch("/api/doctor-questions", {
+      const res = await apiCall("/api/doctor-questions", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ seniorId: SENIOR_ID, question })
@@ -998,7 +1102,7 @@
   }
 
   async function deleteDoctorQuestion(id) {
-    await fetch(`/api/doctor-questions/${id}`, { method: "DELETE" });
+    await apiCall(`/api/doctor-questions/${id}`, { method: "DELETE" });
     loadDoctorQuestions();
   }
 
@@ -1205,7 +1309,7 @@
       const controller = new AbortController();
       const timeout = setTimeout(() => controller.abort(), 8000);
 
-      const res = await fetch("/api/tts", {
+      const res = await apiCall("/api/tts", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ text: clean }),
@@ -1350,7 +1454,7 @@
 
   async function confirmEmergency(call911) {
     closeEmergencyModal();
-    await fetch("/api/emergency", {
+    await apiCall("/api/emergency", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ seniorId: SENIOR_ID })
@@ -1531,7 +1635,7 @@
     formData.append("image", file);
 
     try {
-      const res = await fetch("/api/medications/scan", { method: "POST", body: formData });
+      const res = await apiCall("/api/medications/scan", { method: "POST", body: formData });
       if (!res.ok) {
         const errData = await res.json().catch(() => ({}));
         console.error("[MedScan] Server error:", res.status, errData);
@@ -1584,7 +1688,7 @@
     if (!name) { showToast("Please enter the medication name."); return; }
 
     try {
-      const res = await fetch("/api/medications", {
+      const res = await apiCall("/api/medications", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ seniorId: SENIOR_ID, name, dose, time: time || "8:00 AM", withFood: false }),
@@ -1624,6 +1728,13 @@
     t.textContent = msg;
     t.classList.add("show");
     setTimeout(() => t.classList.remove("show"), duration);
+  }
+
+  function seniorLogout() {
+    localStorage.removeItem("sageSeniorToken");
+    localStorage.removeItem("sageSeniorId");
+    localStorage.removeItem("sageSeniorName");
+    location.reload();
   }
 
   init();
@@ -1669,7 +1780,7 @@
     if (existing) {
       // Already subscribed — unsubscribe
       await existing.unsubscribe();
-      await fetch("/api/push/unsubscribe", {
+      await apiCall("/api/push/unsubscribe", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ seniorId: SENIOR_ID }),
@@ -1687,7 +1798,7 @@
     }
 
     // Get VAPID public key from server
-    const keyRes  = await fetch("/api/push/key");
+    const keyRes  = await apiCall("/api/push/key");
     const keyData = await keyRes.json();
     if (!keyData.publicKey) {
       showToast("Push notifications not configured on server yet");
@@ -1701,7 +1812,7 @@
     });
 
     // Send subscription to server
-    await fetch("/api/push/subscribe", {
+    await apiCall("/api/push/subscribe", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
@@ -1717,7 +1828,7 @@
     showToast("✅ Reminders enabled! You'll be notified at medication times.");
 
     // Send a test notification so they see it works
-    await fetch("/api/push/test", {
+    await apiCall("/api/push/test", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ seniorId: SENIOR_ID }),

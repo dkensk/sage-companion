@@ -1,7 +1,7 @@
 // ── Sage Companion Service Worker ────────────────────────────────────────────
 // Handles: offline caching + push notification display
 
-const CACHE_NAME = "sage-v13";
+const CACHE_NAME = "sage-v14";
 const CACHE_URLS = [
   "/",
   "/elder",

@@ -347,6 +347,36 @@
   let timerInterval = null;
   let secondsElapsed = 0;
 
+  // ── Auth ─────────────────────────────────────────────────────────────────
+  function getSeniorToken() { return localStorage.getItem("sageSeniorToken"); }
+
+  async function apiCall(url, opts = {}) {
+    const token = getSeniorToken();
+    if (token) {
+      opts.headers = opts.headers || {};
+      if (typeof opts.headers === "object" && !(opts.headers instanceof Headers)) {
+        opts.headers["x-senior-token"] = token;
+      }
+    }
+    const res = await fetch(url, opts);
+    if (res.status === 401) {
+      localStorage.removeItem("sageSeniorToken");
+      showToast("Session expired — redirecting to login…");
+      setTimeout(() => window.location.href = "/elder", 1500);
+      throw new Error("Session expired");
+    }
+    return res;
+  }
+
+  function checkAuth() {
+    const id = localStorage.getItem("sageSeniorId");
+    if (id === "00000000-0000-0000-0000-000000000001" || localStorage.getItem("sageDemo")) return;
+    if (!getSeniorToken()) {
+      window.location.href = "/elder";
+    }
+  }
+  checkAuth();
+
   // ── Init ──────────────────────────────────────────────────────────────────
   async function init() {
     setupRecognition();
@@ -479,7 +509,7 @@
 
     try {
       console.log("[DoctorVisit] Saving with seniorId:", SENIOR_ID);
-      const res = await fetch("/api/doctor-visits", {
+      const res = await apiCall("/api/doctor-visits", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ seniorId: SENIOR_ID, transcript, doctorName, notes }),
@@ -515,7 +545,7 @@
   // ── Doctor Questions ──────────────────────────────────────────────────────
   async function loadQuestions() {
     try {
-      const res = await fetch(`/api/doctor-questions/${SENIOR_ID}`);
+      const res = await apiCall(`/api/doctor-questions/${SENIOR_ID}`);
       const questions = await res.json();
       renderQuestions(questions);
     } catch (e) {
@@ -547,13 +577,13 @@
 
   async function markAsked(id, alreadyAsked) {
     if (alreadyAsked) return;
-    await fetch(`/api/doctor-questions/${id}/asked`, { method: "PATCH" });
+    await apiCall(`/api/doctor-questions/${id}/asked`, { method: "PATCH" });
     showToast("✓ Marked as asked!");
     await loadQuestions();
   }
 
   async function deleteQuestion(id) {
-    await fetch(`/api/doctor-questions/${id}`, { method: "DELETE" });
+    await apiCall(`/api/doctor-questions/${id}`, { method: "DELETE" });
     await loadQuestions();
   }
 
@@ -561,7 +591,7 @@
   async function loadPastVisits() {
     let visits;
     try {
-      const res = await fetch(`/api/doctor-visits/${SENIOR_ID}`);
+      const res = await apiCall(`/api/doctor-visits/${SENIOR_ID}`);
       visits = await res.json();
     } catch (e) { return; }
     const card = document.getElementById("pastVisitsCard");
