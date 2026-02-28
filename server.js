@@ -15,6 +15,8 @@ const multer     = require("multer");
 const { google } = require("googleapis");
 const webpush    = require("web-push");
 const cron       = require("node-cron");
+const Stripe     = require("stripe");
+const { Resend } = require("resend");
 
 // ── Multer (image uploads — memory only) ─────────────────────────────────────
 const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 15 * 1024 * 1024 } });
@@ -29,6 +31,16 @@ const supabase = createClient(
   process.env.SUPABASE_URL             || "",
   process.env.SUPABASE_SERVICE_ROLE_KEY || ""
 );
+
+// ── Stripe (payments) ─────────────────────────────────────────────────────────
+const stripe = process.env.STRIPE_SECRET_KEY ? new Stripe(process.env.STRIPE_SECRET_KEY) : null;
+const STRIPE_WEBHOOK_SECRET = process.env.STRIPE_WEBHOOK_SECRET || "";
+const STRIPE_PRICE_MONTHLY  = process.env.STRIPE_PRICE_MONTHLY  || ""; // Stripe Price ID for $9.99/mo
+const STRIPE_PRICE_YEARLY   = process.env.STRIPE_PRICE_YEARLY   || ""; // Stripe Price ID for $89.99/yr
+
+// ── Resend (transactional email) ──────────────────────────────────────────────
+const resend = process.env.RESEND_API_KEY ? new Resend(process.env.RESEND_API_KEY) : null;
+const FROM_EMAIL = process.env.FROM_EMAIL || "Sage Companion <noreply@sagecompanion.com>";
 
 // ── Demo senior ID ────────────────────────────────────────────────────────────
 const DEMO_SENIOR_ID = "00000000-0000-0000-0000-000000000001";
@@ -263,6 +275,73 @@ async function checkMedicationReminders() {
 }
 
 // ── Middleware ────────────────────────────────────────────────────────────────
+// Stripe webhooks need raw body — must be before express.json()
+app.post("/api/stripe/webhook", express.raw({ type: "application/json" }), async (req, res) => {
+  if (!stripe) return res.status(503).json({ error: "Stripe not configured" });
+  let event;
+  try {
+    event = STRIPE_WEBHOOK_SECRET
+      ? stripe.webhooks.constructEvent(req.body, req.headers["stripe-signature"], STRIPE_WEBHOOK_SECRET)
+      : JSON.parse(req.body);
+  } catch (err) {
+    console.error("[Stripe] Webhook signature verification failed:", err.message);
+    return res.status(400).json({ error: "Invalid signature" });
+  }
+
+  try {
+    switch (event.type) {
+      case "checkout.session.completed": {
+        const session = event.data.object;
+        const seniorId = session.metadata?.seniorId;
+        if (seniorId) {
+          await supabase.from("seniors").update({
+            stripe_customer_id: session.customer,
+            subscription_status: "active",
+            subscription_plan: session.metadata?.plan || "premium",
+          }).eq("id", seniorId);
+          console.log(`[Stripe] ✅ Subscription activated for ${seniorId}`);
+        }
+        break;
+      }
+      case "customer.subscription.updated": {
+        const sub = event.data.object;
+        const { data: senior } = await supabase.from("seniors").select("id")
+          .eq("stripe_customer_id", sub.customer).single();
+        if (senior) {
+          await supabase.from("seniors").update({
+            subscription_status: sub.status === "active" ? "active" : sub.status,
+          }).eq("id", senior.id);
+          console.log(`[Stripe] Subscription updated: ${sub.status} for ${senior.id}`);
+        }
+        break;
+      }
+      case "customer.subscription.deleted": {
+        const sub = event.data.object;
+        const { data: senior } = await supabase.from("seniors").select("id")
+          .eq("stripe_customer_id", sub.customer).single();
+        if (senior) {
+          await supabase.from("seniors").update({ subscription_status: "cancelled" }).eq("id", senior.id);
+          console.log(`[Stripe] Subscription cancelled for ${senior.id}`);
+        }
+        break;
+      }
+      case "invoice.payment_failed": {
+        const invoice = event.data.object;
+        const { data: senior } = await supabase.from("seniors").select("id, email")
+          .eq("stripe_customer_id", invoice.customer).single();
+        if (senior) {
+          await supabase.from("seniors").update({ subscription_status: "past_due" }).eq("id", senior.id);
+          console.log(`[Stripe] Payment failed for ${senior.id}`);
+        }
+        break;
+      }
+    }
+  } catch (e) {
+    console.error("[Stripe] Webhook handler error:", e.message);
+  }
+  res.json({ received: true });
+});
+
 app.use(express.json({ limit: "1mb" }));
 
 // ── Rate Limiting (in-memory, no dependencies) ──────────────────────────────
@@ -1199,6 +1278,10 @@ app.post("/api/seniors", async (req, res) => {
     // Issue a senior token so the user is logged in immediately after setup
     const token = makeSeniorToken(senior.id);
     console.log(`✅ New user: ${name} | Family code: ${familyCode}`);
+
+    // Send welcome email with family code (non-blocking)
+    sendWelcomeEmail(email.trim().toLowerCase(), name.trim(), familyCode).catch(() => {});
+
     res.json({ success: true, senior: norm(senior), token });
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
@@ -1480,13 +1563,320 @@ app.post("/api/push/test", seniorAuth, async (req, res) => {
 // ─────────────────────────────────────────────────────────────────────────────
 // STATIC ROUTES
 // ─────────────────────────────────────────────────────────────────────────────
-app.get("/elder",    (req, res) => res.sendFile(path.join(__dirname, "public", "elder.html")));
-app.get("/family",   (req, res) => res.sendFile(path.join(__dirname, "public", "family.html")));
-app.get("/doctor",   (req, res) => res.sendFile(path.join(__dirname, "public", "doctor.html")));
-app.get("/calendar", (req, res) => res.sendFile(path.join(__dirname, "public", "calendar.html")));
-app.get("/setup",    (req, res) => res.sendFile(path.join(__dirname, "public", "setup.html")));
-app.get("/admin",    (req, res) => res.sendFile(path.join(__dirname, "public", "admin.html")));
-app.get("/",         (req, res) => res.sendFile(path.join(__dirname, "public", "index.html")));
+app.get("/elder",          (req, res) => res.sendFile(path.join(__dirname, "public", "elder.html")));
+app.get("/family",         (req, res) => res.sendFile(path.join(__dirname, "public", "family.html")));
+app.get("/doctor",         (req, res) => res.sendFile(path.join(__dirname, "public", "doctor.html")));
+app.get("/calendar",       (req, res) => res.sendFile(path.join(__dirname, "public", "calendar.html")));
+app.get("/setup",          (req, res) => res.sendFile(path.join(__dirname, "public", "setup.html")));
+app.get("/admin",          (req, res) => res.sendFile(path.join(__dirname, "public", "admin.html")));
+app.get("/settings",       (req, res) => res.sendFile(path.join(__dirname, "public", "settings.html")));
+app.get("/terms",          (req, res) => res.sendFile(path.join(__dirname, "public", "terms.html")));
+app.get("/privacy",        (req, res) => res.sendFile(path.join(__dirname, "public", "privacy.html")));
+app.get("/reset-password", (req, res) => res.sendFile(path.join(__dirname, "public", "reset-password.html")));
+app.get("/",               (req, res) => res.sendFile(path.join(__dirname, "public", "index.html")));
+
+// ─────────────────────────────────────────────────────────────────────────────
+// STRIPE PAYMENT ENDPOINTS
+// ─────────────────────────────────────────────────────────────────────────────
+
+// Create checkout session for subscription
+app.post("/api/billing/checkout", seniorAuth, async (req, res) => {
+  if (!stripe) return res.status(503).json({ error: "Payments not configured yet. Coming soon!" });
+  try {
+    const { plan } = req.body; // "monthly" or "yearly"
+    const priceId = plan === "yearly" ? STRIPE_PRICE_YEARLY : STRIPE_PRICE_MONTHLY;
+    if (!priceId) return res.status(400).json({ error: "Pricing not configured" });
+
+    const { data: senior } = await supabase.from("seniors").select("*").eq("id", req.seniorId).single();
+    if (!senior) return res.status(404).json({ error: "Account not found" });
+
+    const sessionParams = {
+      mode: "subscription",
+      payment_method_types: ["card"],
+      line_items: [{ price: priceId, quantity: 1 }],
+      success_url: `${req.protocol}://${req.get("host")}/settings?billing=success`,
+      cancel_url: `${req.protocol}://${req.get("host")}/settings?billing=cancelled`,
+      metadata: { seniorId: req.seniorId, plan },
+      customer_email: senior.email,
+    };
+
+    // Reuse existing Stripe customer if available
+    if (senior.stripe_customer_id) {
+      sessionParams.customer = senior.stripe_customer_id;
+      delete sessionParams.customer_email;
+    }
+
+    const session = await stripe.checkout.sessions.create(sessionParams);
+    res.json({ url: session.url });
+  } catch (e) {
+    console.error("[Stripe] Checkout error:", e.message);
+    res.status(500).json({ error: e.message });
+  }
+});
+
+// Get subscription status
+app.get("/api/billing/status", seniorAuth, async (req, res) => {
+  try {
+    const { data: senior } = await supabase.from("seniors").select("subscription_status, subscription_plan, stripe_customer_id").eq("id", req.seniorId).single();
+    if (!senior) return res.status(404).json({ error: "Account not found" });
+    res.json({
+      status: senior.subscription_status || "free",
+      plan: senior.subscription_plan || "free",
+      hasStripe: !!senior.stripe_customer_id,
+    });
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+// Stripe billing portal (manage subscription, update card, cancel)
+app.post("/api/billing/portal", seniorAuth, async (req, res) => {
+  if (!stripe) return res.status(503).json({ error: "Payments not configured yet" });
+  try {
+    const { data: senior } = await supabase.from("seniors").select("stripe_customer_id").eq("id", req.seniorId).single();
+    if (!senior?.stripe_customer_id) return res.status(400).json({ error: "No active subscription" });
+
+    const portalSession = await stripe.billingPortal.sessions.create({
+      customer: senior.stripe_customer_id,
+      return_url: `${req.protocol}://${req.get("host")}/settings`,
+    });
+    res.json({ url: portalSession.url });
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// EMAIL ENDPOINTS
+// ─────────────────────────────────────────────────────────────────────────────
+
+// Send welcome email with family code (called after signup)
+async function sendWelcomeEmail(email, name, familyCode) {
+  if (!resend) { console.log("[Email] Resend not configured — skipping welcome email"); return; }
+  try {
+    await resend.emails.send({
+      from: FROM_EMAIL,
+      to: email,
+      subject: `Welcome to Sage, ${name}!`,
+      html: `
+        <div style="font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;max-width:560px;margin:0 auto;padding:32px 24px;">
+          <div style="text-align:center;margin-bottom:24px;">
+            <span style="font-size:48px;">🌿</span>
+            <h1 style="color:#1E3A8A;font-size:28px;margin:12px 0 0;">Welcome to Sage</h1>
+          </div>
+          <p style="font-size:18px;color:#333;line-height:1.6;">Hi ${name},</p>
+          <p style="font-size:18px;color:#333;line-height:1.6;">Your Sage Companion account is all set up! Here's your family code — share it with your loved ones so they can stay connected:</p>
+          <div style="background:#1E3A8A;border-radius:16px;padding:24px;text-align:center;margin:24px 0;">
+            <div style="color:rgba(255,255,255,0.7);font-size:13px;font-weight:700;letter-spacing:2px;text-transform:uppercase;margin-bottom:8px;">Your Family Code</div>
+            <div style="color:white;font-size:36px;font-weight:900;letter-spacing:6px;">${familyCode}</div>
+          </div>
+          <p style="font-size:16px;color:#666;line-height:1.6;">Family members can use this code at the Family Dashboard to check in on your wellbeing, see your medications, and stay up to date.</p>
+          <p style="font-size:16px;color:#666;line-height:1.6;">If you ever forget your family code, you can find it in your Settings page or request it via email from the login screen.</p>
+          <hr style="border:none;border-top:1px solid #E2E8F0;margin:28px 0;">
+          <p style="font-size:14px;color:#999;text-align:center;">Sage Companion LLC — Always here for you.</p>
+        </div>
+      `,
+    });
+    console.log(`[Email] Welcome email sent to ${email}`);
+  } catch (e) { console.error("[Email] Failed to send welcome:", e.message); }
+}
+
+// Forgot family code — sends code to registered email
+app.post("/api/auth/forgot-code", rateLimit("login"), async (req, res) => {
+  try {
+    const { email } = req.body;
+    if (!email) return res.status(400).json({ error: "Email is required" });
+
+    const { data: senior } = await supabase.from("seniors").select("name, family_code, email")
+      .eq("email", email.trim().toLowerCase()).single();
+
+    // Always return success (don't reveal if email exists)
+    if (!senior) return res.json({ success: true, message: "If an account exists with that email, we'll send your family code." });
+
+    if (resend) {
+      await resend.emails.send({
+        from: FROM_EMAIL,
+        to: senior.email,
+        subject: "Your Sage Family Code",
+        html: `
+          <div style="font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;max-width:560px;margin:0 auto;padding:32px 24px;">
+            <div style="text-align:center;margin-bottom:24px;">
+              <span style="font-size:48px;">🌿</span>
+              <h1 style="color:#1E3A8A;font-size:24px;margin:12px 0 0;">Your Family Code</h1>
+            </div>
+            <p style="font-size:18px;color:#333;line-height:1.6;">Hi ${senior.name},</p>
+            <p style="font-size:18px;color:#333;line-height:1.6;">Here's your family code:</p>
+            <div style="background:#1E3A8A;border-radius:16px;padding:24px;text-align:center;margin:24px 0;">
+              <div style="color:white;font-size:36px;font-weight:900;letter-spacing:6px;">${senior.family_code}</div>
+            </div>
+            <p style="font-size:16px;color:#666;">Share this with family members so they can connect to your Sage dashboard.</p>
+            <hr style="border:none;border-top:1px solid #E2E8F0;margin:28px 0;">
+            <p style="font-size:14px;color:#999;text-align:center;">Sage Companion LLC</p>
+          </div>
+        `,
+      });
+      console.log(`[Email] Family code sent to ${email}`);
+    }
+    res.json({ success: true, message: "If an account exists with that email, we'll send your family code." });
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+// Password reset — sends reset token via email
+app.post("/api/auth/forgot-password", rateLimit("login"), async (req, res) => {
+  try {
+    const { email } = req.body;
+    if (!email) return res.status(400).json({ error: "Email is required" });
+
+    const { data: senior } = await supabase.from("seniors").select("id, name, email")
+      .eq("email", email.trim().toLowerCase()).single();
+
+    // Always return success
+    if (!senior) return res.json({ success: true });
+
+    // Generate reset token (valid 1 hour)
+    const resetToken = crypto.randomBytes(32).toString("hex");
+    const resetExpires = new Date(Date.now() + 60 * 60 * 1000).toISOString();
+    await supabase.from("seniors").update({ reset_token: resetToken, reset_expires: resetExpires }).eq("id", senior.id);
+
+    if (resend) {
+      const resetUrl = `${req.protocol}://${req.get("host")}/reset-password?token=${resetToken}`;
+      await resend.emails.send({
+        from: FROM_EMAIL,
+        to: senior.email,
+        subject: "Reset Your Sage Password",
+        html: `
+          <div style="font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;max-width:560px;margin:0 auto;padding:32px 24px;">
+            <div style="text-align:center;margin-bottom:24px;">
+              <span style="font-size:48px;">🌿</span>
+              <h1 style="color:#1E3A8A;font-size:24px;margin:12px 0 0;">Reset Your Password</h1>
+            </div>
+            <p style="font-size:18px;color:#333;line-height:1.6;">Hi ${senior.name},</p>
+            <p style="font-size:18px;color:#333;line-height:1.6;">Click the button below to reset your password. This link expires in 1 hour.</p>
+            <div style="text-align:center;margin:28px 0;">
+              <a href="${resetUrl}" style="display:inline-block;background:#1E3A8A;color:white;text-decoration:none;padding:16px 36px;border-radius:14px;font-size:18px;font-weight:700;">Reset Password</a>
+            </div>
+            <p style="font-size:14px;color:#999;">If you didn't request this, you can safely ignore this email.</p>
+            <hr style="border:none;border-top:1px solid #E2E8F0;margin:28px 0;">
+            <p style="font-size:14px;color:#999;text-align:center;">Sage Companion LLC</p>
+          </div>
+        `,
+      });
+      console.log(`[Email] Password reset sent to ${email}`);
+    }
+    res.json({ success: true });
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+// Reset password with token
+app.post("/api/auth/reset-password", rateLimit("login"), async (req, res) => {
+  try {
+    const { token, password } = req.body;
+    if (!token || !password || password.length < 6) return res.status(400).json({ error: "Valid token and password (6+ chars) required" });
+
+    const { data: senior } = await supabase.from("seniors").select("id, reset_token, reset_expires")
+      .eq("reset_token", token).single();
+    if (!senior) return res.status(400).json({ error: "Invalid or expired reset link" });
+    if (new Date(senior.reset_expires) < new Date()) return res.status(400).json({ error: "Reset link has expired. Please request a new one." });
+
+    const salt = crypto.randomBytes(16).toString("hex");
+    const hash = crypto.pbkdf2Sync(password, salt, 100000, 64, "sha512").toString("hex");
+    await supabase.from("seniors").update({
+      password_hash: salt + ":" + hash,
+      reset_token: null,
+      reset_expires: null,
+    }).eq("id", senior.id);
+
+    res.json({ success: true });
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// SETTINGS / ACCOUNT MANAGEMENT
+// ─────────────────────────────────────────────────────────────────────────────
+
+// Get account info for settings page
+app.get("/api/account", seniorAuth, async (req, res) => {
+  try {
+    const { data: senior } = await supabase.from("seniors").select("name, email, age, family_code, subscription_status, subscription_plan, created_at").eq("id", req.seniorId).single();
+    if (!senior) return res.status(404).json({ error: "Account not found" });
+    res.json(norm(senior));
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+// Change password
+app.post("/api/account/change-password", seniorAuth, rateLimit("login"), async (req, res) => {
+  try {
+    const { currentPassword, newPassword } = req.body;
+    if (!newPassword || newPassword.length < 6) return res.status(400).json({ error: "New password must be at least 6 characters" });
+
+    const { data: senior } = await supabase.from("seniors").select("password_hash").eq("id", req.seniorId).single();
+    if (!senior) return res.status(404).json({ error: "Account not found" });
+
+    // Verify current password if one exists
+    if (senior.password_hash && currentPassword) {
+      const [salt, storedHash] = senior.password_hash.split(":");
+      const hash = crypto.pbkdf2Sync(currentPassword, salt, 100000, 64, "sha512").toString("hex");
+      if (hash !== storedHash) return res.status(401).json({ error: "Current password is incorrect" });
+    }
+
+    const salt = crypto.randomBytes(16).toString("hex");
+    const hash = crypto.pbkdf2Sync(newPassword, salt, 100000, 64, "sha512").toString("hex");
+    await supabase.from("seniors").update({ password_hash: salt + ":" + hash }).eq("id", req.seniorId);
+
+    res.json({ success: true });
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+// Update email
+app.post("/api/account/change-email", seniorAuth, rateLimit("login"), async (req, res) => {
+  try {
+    const { newEmail, password } = req.body;
+    if (!newEmail) return res.status(400).json({ error: "New email required" });
+
+    // Verify password
+    const { data: senior } = await supabase.from("seniors").select("password_hash").eq("id", req.seniorId).single();
+    if (senior?.password_hash && password) {
+      const [salt, storedHash] = senior.password_hash.split(":");
+      const hash = crypto.pbkdf2Sync(password, salt, 100000, 64, "sha512").toString("hex");
+      if (hash !== storedHash) return res.status(401).json({ error: "Password is incorrect" });
+    }
+
+    // Check if email taken
+    const { data: existing } = await supabase.from("seniors").select("id").eq("email", newEmail.trim().toLowerCase()).limit(1);
+    if (existing && existing.length > 0) return res.status(409).json({ error: "This email is already in use" });
+
+    await supabase.from("seniors").update({ email: newEmail.trim().toLowerCase() }).eq("id", req.seniorId);
+    res.json({ success: true });
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+// Delete account
+app.post("/api/account/delete", seniorAuth, rateLimit("login"), async (req, res) => {
+  try {
+    const { password, confirmation } = req.body;
+    if (confirmation !== "DELETE") return res.status(400).json({ error: 'Please type "DELETE" to confirm' });
+
+    // Verify password
+    const { data: senior } = await supabase.from("seniors").select("id, password_hash, stripe_customer_id, name").eq("id", req.seniorId).single();
+    if (!senior) return res.status(404).json({ error: "Account not found" });
+
+    if (senior.password_hash && password) {
+      const [salt, storedHash] = senior.password_hash.split(":");
+      const hash = crypto.pbkdf2Sync(password, salt, 100000, 64, "sha512").toString("hex");
+      if (hash !== storedHash) return res.status(401).json({ error: "Password is incorrect" });
+    }
+
+    // Cancel Stripe subscription if exists
+    if (stripe && senior.stripe_customer_id) {
+      try {
+        const subs = await stripe.subscriptions.list({ customer: senior.stripe_customer_id, status: "active" });
+        for (const sub of subs.data) { await stripe.subscriptions.cancel(sub.id); }
+      } catch (e) { console.error("[Stripe] Error cancelling subscription:", e.message); }
+    }
+
+    // Delete all user data (cascades via foreign keys)
+    await supabase.from("seniors").delete().eq("id", req.seniorId);
+    console.log(`[Account] Deleted account: ${senior.name} (${req.seniorId})`);
+
+    res.json({ success: true });
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
 
 // ─────────────────────────────────────────────────────────────────────────────
 // START

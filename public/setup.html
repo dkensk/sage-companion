@@ -268,6 +268,14 @@
         <div class="error-msg" id="passwordError">Password must be at least 6 characters.</div>
       </div>
 
+      <div style="text-align:left; margin:12px 0 4px; display:flex; align-items:flex-start; gap:10px;">
+        <input type="checkbox" id="termsCheck" style="width:20px; height:20px; margin-top:2px; flex-shrink:0;" />
+        <label for="termsCheck" style="font-size:14px; color:var(--muted); line-height:1.5; cursor:pointer;">
+          I agree to the <a href="/terms" target="_blank" style="color:var(--navy); font-weight:600;">Terms of Service</a> and <a href="/privacy" target="_blank" style="color:var(--navy); font-weight:600;">Privacy Policy</a>
+        </label>
+      </div>
+      <div class="error-msg" id="termsError">Please agree to the Terms and Privacy Policy.</div>
+
       <button class="btn-primary" onclick="goStep(3)">Continue →</button>
       <button class="btn-secondary" onclick="goStep(1)">← Back</button>
     </div>
@@ -322,6 +330,12 @@
 
       <div class="error-msg" id="returningError">Invalid email or password. Please try again.</div>
 
+      <div style="display:flex; gap:16px; justify-content:center; margin-bottom:8px;">
+        <a href="#" onclick="forgotPassword(); return false;" style="color:var(--navy); font-size:14px; font-weight:600; text-decoration:none;">Forgot password?</a>
+        <a href="#" onclick="forgotFamilyCode(); return false;" style="color:var(--navy); font-size:14px; font-weight:600; text-decoration:none;">Forgot family code?</a>
+      </div>
+      <div id="forgotMsg" style="font-size:14px; margin-bottom:10px; display:none; font-weight:500; text-align:center;"></div>
+
       <button class="btn-primary" onclick="lookupReturning()">Sign In →</button>
 
       <div class="divider">or use your family code</div>
@@ -369,6 +383,10 @@
       if (!password || password.length < 6) {
         document.getElementById("passwordError").style.display = "block";
         document.getElementById("passwordInput").focus();
+        return;
+      }
+      if (!document.getElementById("termsCheck").checked) {
+        document.getElementById("termsError").style.display = "block";
         return;
       }
       createProfile(name, parseInt(age), email, password);
@@ -444,6 +462,27 @@
 
   function launchSage() {
     window.location.href = "/elder";
+  }
+
+  // ── Forgot password / family code ────────────────────────────────────────────
+  async function forgotPassword() {
+    const email = document.getElementById("returningEmail").value.trim();
+    const msgEl = document.getElementById("forgotMsg");
+    if (!email) { msgEl.style.color = "#DC2626"; msgEl.textContent = "Enter your email above first."; msgEl.style.display = "block"; return; }
+    try {
+      await fetch("/api/auth/forgot-password", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ email }) });
+      msgEl.style.color = "var(--teal)"; msgEl.textContent = "If an account exists, we'll email you a reset link."; msgEl.style.display = "block";
+    } catch { msgEl.style.color = "#DC2626"; msgEl.textContent = "Error — please try again."; msgEl.style.display = "block"; }
+  }
+
+  async function forgotFamilyCode() {
+    const email = document.getElementById("returningEmail").value.trim();
+    const msgEl = document.getElementById("forgotMsg");
+    if (!email) { msgEl.style.color = "#DC2626"; msgEl.textContent = "Enter your email above first."; msgEl.style.display = "block"; return; }
+    try {
+      await fetch("/api/auth/forgot-code", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ email }) });
+      msgEl.style.color = "var(--teal)"; msgEl.textContent = "If an account exists, we'll email your family code."; msgEl.style.display = "block";
+    } catch { msgEl.style.color = "#DC2626"; msgEl.textContent = "Error — please try again."; msgEl.style.display = "block"; }
   }
 
   // ── Returning user login with email + password ──────────────────────────────

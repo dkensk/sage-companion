@@ -587,6 +587,12 @@
     </button>
 
     <div id="seniorLoginError" style="color:var(--red); font-size:14px; margin-top:12px; display:none; font-weight:500;"></div>
+
+    <div style="margin-top:16px; display:flex; gap:16px; justify-content:center;">
+      <a href="#" onclick="forgotPassword(); return false;" style="color:var(--navy); font-size:14px; font-weight:600; text-decoration:none;">Forgot password?</a>
+      <a href="#" onclick="forgotFamilyCode(); return false;" style="color:var(--navy); font-size:14px; font-weight:600; text-decoration:none;">Forgot family code?</a>
+    </div>
+    <div id="forgotMsg" style="color:var(--teal); font-size:14px; margin-top:10px; display:none; font-weight:500;"></div>
   </div>
 </div>
 
@@ -597,7 +603,10 @@
   </div>
   <div style="text-align:right;">
     <div class="header-time" id="headerTime"></div>
-    <button onclick="seniorLogout()" style="margin-top:6px; background:rgba(255,255,255,0.15); border:1px solid rgba(255,255,255,0.25); color:white; padding:5px 12px; border-radius:8px; font-size:12px; font-weight:600; cursor:pointer;">Sign out</button>
+    <div style="display:flex; gap:6px; margin-top:6px; justify-content:flex-end;">
+      <a href="/settings" style="background:rgba(255,255,255,0.15); border:1px solid rgba(255,255,255,0.25); color:white; padding:5px 12px; border-radius:8px; font-size:12px; font-weight:600; text-decoration:none;">⚙️ Settings</a>
+      <button onclick="seniorLogout()" style="background:rgba(255,255,255,0.15); border:1px solid rgba(255,255,255,0.25); color:white; padding:5px 12px; border-radius:8px; font-size:12px; font-weight:600; cursor:pointer;">Sign out</button>
+    </div>
   </div>
 </header>
 
@@ -841,6 +850,46 @@
       errEl.textContent = "Connection error — please try again.";
       errEl.style.display = "block";
     }
+  }
+
+  async function forgotPassword() {
+    const email = document.getElementById("seniorLoginEmail").value.trim();
+    const msgEl = document.getElementById("forgotMsg");
+    if (!email) {
+      msgEl.style.color = "var(--red)";
+      msgEl.textContent = "Enter your email above first.";
+      msgEl.style.display = "block";
+      return;
+    }
+    try {
+      await fetch("/api/auth/forgot-password", {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email }),
+      });
+      msgEl.style.color = "var(--teal)";
+      msgEl.textContent = "If an account exists, we'll email you a reset link.";
+      msgEl.style.display = "block";
+    } catch { msgEl.textContent = "Error — please try again."; msgEl.style.color = "var(--red)"; msgEl.style.display = "block"; }
+  }
+
+  async function forgotFamilyCode() {
+    const email = document.getElementById("seniorLoginEmail").value.trim();
+    const msgEl = document.getElementById("forgotMsg");
+    if (!email) {
+      msgEl.style.color = "var(--red)";
+      msgEl.textContent = "Enter your email above first.";
+      msgEl.style.display = "block";
+      return;
+    }
+    try {
+      await fetch("/api/auth/forgot-code", {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email }),
+      });
+      msgEl.style.color = "var(--teal)";
+      msgEl.textContent = "If an account exists, we'll email your family code.";
+      msgEl.style.display = "block";
+    } catch { msgEl.textContent = "Error — please try again."; msgEl.style.color = "var(--red)"; msgEl.style.display = "block"; }
   }
 
   async function checkSeniorAuth() {

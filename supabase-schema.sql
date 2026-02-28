@@ -12,10 +12,15 @@ CREATE TABLE IF NOT EXISTS seniors (
   age           INTEGER,
   family_code   TEXT UNIQUE NOT NULL,
   conditions    TEXT[]   DEFAULT '{}',
-  google_tokens JSONB,
-  preferences   JSONB    DEFAULT '{"voiceSpeed":"normal","theme":"default"}',
-  created_at    TIMESTAMPTZ DEFAULT NOW(),
-  last_active   TIMESTAMPTZ DEFAULT NOW()
+  google_tokens       JSONB,
+  preferences         JSONB    DEFAULT '{"voiceSpeed":"normal","theme":"default"}',
+  stripe_customer_id  TEXT,
+  subscription_status TEXT     DEFAULT 'free',
+  subscription_plan   TEXT     DEFAULT 'free',
+  reset_token         TEXT,
+  reset_expires       TIMESTAMPTZ,
+  created_at          TIMESTAMPTZ DEFAULT NOW(),
+  last_active         TIMESTAMPTZ DEFAULT NOW()
 );
 
 -- ── Medications ───────────────────────────────────────────────────────────────

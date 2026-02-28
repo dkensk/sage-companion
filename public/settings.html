@@ -1,0 +1,991 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Settings - Sage Companion</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
+      background-color: #F1F5F9;
+      color: #0F172A;
+    }
+
+    /* Header */
+    .header {
+      background: linear-gradient(135deg, #0F766E 0%, #0D5E5A 100%);
+      color: white;
+      padding: 2rem;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+    }
+
+    .header-title {
+      font-size: 2.5rem;
+      font-weight: 600;
+      display: flex;
+      align-items: center;
+      gap: 1rem;
+    }
+
+    .header-title-emoji {
+      font-size: 2.5rem;
+    }
+
+    .back-link {
+      background-color: rgba(255, 255, 255, 0.2);
+      color: white;
+      padding: 0.75rem 1.5rem;
+      border-radius: 12px;
+      text-decoration: none;
+      font-size: 1.125rem;
+      border: 2px solid rgba(255, 255, 255, 0.3);
+      transition: all 0.3s ease;
+      display: inline-flex;
+      align-items: center;
+      gap: 0.5rem;
+    }
+
+    .back-link:hover {
+      background-color: rgba(255, 255, 255, 0.3);
+      border-color: rgba(255, 255, 255, 0.5);
+    }
+
+    /* Main container */
+    .container {
+      max-width: 800px;
+      margin: 2rem auto;
+      padding: 0 1rem;
+    }
+
+    /* Cards */
+    .card {
+      background-color: #FFFFFF;
+      border-radius: 20px;
+      padding: 2rem;
+      margin-bottom: 2rem;
+      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+      border: 1px solid #E2E8F0;
+    }
+
+    .card-title {
+      font-size: 1.5rem;
+      font-weight: 600;
+      margin-bottom: 1.5rem;
+      color: #0F172A;
+    }
+
+    /* Account Info */
+    .info-item {
+      margin-bottom: 1.5rem;
+    }
+
+    .info-label {
+      font-size: 0.95rem;
+      color: #64748B;
+      margin-bottom: 0.5rem;
+      font-weight: 500;
+    }
+
+    .info-value {
+      font-size: 1.25rem;
+      color: #0F172A;
+      font-weight: 500;
+    }
+
+    /* Family Code */
+    .family-code-container {
+      background-color: #F1F5F9;
+      border-radius: 12px;
+      padding: 1.5rem;
+      margin: 1rem 0;
+      border: 2px solid #0F766E;
+      text-align: center;
+    }
+
+    .family-code-label {
+      font-size: 1rem;
+      color: #64748B;
+      margin-bottom: 0.75rem;
+    }
+
+    .family-code-value {
+      font-size: 2.5rem;
+      font-weight: 700;
+      color: #0F766E;
+      letter-spacing: 0.2em;
+      margin: 1rem 0;
+      font-family: 'Courier New', monospace;
+    }
+
+    .copy-button {
+      background-color: #0F766E;
+      color: white;
+      border: none;
+      padding: 1rem 2rem;
+      font-size: 1.125rem;
+      border-radius: 12px;
+      cursor: pointer;
+      font-weight: 600;
+      transition: all 0.3s ease;
+      margin-top: 1rem;
+    }
+
+    .copy-button:hover {
+      background-color: #0D5E5A;
+      transform: translateY(-2px);
+      box-shadow: 0 4px 12px rgba(15, 118, 110, 0.3);
+    }
+
+    .copy-button:active {
+      transform: translateY(0);
+    }
+
+    .family-code-description {
+      font-size: 1.025rem;
+      color: #64748B;
+      margin-top: 1rem;
+      line-height: 1.6;
+    }
+
+    /* Subscription */
+    .subscription-status {
+      background-color: #F1F5F9;
+      padding: 1.5rem;
+      border-radius: 12px;
+      margin-bottom: 1.5rem;
+      display: flex;
+      align-items: center;
+      gap: 1rem;
+    }
+
+    .plan-badge {
+      background-color: #16A34A;
+      color: white;
+      padding: 0.75rem 1.5rem;
+      border-radius: 8px;
+      font-size: 1.125rem;
+      font-weight: 600;
+    }
+
+    .plan-badge.free {
+      background-color: #64748B;
+    }
+
+    .subscription-buttons {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 1rem;
+      margin-top: 1.5rem;
+    }
+
+    @media (max-width: 600px) {
+      .subscription-buttons {
+        grid-template-columns: 1fr;
+      }
+    }
+
+    .subscription-button {
+      background-color: #0F766E;
+      color: white;
+      border: none;
+      padding: 1.25rem;
+      font-size: 1.125rem;
+      border-radius: 12px;
+      cursor: pointer;
+      font-weight: 600;
+      transition: all 0.3s ease;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 0.5rem;
+    }
+
+    .subscription-button:hover {
+      background-color: #0D5E5A;
+      transform: translateY(-2px);
+      box-shadow: 0 4px 12px rgba(15, 118, 110, 0.3);
+    }
+
+    .subscription-button:active {
+      transform: translateY(0);
+    }
+
+    .subscription-button-price {
+      font-size: 1.375rem;
+      font-weight: 700;
+    }
+
+    .subscription-button-period {
+      font-size: 0.95rem;
+      opacity: 0.9;
+    }
+
+    .subscription-button-saving {
+      font-size: 0.85rem;
+      background-color: rgba(255, 255, 255, 0.2);
+      padding: 0.25rem 0.75rem;
+      border-radius: 6px;
+    }
+
+    .manage-button {
+      background-color: #0F766E;
+      color: white;
+      border: none;
+      padding: 1rem 2rem;
+      font-size: 1.125rem;
+      border-radius: 12px;
+      cursor: pointer;
+      font-weight: 600;
+      transition: all 0.3s ease;
+      width: 100%;
+    }
+
+    .manage-button:hover {
+      background-color: #0D5E5A;
+      transform: translateY(-2px);
+      box-shadow: 0 4px 12px rgba(15, 118, 110, 0.3);
+    }
+
+    .coming-soon {
+      color: #64748B;
+      font-size: 1.125rem;
+      font-style: italic;
+    }
+
+    /* Forms */
+    .form-group {
+      margin-bottom: 1.5rem;
+    }
+
+    .form-label {
+      display: block;
+      font-size: 1.125rem;
+      font-weight: 600;
+      margin-bottom: 0.75rem;
+      color: #0F172A;
+    }
+
+    .form-input {
+      width: 100%;
+      padding: 1rem;
+      font-size: 1.125rem;
+      border: 2px solid #E2E8F0;
+      border-radius: 12px;
+      color: #0F172A;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
+      transition: border-color 0.3s ease;
+    }
+
+    .form-input:focus {
+      outline: none;
+      border-color: #0F766E;
+      box-shadow: 0 0 0 3px rgba(15, 118, 110, 0.1);
+    }
+
+    .form-button {
+      background-color: #16A34A;
+      color: white;
+      border: none;
+      padding: 1rem 2rem;
+      font-size: 1.125rem;
+      border-radius: 12px;
+      cursor: pointer;
+      font-weight: 600;
+      transition: all 0.3s ease;
+      width: 100%;
+    }
+
+    .form-button:hover {
+      background-color: #15803D;
+      transform: translateY(-2px);
+      box-shadow: 0 4px 12px rgba(22, 163, 74, 0.3);
+    }
+
+    .form-button:active {
+      transform: translateY(0);
+    }
+
+    .form-button:disabled {
+      background-color: #64748B;
+      cursor: not-allowed;
+      transform: none;
+    }
+
+    /* Delete Account Card */
+    .card-delete {
+      border: 2px solid #DC2626;
+    }
+
+    .card-delete .card-title {
+      color: #DC2626;
+    }
+
+    .delete-warning {
+      background-color: #FEE2E2;
+      border-left: 4px solid #DC2626;
+      padding: 1.25rem;
+      border-radius: 8px;
+      margin-bottom: 1.5rem;
+      font-size: 1.025rem;
+      color: #7F1D1D;
+      line-height: 1.6;
+    }
+
+    .delete-button {
+      background-color: #DC2626;
+      color: white;
+      border: none;
+      padding: 1rem 2rem;
+      font-size: 1.125rem;
+      border-radius: 12px;
+      cursor: pointer;
+      font-weight: 600;
+      transition: all 0.3s ease;
+      width: 100%;
+    }
+
+    .delete-button:hover {
+      background-color: #B91C1C;
+      transform: translateY(-2px);
+      box-shadow: 0 4px 12px rgba(220, 38, 38, 0.3);
+    }
+
+    .delete-button:active {
+      transform: translateY(0);
+    }
+
+    .delete-button:disabled {
+      background-color: #64748B;
+      cursor: not-allowed;
+      transform: none;
+    }
+
+    /* Legal Links */
+    .legal-links {
+      display: flex;
+      gap: 2rem;
+      flex-wrap: wrap;
+    }
+
+    .legal-link {
+      color: #0F766E;
+      text-decoration: none;
+      font-size: 1.125rem;
+      font-weight: 500;
+      transition: color 0.3s ease;
+    }
+
+    .legal-link:hover {
+      color: #0D5E5A;
+      text-decoration: underline;
+    }
+
+    /* Footer */
+    .footer {
+      background-color: #FFFFFF;
+      border-top: 1px solid #E2E8F0;
+      padding: 2rem;
+      text-align: center;
+      color: #64748B;
+      font-size: 1rem;
+      margin-top: 4rem;
+    }
+
+    .footer-content {
+      max-width: 800px;
+      margin: 0 auto;
+    }
+
+    /* Toast Notifications */
+    .toast {
+      position: fixed;
+      bottom: 2rem;
+      right: 2rem;
+      padding: 1.5rem 2rem;
+      border-radius: 12px;
+      color: white;
+      font-size: 1.125rem;
+      font-weight: 500;
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+      animation: slideIn 0.3s ease;
+      max-width: 400px;
+      z-index: 1000;
+    }
+
+    .toast.success {
+      background-color: #16A34A;
+    }
+
+    .toast.error {
+      background-color: #DC2626;
+    }
+
+    .toast.info {
+      background-color: #0F766E;
+    }
+
+    @keyframes slideIn {
+      from {
+        transform: translateX(400px);
+        opacity: 0;
+      }
+      to {
+        transform: translateX(0);
+        opacity: 1;
+      }
+    }
+
+    @keyframes slideOut {
+      from {
+        transform: translateX(0);
+        opacity: 1;
+      }
+      to {
+        transform: translateX(400px);
+        opacity: 0;
+      }
+    }
+
+    .toast.hide {
+      animation: slideOut 0.3s ease forwards;
+    }
+
+    /* Loading state */
+    .loading {
+      opacity: 0.6;
+      pointer-events: none;
+    }
+
+    /* Success/Error messages */
+    .message {
+      padding: 1rem;
+      border-radius: 8px;
+      margin-bottom: 1rem;
+      font-size: 1rem;
+      display: none;
+    }
+
+    .message.success {
+      background-color: #DCFCE7;
+      color: #166534;
+      border-left: 4px solid #16A34A;
+      display: block;
+    }
+
+    .message.error {
+      background-color: #FEE2E2;
+      color: #7F1D1D;
+      border-left: 4px solid #DC2626;
+      display: block;
+    }
+
+    /* Responsive */
+    @media (max-width: 768px) {
+      .header {
+        padding: 1.5rem;
+        flex-direction: column;
+        gap: 1rem;
+        text-align: center;
+      }
+
+      .header-title {
+        font-size: 2rem;
+      }
+
+      .container {
+        margin: 1rem auto;
+        padding: 0 1rem;
+      }
+
+      .card {
+        padding: 1.5rem;
+      }
+
+      .card-title {
+        font-size: 1.25rem;
+      }
+
+      .family-code-value {
+        font-size: 2rem;
+      }
+    }
+
+    @media (max-width: 480px) {
+      .header-title {
+        font-size: 1.5rem;
+      }
+
+      .header-title-emoji {
+        font-size: 1.75rem;
+      }
+
+      .back-link {
+        font-size: 1rem;
+        padding: 0.5rem 1rem;
+      }
+
+      .family-code-value {
+        font-size: 1.75rem;
+      }
+
+      .legal-links {
+        flex-direction: column;
+        gap: 1rem;
+      }
+    }
+  </style>
+</head>
+<body>
+  <!-- Header -->
+  <div class="header">
+    <div class="header-title">
+      <span class="header-title-emoji">⚙️</span>
+      <span>Settings</span>
+    </div>
+    <a href="/elder" class="back-link">← Back to Sage</a>
+  </div>
+
+  <!-- Main Content -->
+  <div class="container">
+    <!-- Account Info -->
+    <div class="card">
+      <div class="card-title">Account Information</div>
+      <div class="info-item">
+        <div class="info-label">Name</div>
+        <div class="info-value" id="accountName">Loading...</div>
+      </div>
+      <div class="info-item">
+        <div class="info-label">Email</div>
+        <div class="info-value" id="accountEmail">Loading...</div>
+      </div>
+      <div class="info-item">
+        <div class="info-label">Age</div>
+        <div class="info-value" id="accountAge">Loading...</div>
+      </div>
+      <div class="info-item">
+        <div class="info-label">Member Since</div>
+        <div class="info-value" id="accountMemberSince">Loading...</div>
+      </div>
+    </div>
+
+    <!-- Family Code -->
+    <div class="card">
+      <div class="card-title">Your Family Code</div>
+      <div class="family-code-container">
+        <div class="family-code-label">Share this code with family:</div>
+        <div class="family-code-value" id="familyCode">LOADING</div>
+        <button class="copy-button" onclick="copyFamilyCode()">Copy Code</button>
+      </div>
+      <div class="family-code-description">
+        Share this code with family members so they can connect to your dashboard and receive updates about your health and wellness.
+      </div>
+    </div>
+
+    <!-- Subscription -->
+    <div class="card">
+      <div class="card-title">Subscription</div>
+      <div id="subscriptionContent">
+        <div class="subscription-status">
+          <div class="plan-badge free" id="planBadge">Free Plan</div>
+        </div>
+        <p style="color: #64748B; font-size: 1.025rem;">Loading subscription status...</p>
+      </div>
+    </div>
+
+    <!-- Change Password -->
+    <div class="card">
+      <div class="card-title">Change Password</div>
+      <div id="passwordMessage" class="message"></div>
+      <form id="changePasswordForm" onsubmit="changePassword(event)">
+        <div class="form-group">
+          <label class="form-label">Current Password</label>
+          <input type="password" class="form-input" id="currentPassword" required>
+        </div>
+        <div class="form-group">
+          <label class="form-label">New Password</label>
+          <input type="password" class="form-input" id="newPassword" required>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Confirm New Password</label>
+          <input type="password" class="form-input" id="confirmPassword" required>
+        </div>
+        <button type="submit" class="form-button">Update Password</button>
+      </form>
+    </div>
+
+    <!-- Change Email -->
+    <div class="card">
+      <div class="card-title">Change Email</div>
+      <div id="emailMessage" class="message"></div>
+      <form id="changeEmailForm" onsubmit="changeEmail(event)">
+        <div class="form-group">
+          <label class="form-label">New Email Address</label>
+          <input type="email" class="form-input" id="newEmail" required>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Current Password (for verification)</label>
+          <input type="password" class="form-input" id="emailPassword" required>
+        </div>
+        <button type="submit" class="form-button">Update Email</button>
+      </form>
+    </div>
+
+    <!-- Delete Account -->
+    <div class="card card-delete">
+      <div class="card-title">Delete Account</div>
+      <div class="delete-warning">
+        ⚠️ This will permanently delete your account and all data including medications, conversations, and doctor visits. This cannot be undone.
+      </div>
+      <div id="deleteMessage" class="message"></div>
+      <form id="deleteAccountForm" onsubmit="deleteAccount(event)">
+        <div class="form-group">
+          <label class="form-label">Current Password</label>
+          <input type="password" class="form-input" id="deletePassword" required>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Type DELETE to confirm</label>
+          <input type="text" class="form-input" id="deleteConfirmation" placeholder="Type DELETE here" required>
+        </div>
+        <button type="submit" class="delete-button" id="deleteButton" disabled>Delete My Account</button>
+      </form>
+    </div>
+
+    <!-- Legal -->
+    <div class="card">
+      <div class="card-title">Legal</div>
+      <div class="legal-links">
+        <a href="/terms" class="legal-link">Terms of Service</a>
+        <a href="/privacy" class="legal-link">Privacy Policy</a>
+      </div>
+    </div>
+  </div>
+
+  <!-- Footer -->
+  <div class="footer">
+    <div class="footer-content">
+      <p>Sage Companion LLC &copy; 2026 | Version 1.0.0</p>
+    </div>
+  </div>
+
+  <script>
+    // Authentication pattern
+    function getSeniorToken() {
+      return localStorage.getItem("sageSeniorToken");
+    }
+
+    async function apiCall(url, opts = {}) {
+      const token = getSeniorToken();
+      if (token) {
+        opts.headers = opts.headers || {};
+        opts.headers["x-senior-token"] = token;
+      }
+      const res = await fetch(url, opts);
+      if (res.status === 401) {
+        window.location.href = "/elder";
+        throw new Error("Session expired");
+      }
+      return res;
+    }
+
+    // Toast Notifications
+    function showToast(message, type = 'info') {
+      const toast = document.createElement('div');
+      toast.className = `toast ${type}`;
+      toast.textContent = message;
+      document.body.appendChild(toast);
+
+      setTimeout(() => {
+        toast.classList.add('hide');
+        setTimeout(() => toast.remove(), 300);
+      }, 4000);
+    }
+
+    // Message Display
+    function showMessage(elementId, message, type = 'success') {
+      const messageEl = document.getElementById(elementId);
+      messageEl.textContent = message;
+      messageEl.className = `message ${type}`;
+    }
+
+    function clearMessage(elementId) {
+      const messageEl = document.getElementById(elementId);
+      messageEl.className = 'message';
+      messageEl.textContent = '';
+    }
+
+    // Load Account Info
+    async function loadAccountInfo() {
+      try {
+        const res = await apiCall('/api/account');
+        const data = await res.json();
+
+        if (res.ok && data) {
+          document.getElementById('accountName').textContent = data.name || 'Not set';
+          document.getElementById('accountEmail').textContent = data.email || 'Not set';
+          document.getElementById('accountAge').textContent = data.age || 'Not set';
+          document.getElementById('familyCode').textContent = data.familyCode || 'XXXXX';
+
+          // Format member since date
+          if (data.memberSince) {
+            const date = new Date(data.memberSince);
+            const formatted = date.toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' });
+            document.getElementById('accountMemberSince').textContent = formatted;
+          }
+
+          // Load subscription
+          loadSubscription(data.subscriptionStatus);
+        }
+      } catch (error) {
+        console.error('Error loading account info:', error);
+        showToast('Error loading account information', 'error');
+      }
+    }
+
+    // Load Subscription
+    async function loadSubscription(status) {
+      try {
+        const subscriptionContent = document.getElementById('subscriptionContent');
+        const planBadge = document.getElementById('planBadge');
+
+        if (status === 'free') {
+          planBadge.textContent = 'Free Plan';
+          planBadge.className = 'plan-badge free';
+          subscriptionContent.innerHTML = `
+            <div class="subscription-status">
+              <div class="plan-badge free">Free Plan</div>
+            </div>
+            <div class="subscription-buttons">
+              <button class="subscription-button" onclick="subscribe('monthly')">
+                <div class="subscription-button-price">$9.99</div>
+                <div class="subscription-button-period">Per Month</div>
+              </button>
+              <button class="subscription-button" onclick="subscribe('yearly')">
+                <div class="subscription-button-price">$89.99</div>
+                <div class="subscription-button-period">Per Year</div>
+                <div class="subscription-button-saving">Save 25%</div>
+              </button>
+            </div>
+          `;
+        } else if (status === 'active' || status === 'premium') {
+          planBadge.textContent = 'Premium';
+          planBadge.className = 'plan-badge';
+          subscriptionContent.innerHTML = `
+            <div class="subscription-status">
+              <div class="plan-badge">Premium</div>
+              <p style="color: #64748B; font-size: 1.025rem;">Your subscription is active</p>
+            </div>
+            <button class="manage-button" onclick="manageSubscription()">Manage Subscription</button>
+          `;
+        } else {
+          subscriptionContent.innerHTML = `
+            <p class="coming-soon">Subscription management coming soon</p>
+          `;
+        }
+      } catch (error) {
+        console.error('Error loading subscription:', error);
+      }
+    }
+
+    // Subscribe
+    async function subscribe(plan) {
+      try {
+        const res = await apiCall('/api/billing/checkout', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ plan })
+        });
+
+        const data = await res.json();
+        if (res.ok && data.url) {
+          window.location.href = data.url;
+        } else {
+          showToast('Error starting subscription', 'error');
+        }
+      } catch (error) {
+        console.error('Error subscribing:', error);
+        showToast('Error starting subscription', 'error');
+      }
+    }
+
+    // Manage Subscription
+    async function manageSubscription() {
+      try {
+        const res = await apiCall('/api/billing/portal', {
+          method: 'POST'
+        });
+
+        const data = await res.json();
+        if (res.ok && data.url) {
+          window.location.href = data.url;
+        } else {
+          showToast('Error opening subscription management', 'error');
+        }
+      } catch (error) {
+        console.error('Error managing subscription:', error);
+        showToast('Error opening subscription management', 'error');
+      }
+    }
+
+    // Copy Family Code
+    function copyFamilyCode() {
+      const code = document.getElementById('familyCode').textContent;
+      navigator.clipboard.writeText(code).then(() => {
+        showToast('Family code copied!', 'success');
+      }).catch(() => {
+        showToast('Failed to copy code', 'error');
+      });
+    }
+
+    // Change Password
+    async function changePassword(e) {
+      e.preventDefault();
+      clearMessage('passwordMessage');
+
+      const currentPassword = document.getElementById('currentPassword').value;
+      const newPassword = document.getElementById('newPassword').value;
+      const confirmPassword = document.getElementById('confirmPassword').value;
+
+      if (newPassword !== confirmPassword) {
+        showMessage('passwordMessage', 'New passwords do not match', 'error');
+        return;
+      }
+
+      try {
+        const form = document.getElementById('changePasswordForm');
+        form.classList.add('loading');
+
+        const res = await apiCall('/api/account/change-password', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ currentPassword, newPassword })
+        });
+
+        const data = await res.json();
+
+        if (res.ok) {
+          showMessage('passwordMessage', 'Password updated successfully!', 'success');
+          document.getElementById('changePasswordForm').reset();
+          setTimeout(() => clearMessage('passwordMessage'), 5000);
+        } else {
+          showMessage('passwordMessage', data.message || 'Error updating password', 'error');
+        }
+
+        form.classList.remove('loading');
+      } catch (error) {
+        console.error('Error changing password:', error);
+        showMessage('passwordMessage', 'Error updating password', 'error');
+        document.getElementById('changePasswordForm').classList.remove('loading');
+      }
+    }
+
+    // Change Email
+    async function changeEmail(e) {
+      e.preventDefault();
+      clearMessage('emailMessage');
+
+      const newEmail = document.getElementById('newEmail').value;
+      const password = document.getElementById('emailPassword').value;
+
+      try {
+        const form = document.getElementById('changeEmailForm');
+        form.classList.add('loading');
+
+        const res = await apiCall('/api/account/change-email', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ newEmail, password })
+        });
+
+        const data = await res.json();
+
+        if (res.ok) {
+          showMessage('emailMessage', 'Email updated successfully!', 'success');
+          document.getElementById('changeEmailForm').reset();
+          setTimeout(() => clearMessage('emailMessage'), 5000);
+        } else {
+          showMessage('emailMessage', data.message || 'Error updating email', 'error');
+        }
+
+        form.classList.remove('loading');
+      } catch (error) {
+        console.error('Error changing email:', error);
+        showMessage('emailMessage', 'Error updating email', 'error');
+        document.getElementById('changeEmailForm').classList.remove('loading');
+      }
+    }
+
+    // Delete Account
+    async function deleteAccount(e) {
+      e.preventDefault();
+      clearMessage('deleteMessage');
+
+      const password = document.getElementById('deletePassword').value;
+      const confirmation = document.getElementById('deleteConfirmation').value;
+
+      if (confirmation !== 'DELETE') {
+        showMessage('deleteMessage', 'Please type DELETE to confirm', 'error');
+        return;
+      }
+
+      try {
+        const form = document.getElementById('deleteAccountForm');
+        form.classList.add('loading');
+
+        const res = await apiCall('/api/account/delete', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ password, confirmation })
+        });
+
+        if (res.ok) {
+          localStorage.clear();
+          showToast('Account deleted', 'success');
+          setTimeout(() => {
+            window.location.href = '/';
+          }, 2000);
+        } else {
+          const data = await res.json();
+          showMessage('deleteMessage', data.message || 'Error deleting account', 'error');
+        }
+
+        form.classList.remove('loading');
+      } catch (error) {
+        console.error('Error deleting account:', error);
+        showMessage('deleteMessage', 'Error deleting account', 'error');
+        document.getElementById('deleteAccountForm').classList.remove('loading');
+      }
+    }
+
+    // Enable/disable delete button based on confirmation text
+    document.getElementById('deleteConfirmation')?.addEventListener('input', (e) => {
+      const button = document.getElementById('deleteButton');
+      button.disabled = e.target.value !== 'DELETE';
+    });
+
+    // Check for billing query params
+    window.addEventListener('DOMContentLoaded', () => {
+      const params = new URLSearchParams(window.location.search);
+
+      if (params.get('billing') === 'success') {
+        showToast('Subscription activated!', 'success');
+        window.history.replaceState({}, document.title, window.location.pathname);
+      } else if (params.get('billing') === 'cancelled') {
+        showToast('Checkout cancelled', 'info');
+        window.history.replaceState({}, document.title, window.location.pathname);
+      }
+
+      // Load account info
+      loadAccountInfo();
+    });
+  </script>
+</body>
+</html>
