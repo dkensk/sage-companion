@@ -524,7 +524,8 @@
     }, 1000);
 
     document.getElementById("transcriptBox").classList.add("recording");
-    document.getElementById("placeholder").style.display = "none";
+    const ph = document.getElementById("placeholder");
+    if (ph) ph.style.display = "none";
   }
 
   function stopRecording() {
@@ -549,13 +550,10 @@
 
   function renderTranscript() {
     const box = document.getElementById("transcriptBox");
-    const placeholder = document.getElementById("placeholder");
     if (!transcript && !interim) {
-      placeholder.style.display = "block";
       box.innerHTML = '<span class="transcript-placeholder" id="placeholder">Your conversation will appear here as you record…</span>';
       return;
     }
-    placeholder.style.display = "none";
     box.innerHTML = (transcript || "") + (interim ? `<span class="interim-text"> ${interim}</span>` : "");
     box.scrollTop = box.scrollHeight;
   }
