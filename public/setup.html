@@ -248,11 +248,22 @@
       </div>
 
       <div class="field">
-        <label>Email (optional — for medication reminders)</label>
+        <label>Email</label>
         <input type="email" id="emailInput" placeholder="e.g. margaret@email.com"
           autocomplete="email"
+          oninput="document.getElementById('emailError').style.display='none'"
+          onkeydown="if(event.key==='Enter') document.getElementById('passwordInput').focus()" />
+        <div class="error-msg" id="emailError">Please enter a valid email address.</div>
+        <div style="font-size:13px;color:#64748B;margin-top:6px;">Used for account login and medication reminders. Never shared.</div>
+      </div>
+
+      <div class="field">
+        <label>Password</label>
+        <input type="password" id="passwordInput" placeholder="Choose a password"
+          autocomplete="new-password"
+          oninput="document.getElementById('passwordError').style.display='none'"
           onkeydown="if(event.key==='Enter') goStep(3)" />
-        <div style="font-size:13px;color:#64748B;margin-top:6px;">Used only to send medication reminders. Never shared.</div>
+        <div class="error-msg" id="passwordError">Password must be at least 6 characters.</div>
       </div>
 
       <button class="btn-primary" onclick="goStep(3)">Continue →</button>
@@ -289,16 +300,39 @@
     <div class="card">
       <div class="logo" style="font-size:42px;">🔑</div>
       <h2>Welcome back!</h2>
-      <p>Enter your name exactly as you set it up, and we'll restore your profile.</p>
+      <p>Sign in with your email and password, or enter your family code.</p>
 
       <div class="field">
-        <label>Your first name</label>
-        <input type="text" id="returningName" placeholder="e.g. Margaret"
-          onkeydown="if(event.key==='Enter') lookupReturning()" />
-        <div class="error-msg" id="returningError">Name not found. Please check and try again.</div>
+        <label>Email</label>
+        <input type="email" id="returningEmail" placeholder="e.g. margaret@email.com"
+          autocomplete="email"
+          onkeydown="if(event.key==='Enter') document.getElementById('returningPassword').focus()"
+          oninput="document.getElementById('returningError').style.display='none'" />
       </div>
 
-      <button class="btn-primary" onclick="lookupReturning()">Find My Profile →</button>
+      <div class="field">
+        <label>Password</label>
+        <input type="password" id="returningPassword" placeholder="Your password"
+          autocomplete="current-password"
+          onkeydown="if(event.key==='Enter') lookupReturning()"
+          oninput="document.getElementById('returningError').style.display='none'" />
+      </div>
+
+      <div class="error-msg" id="returningError">Invalid email or password. Please try again.</div>
+
+      <button class="btn-primary" onclick="lookupReturning()">Sign In →</button>
+
+      <div class="divider">or use your family code</div>
+
+      <div class="field">
+        <label>Family Code</label>
+        <input type="text" id="returningCode" placeholder="e.g. ABCD12"
+          style="text-transform:uppercase; letter-spacing:3px; text-align:center;"
+          onkeydown="if(event.key==='Enter') loginWithCode()"
+          oninput="document.getElementById('returningError').style.display='none'" />
+      </div>
+
+      <button class="btn-secondary" onclick="loginWithCode()">Sign In with Code →</button>
       <button class="btn-secondary" onclick="goStep(1)">← Back</button>
     </div>
   </div>
@@ -310,12 +344,25 @@
   function goStep(id) {
     if (id === 3) {
       const name = document.getElementById("nameInput").value.trim();
+      const email = document.getElementById("emailInput").value.trim();
+      const password = document.getElementById("passwordInput").value;
+
       if (!name) {
         document.getElementById("nameError").style.display = "block";
         document.getElementById("nameInput").focus();
         return;
       }
-      createProfile(name);
+      if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+        document.getElementById("emailError").style.display = "block";
+        document.getElementById("emailInput").focus();
+        return;
+      }
+      if (!password || password.length < 6) {
+        document.getElementById("passwordError").style.display = "block";
+        document.getElementById("passwordInput").focus();
+        return;
+      }
+      createProfile(name, email, password);
     }
 
     document.querySelectorAll(".step").forEach(s => s.classList.remove("active"));
@@ -339,7 +386,7 @@
   // ── Create new profile ────────────────────────────────────────────────────
   let createdSenior = null;
 
-  async function createProfile(name) {
+  async function createProfile(name, email, password) {
     const age = document.getElementById("ageInput").value;
     document.getElementById("step3Logo").textContent   = "⏳";
     document.getElementById("step3Title").textContent  = "Setting up Sage…";
@@ -350,7 +397,7 @@
       const res = await fetch("/api/seniors", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ name, age: age ? parseInt(age) : null, email: document.getElementById("emailInput").value.trim() || null }),
+        body: JSON.stringify({ name, age: age ? parseInt(age) : null, email, password }),
       });
 
       const data = await res.json();
@@ -391,37 +438,59 @@
     window.location.href = "/elder";
   }
 
-  // ── Returning user lookup ──────────────────────────────────────────────────
+  // ── Returning user login with email + password ──────────────────────────────
   async function lookupReturning() {
-    const name = document.getElementById("returningName").value.trim();
-    if (!name) return;
+    const email = document.getElementById("returningEmail").value.trim();
+    const password = document.getElementById("returningPassword").value;
+    if (!email || !password) {
+      document.getElementById("returningError").textContent = "Please enter both email and password.";
+      document.getElementById("returningError").style.display = "block";
+      return;
+    }
 
-    // Try to find by name — use seniors lookup
-    // For now, if user remembers their family code, family.html login handles it.
-    // Here we do a simple name search.
     try {
-      const res = await fetch(`/api/senior/by-name/${encodeURIComponent(name)}`);
-      if (!res.ok) throw new Error("Not found");
-      const senior = await res.json();
-      localStorage.setItem("sageSeniorId",   senior._id);
-      localStorage.setItem("sageSeniorName", senior.name);
-      localStorage.setItem("sageFamilyCode", senior.familyCode);
-      // Get auth token via login
-      if (senior.familyCode) {
-        try {
-          const loginRes = await fetch("/api/senior/login", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ familyCode: senior.familyCode }),
-          });
-          if (loginRes.ok) {
-            const loginData = await loginRes.json();
-            localStorage.setItem("sageSeniorToken", loginData.token);
-          }
-        } catch (e) { /* proceed without token, login screen will catch it */ }
-      }
+      const res = await fetch("/api/senior/login", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email, password }),
+      });
+      if (!res.ok) throw new Error("Invalid");
+      const data = await res.json();
+      localStorage.setItem("sageSeniorId",   data.senior._id);
+      localStorage.setItem("sageSeniorName", data.senior.name);
+      localStorage.setItem("sageFamilyCode", data.senior.familyCode);
+      localStorage.setItem("sageSeniorToken", data.token);
       window.location.href = "/elder";
     } catch {
+      document.getElementById("returningError").textContent = "Invalid email or password. Please try again.";
+      document.getElementById("returningError").style.display = "block";
+    }
+  }
+
+  // ── Login with family code ──────────────────────────────────────────────────
+  async function loginWithCode() {
+    const code = document.getElementById("returningCode").value.trim();
+    if (!code) {
+      document.getElementById("returningError").textContent = "Please enter your family code.";
+      document.getElementById("returningError").style.display = "block";
+      return;
+    }
+
+    try {
+      const res = await fetch("/api/senior/login", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ familyCode: code }),
+      });
+      if (!res.ok) throw new Error("Invalid");
+      const data = await res.json();
+      localStorage.setItem("sageSeniorId",   data.senior._id);
+      localStorage.setItem("sageSeniorName", data.senior.name);
+      localStorage.setItem("sageFamilyCode", data.senior.familyCode);
+      localStorage.setItem("sageSeniorToken", data.token);
+      window.location.href = "/elder";
+    } catch {
+      document.getElementById("returningError").textContent = "Invalid family code. Please check and try again.";
       document.getElementById("returningError").style.display = "block";
     }
   }

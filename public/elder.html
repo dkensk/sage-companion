@@ -559,15 +559,33 @@
 <div id="loginScreen" style="display:none; position:fixed; inset:0; background:var(--bg); z-index:200; align-items:center; justify-content:center; padding:24px;">
   <div style="background:white; border-radius:24px; padding:40px 28px; max-width:400px; width:100%; text-align:center; box-shadow:0 8px 32px rgba(0,0,0,0.12);">
     <div style="font-size:56px; margin-bottom:16px;">🌿</div>
-    <h2 style="font-size:28px; font-weight:900; color:var(--navy); margin-bottom:8px;">Welcome to Sage</h2>
-    <p style="font-size:16px; color:var(--muted); margin-bottom:32px; line-height:1.55;">Enter your family code to get started.</p>
+    <h2 style="font-size:28px; font-weight:900; color:var(--navy); margin-bottom:8px;">Welcome back</h2>
+    <p style="font-size:16px; color:var(--muted); margin-bottom:24px; line-height:1.55;">Sign in to continue.</p>
+
+    <input type="email" id="seniorLoginEmail" placeholder="Email address"
+      autocomplete="email"
+      onkeydown="if(event.key==='Enter') document.getElementById('seniorLoginPassword').focus()"
+      style="width:100%; border:2px solid var(--border); border-radius:14px; padding:16px; font-size:18px; outline:none; margin-bottom:10px; color:var(--text);" />
+    <input type="password" id="seniorLoginPassword" placeholder="Password"
+      autocomplete="current-password"
+      onkeydown="if(event.key==='Enter') seniorLogin()"
+      style="width:100%; border:2px solid var(--border); border-radius:14px; padding:16px; font-size:18px; outline:none; margin-bottom:14px; color:var(--text);" />
+    <button onclick="seniorLogin()" style="width:100%; background:linear-gradient(135deg, var(--navy), #2D4EAA); color:white; border:none; border-radius:14px; padding:17px; font-size:17px; font-weight:700; cursor:pointer; box-shadow:0 4px 16px rgba(30,58,138,0.3);">
+      Sign In →
+    </button>
+
+    <div style="display:flex; align-items:center; gap:12px; margin:18px 0; color:var(--muted); font-size:14px; font-weight:600;">
+      <div style="flex:1; height:1px; background:var(--border);"></div>or<div style="flex:1; height:1px; background:var(--border);"></div>
+    </div>
+
     <input type="text" id="seniorLoginCode" placeholder="FAMILY CODE" maxlength="10"
       oninput="this.value=this.value.toUpperCase()"
-      onkeydown="if(event.key==='Enter') seniorLogin()"
-      style="width:100%; border:2px solid var(--border); border-radius:14px; padding:18px; font-size:22px; text-align:center; letter-spacing:6px; font-weight:800; outline:none; margin-bottom:14px; text-transform:uppercase; color:var(--text);" />
-    <button onclick="seniorLogin()" style="width:100%; background:linear-gradient(135deg, var(--navy), #2D4EAA); color:white; border:none; border-radius:14px; padding:17px; font-size:17px; font-weight:700; cursor:pointer; box-shadow:0 4px 16px rgba(30,58,138,0.3);">
-      Continue →
+      onkeydown="if(event.key==='Enter') seniorLoginWithCode()"
+      style="width:100%; border:2px solid var(--border); border-radius:14px; padding:16px; font-size:20px; text-align:center; letter-spacing:5px; font-weight:800; outline:none; margin-bottom:10px; text-transform:uppercase; color:var(--text);" />
+    <button onclick="seniorLoginWithCode()" style="width:100%; background:var(--bg); color:var(--navy); border:2px solid var(--border); border-radius:14px; padding:15px; font-size:16px; font-weight:700; cursor:pointer;">
+      Sign In with Code
     </button>
+
     <div id="seniorLoginError" style="color:var(--red); font-size:14px; margin-top:12px; display:none; font-weight:500;"></div>
   </div>
 </div>
@@ -763,6 +781,41 @@
   function getSeniorToken() { return localStorage.getItem("sageSeniorToken"); }
 
   async function seniorLogin() {
+    const email = document.getElementById("seniorLoginEmail").value.trim();
+    const password = document.getElementById("seniorLoginPassword").value;
+    if (!email || !password) {
+      const errEl = document.getElementById("seniorLoginError");
+      errEl.textContent = "Please enter your email and password.";
+      errEl.style.display = "block";
+      return;
+    }
+    const errEl = document.getElementById("seniorLoginError");
+    errEl.style.display = "none";
+    try {
+      const res = await fetch("/api/senior/login", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email, password }),
+      });
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        errEl.textContent = data.error || "Invalid email or password.";
+        errEl.style.display = "block";
+        return;
+      }
+      const { token, senior } = await res.json();
+      localStorage.setItem("sageSeniorToken", token);
+      localStorage.setItem("sageSeniorId", senior._id);
+      localStorage.setItem("sageSeniorName", senior.name);
+      localStorage.setItem("sageFamilyCode", senior.familyCode);
+      location.reload();
+    } catch (e) {
+      errEl.textContent = "Connection error — please try again.";
+      errEl.style.display = "block";
+    }
+  }
+
+  async function seniorLoginWithCode() {
     const code = document.getElementById("seniorLoginCode").value.trim().toUpperCase();
     if (!code) return;
     const errEl = document.getElementById("seniorLoginError");
@@ -774,7 +827,7 @@
         body: JSON.stringify({ familyCode: code }),
       });
       if (!res.ok) {
-        errEl.textContent = "Code not found. Please check and try again.";
+        errEl.textContent = "Invalid code. Please check and try again.";
         errEl.style.display = "block";
         return;
       }
@@ -1617,7 +1670,7 @@
           Try again
         </button>
       </div>`;
-    speak("I heard: " + question + ". Should I save that?");
+    speak("I heard: " + question + ". If that's correct, push Yes to save it.");
   }
 
   async function saveSpokenQuestion(question) {

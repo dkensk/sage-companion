@@ -875,14 +875,8 @@ app.post("/api/doctor-visits", seniorAuth, async (req, res) => {
 // FAMILY API
 // ─────────────────────────────────────────────────────────────────────────────
 
-app.get("/api/senior/by-name/:name", async (req, res) => {
-  try {
-    const name = decodeURIComponent(req.params.name).trim();
-    const { data } = await supabase.from("seniors").select("*").ilike("name", name).limit(1);
-    if (!data || data.length === 0) return res.status(404).json({ error: "No profile found with that name" });
-    res.json(norm(data[0]));
-  } catch (e) { res.status(500).json({ error: e.message }); }
-});
+// Deprecated — login by name removed for security. Use email+password or family code.
+// app.get("/api/senior/by-name/:name", ...);
 
 app.get("/api/senior/by-code/:code", async (req, res) => {
   try {
@@ -1164,8 +1158,19 @@ function generateFamilyCode() {
 
 app.post("/api/seniors", async (req, res) => {
   try {
-    const { name, age } = req.body;
+    const { name, age, email, password } = req.body;
     if (!name) return res.status(400).json({ error: "Name is required" });
+    if (!email) return res.status(400).json({ error: "Email is required" });
+    if (!password || password.length < 6) return res.status(400).json({ error: "Password must be at least 6 characters" });
+
+    // Check if email already in use
+    const { data: existing } = await supabase.from("seniors").select("id").eq("email", email.trim().toLowerCase()).limit(1);
+    if (existing && existing.length > 0) return res.status(409).json({ error: "An account with this email already exists. Try signing in instead." });
+
+    // Hash password
+    const salt = crypto.randomBytes(16).toString("hex");
+    const hash = crypto.pbkdf2Sync(password, salt, 100000, 64, "sha512").toString("hex");
+    const passwordHash = salt + ":" + hash;
 
     let familyCode;
     while (true) {
@@ -1176,6 +1181,7 @@ app.post("/api/seniors", async (req, res) => {
 
     const { data: senior } = await supabase.from("seniors").insert({
       name: name.trim(), age: age ? parseInt(age) : null,
+      email: email.trim().toLowerCase(), password_hash: passwordHash,
       family_code: familyCode, conditions: [],
       preferences: { voiceSpeed: "normal", theme: "default" },
       last_active: new Date().toISOString(),
@@ -1324,19 +1330,33 @@ app.get("/api/admin/alerts", adminAuth, async (req, res) => {
 // AUTH ENDPOINTS
 // ─────────────────────────────────────────────────────────────────────────────
 
-// Senior login — exchange family code for a 90-day senior token
+// Senior login — email+password OR family code → 90-day senior token
 app.post("/api/senior/login", rateLimit("login"), async (req, res) => {
   try {
-    const { familyCode } = req.body;
-    if (!familyCode) return res.status(400).json({ error: "Family code required" });
+    const { familyCode, email, password } = req.body;
+    let senior;
 
-    const { data: senior } = await supabase
-      .from("seniors")
-      .select("*")
-      .eq("family_code", familyCode.trim().toUpperCase())
-      .single();
+    if (email && password) {
+      // Email + password login
+      const { data } = await supabase.from("seniors").select("*")
+        .eq("email", email.trim().toLowerCase()).single();
+      if (!data) return res.status(401).json({ error: "Invalid email or password." });
 
-    if (!senior) return res.status(401).json({ error: "Invalid code. Please check and try again." });
+      // Verify password
+      if (!data.password_hash) return res.status(401).json({ error: "This account was created before passwords were required. Please use your family code to sign in." });
+      const [salt, storedHash] = data.password_hash.split(":");
+      const hash = crypto.pbkdf2Sync(password, salt, 100000, 64, "sha512").toString("hex");
+      if (hash !== storedHash) return res.status(401).json({ error: "Invalid email or password." });
+      senior = data;
+    } else if (familyCode) {
+      // Family code login
+      const { data } = await supabase.from("seniors").select("*")
+        .eq("family_code", familyCode.trim().toUpperCase()).single();
+      if (!data) return res.status(401).json({ error: "Invalid code. Please check and try again." });
+      senior = data;
+    } else {
+      return res.status(400).json({ error: "Email and password, or family code required." });
+    }
 
     const token = makeSeniorToken(senior.id);
     console.log(`✅ Senior login: ${senior.name} (${senior.id})`);

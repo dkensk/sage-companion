@@ -8,6 +8,7 @@ CREATE TABLE IF NOT EXISTS seniors (
   id            UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   name          TEXT NOT NULL,
   email         TEXT,
+  password_hash TEXT,
   age           INTEGER,
   family_code   TEXT UNIQUE NOT NULL,
   conditions    TEXT[]   DEFAULT '{}',
