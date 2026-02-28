@@ -242,9 +242,11 @@
       </div>
 
       <div class="field">
-        <label>Age (optional)</label>
+        <label>Age</label>
         <input type="number" id="ageInput" placeholder="e.g. 78" min="18" max="120"
-          onkeydown="if(event.key==='Enter') goStep(3)" />
+          oninput="document.getElementById('ageError').style.display='none'"
+          onkeydown="if(event.key==='Enter') document.getElementById('emailInput').focus()" />
+        <div class="error-msg" id="ageError">Please enter your age.</div>
       </div>
 
       <div class="field">
@@ -347,9 +349,16 @@
       const email = document.getElementById("emailInput").value.trim();
       const password = document.getElementById("passwordInput").value;
 
+      const age = document.getElementById("ageInput").value;
+
       if (!name) {
         document.getElementById("nameError").style.display = "block";
         document.getElementById("nameInput").focus();
+        return;
+      }
+      if (!age || parseInt(age) < 18 || parseInt(age) > 120) {
+        document.getElementById("ageError").style.display = "block";
+        document.getElementById("ageInput").focus();
         return;
       }
       if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {

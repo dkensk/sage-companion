@@ -1160,6 +1160,7 @@ app.post("/api/seniors", async (req, res) => {
   try {
     const { name, age, email, password } = req.body;
     if (!name) return res.status(400).json({ error: "Name is required" });
+    if (!age) return res.status(400).json({ error: "Age is required" });
     if (!email) return res.status(400).json({ error: "Email is required" });
     if (!password || password.length < 6) return res.status(400).json({ error: "Password must be at least 6 characters" });
 
