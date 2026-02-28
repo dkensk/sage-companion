@@ -256,7 +256,7 @@
           oninput="document.getElementById('emailError').style.display='none'"
           onkeydown="if(event.key==='Enter') document.getElementById('passwordInput').focus()" />
         <div class="error-msg" id="emailError">Please enter a valid email address.</div>
-        <div style="font-size:13px;color:#64748B;margin-top:6px;">Used for account login and medication reminders. Never shared.</div>
+        <div style="font-size:13px;color:#64748B;margin-top:6px;">Used for account login. Never shared.</div>
       </div>
 
       <div class="field">
@@ -371,7 +371,7 @@
         document.getElementById("passwordInput").focus();
         return;
       }
-      createProfile(name, email, password);
+      createProfile(name, parseInt(age), email, password);
     }
 
     document.querySelectorAll(".step").forEach(s => s.classList.remove("active"));
@@ -395,8 +395,7 @@
   // ── Create new profile ────────────────────────────────────────────────────
   let createdSenior = null;
 
-  async function createProfile(name, email, password) {
-    const age = document.getElementById("ageInput").value;
+  async function createProfile(name, age, email, password) {
     document.getElementById("step3Logo").textContent   = "⏳";
     document.getElementById("step3Title").textContent  = "Setting up Sage…";
     document.getElementById("step3Sub").textContent    = "Creating your personal profile. Just a moment!";
@@ -406,7 +405,7 @@
       const res = await fetch("/api/seniors", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ name, age: age ? parseInt(age) : null, email, password }),
+        body: JSON.stringify({ name, age, email, password }),
       });
 
       const data = await res.json();
