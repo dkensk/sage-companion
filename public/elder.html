@@ -849,7 +849,7 @@
 
   // Redirect to setup if no profile saved (and not the demo user)
   if (!localStorage.getItem("sageSeniorId") && !localStorage.getItem("sageDemo")) {
-    // Allow demo to pass through; new installs go to setup
+    window.location.href = "/setup";
   }
   let isListening = false;
   let recognition = null;
@@ -1750,10 +1750,11 @@
     localStorage.removeItem("sageSeniorToken");
     localStorage.removeItem("sageSeniorId");
     localStorage.removeItem("sageSeniorName");
-    location.reload();
+    localStorage.removeItem("sageFamilyCode");
+    localStorage.removeItem("sageDemo");
+    localStorage.removeItem("sageLocation");
+    window.location.href = "/";
   }
-
-  init();
 
   // ── Push Notification / Medication Reminders ──────────────────────────────────
   async function initReminders() {
