@@ -297,7 +297,10 @@
     <div class="section-title">🎙️ Record Your Visit</div>
 
     <div class="setup-row">
-      <input type="text" id="doctorNameInput" placeholder="Doctor's name (optional)" />
+      <select id="doctorNameSelect" onchange="handleDoctorSelect(this)" style="flex:1;min-width:160px;border:2px solid var(--border);border-radius:12px;padding:12px 14px;font-size:17px;outline:none;background:var(--bg);color:var(--text);transition:border-color 0.15s;appearance:none;-webkit-appearance:none;">
+        <option value="">Select a doctor (optional)</option>
+      </select>
+      <input type="text" id="doctorNameInput" placeholder="Or type a name…" style="display:none;" />
     </div>
 
     <button id="recordBtn" onclick="toggleRecording()">
@@ -380,8 +383,63 @@
   // ── Init ──────────────────────────────────────────────────────────────────
   async function init() {
     setupRecognition();
+    await loadDoctorNames();
     await loadQuestions();
     await loadPastVisits();
+  }
+
+  // ── Doctor name dropdown from appointments ─────────────────────────────
+  async function loadDoctorNames() {
+    try {
+      const res = await apiCall(`/api/doctor-visits/${SENIOR_ID}`);
+      const visits = await res.json();
+      const sel = document.getElementById("doctorNameSelect");
+      // Collect unique doctor names from past visits
+      const names = new Set();
+      if (visits && visits.length > 0) {
+        visits.forEach(v => { if (v.doctorName) names.add(v.doctorName); });
+      }
+      // Also try to pull doctor names from appointments
+      try {
+        const apptRes = await apiCall(`/api/appointments/${SENIOR_ID}`);
+        const appts = await apptRes.json();
+        if (appts && appts.length > 0) {
+          appts.forEach(a => {
+            const t = (a.title || "").toLowerCase();
+            // Extract "Dr. Name" patterns from appointment titles
+            const drMatch = (a.title || "").match(/(?:Dr\.?\s+|Doctor\s+)([A-Z][a-zA-Z]+(?:\s+[A-Z][a-zA-Z]+)?)/i);
+            if (drMatch) names.add(drMatch[1]);
+          });
+        }
+      } catch (e) { /* appointments optional */ }
+
+      names.forEach(name => {
+        const opt = document.createElement("option");
+        opt.value = name;
+        opt.textContent = `Dr. ${name}`;
+        sel.appendChild(opt);
+      });
+      // Always add "Other" option
+      const other = document.createElement("option");
+      other.value = "__other__";
+      other.textContent = "Other (type a name)";
+      sel.appendChild(other);
+    } catch (e) {
+      // If loading fails, just show the text input
+      document.getElementById("doctorNameSelect").style.display = "none";
+      document.getElementById("doctorNameInput").style.display = "block";
+    }
+  }
+
+  function handleDoctorSelect(sel) {
+    const inp = document.getElementById("doctorNameInput");
+    if (sel.value === "__other__") {
+      inp.style.display = "block";
+      inp.focus();
+    } else {
+      inp.style.display = "none";
+      inp.value = "";
+    }
   }
 
   // ── Recording ─────────────────────────────────────────────────────────────
@@ -500,7 +558,9 @@
     if (!transcript.trim()) return;
     if (isRecording) stopRecording();
 
-    const doctorName = document.getElementById("doctorNameInput").value.trim();
+    const sel = document.getElementById("doctorNameSelect");
+    const inp = document.getElementById("doctorNameInput");
+    const doctorName = (sel.value === "__other__" ? inp.value.trim() : sel.value) || "";
     const notes = document.getElementById("notesBox").value.trim();
 
     const btn = document.getElementById("saveBtn");
@@ -535,6 +595,7 @@
         btn.textContent = "💾 Save & Share with Family";
       }
     } catch (e) {
+      if (e.message === "Session expired") return; // apiCall handles redirect
       console.error("[DoctorVisit] Connection error:", e);
       showToast("Connection error — please try again.");
       btn.disabled = false;

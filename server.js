@@ -262,6 +262,66 @@ async function checkMedicationReminders() {
 // ── Middleware ────────────────────────────────────────────────────────────────
 app.use(express.json({ limit: "1mb" }));
 
+// ── Rate Limiting (in-memory, no dependencies) ──────────────────────────────
+const rateLimitMap = new Map();
+const RATE_WINDOW = 60 * 1000; // 1 minute window
+const RATE_LIMITS = {
+  login: { max: 5, window: RATE_WINDOW },       // 5 login attempts per minute
+  api: { max: 60, window: RATE_WINDOW },         // 60 API calls per minute
+  upload: { max: 10, window: RATE_WINDOW * 5 },  // 10 uploads per 5 minutes
+};
+
+function rateLimit(category = "api") {
+  return (req, res, next) => {
+    const ip = req.ip || req.connection.remoteAddress || "unknown";
+    const key = `${category}:${ip}`;
+    const limit = RATE_LIMITS[category] || RATE_LIMITS.api;
+    const now = Date.now();
+
+    let bucket = rateLimitMap.get(key);
+    if (!bucket || now - bucket.start > limit.window) {
+      bucket = { count: 0, start: now };
+      rateLimitMap.set(key, bucket);
+    }
+
+    bucket.count++;
+    if (bucket.count > limit.max) {
+      return res.status(429).json({ error: "Too many requests. Please wait a moment and try again." });
+    }
+    next();
+  };
+}
+
+// Clean up old rate limit entries every 5 minutes
+setInterval(() => {
+  const now = Date.now();
+  for (const [key, bucket] of rateLimitMap) {
+    if (now - bucket.start > RATE_LIMITS.api.window * 2) rateLimitMap.delete(key);
+  }
+}, 5 * 60 * 1000);
+
+// ── Input Sanitization ──────────────────────────────────────────────────────
+function sanitize(str) {
+  if (typeof str !== "string") return str;
+  return str
+    .replace(/[<>]/g, "")           // strip HTML angle brackets
+    .replace(/javascript:/gi, "")    // strip JS protocol
+    .replace(/on\w+\s*=/gi, "")      // strip inline event handlers
+    .trim()
+    .slice(0, 10000);                // cap length
+}
+
+function sanitizeBody(req, res, next) {
+  if (req.body && typeof req.body === "object") {
+    for (const key of Object.keys(req.body)) {
+      if (typeof req.body[key] === "string") {
+        req.body[key] = sanitize(req.body[key]);
+      }
+    }
+  }
+  next();
+}
+
 // Security headers + CORS
 app.use((req, res, next) => {
   res.setHeader("X-Content-Type-Options", "nosniff");
@@ -281,23 +341,7 @@ app.use((req, res, next) => {
   next();
 });
 
-// Simple in-memory rate limiter for expensive AI endpoints
-const rateBuckets = new Map();
-function rateLimit(windowMs, maxHits) {
-  return (req, res, next) => {
-    const ip = req.ip || req.connection.remoteAddress || "unknown";
-    const key = `${req.route?.path || req.path}:${ip}`;
-    const now = Date.now();
-    const bucket = rateBuckets.get(key) || { count: 0, resetAt: now + windowMs };
-    if (now > bucket.resetAt) { bucket.count = 0; bucket.resetAt = now + windowMs; }
-    bucket.count++;
-    rateBuckets.set(key, bucket);
-    if (bucket.count > maxHits) {
-      return res.status(429).json({ error: "Too many requests — please wait a moment." });
-    }
-    next();
-  };
-}
+app.use(sanitizeBody);
 
 app.use(express.static(path.join(__dirname, "public")));
 
@@ -371,7 +415,7 @@ app.get("/api/medications/scan/status", (req, res) => {
 });
 
 // POST /api/medications/scan — Claude Vision reads a medication bottle label
-app.post("/api/medications/scan", upload.single("image"), seniorAuth, async (req, res) => {
+app.post("/api/medications/scan", rateLimit("upload"), upload.single("image"), seniorAuth, async (req, res) => {
   try {
     if (!req.file) return res.status(400).json({ error: "No image provided" });
     const b64  = req.file.buffer.toString("base64");
@@ -966,7 +1010,7 @@ app.post("/api/appointments/parse", seniorAuth, async (req, res) => {
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
-app.post("/api/appointments/ocr", upload.single("image"), seniorAuth, async (req, res) => {
+app.post("/api/appointments/ocr", rateLimit("upload"), upload.single("image"), seniorAuth, async (req, res) => {
   try {
     if (!req.file) return res.status(400).json({ error: "No image provided" });
     const b64  = req.file.buffer.toString("base64");
@@ -1142,8 +1186,10 @@ app.post("/api/seniors", async (req, res) => {
       description: `${name} joined Sage Companion`, timestamp: new Date().toISOString(),
     });
 
+    // Issue a senior token so the user is logged in immediately after setup
+    const token = makeSeniorToken(senior.id);
     console.log(`✅ New user: ${name} | Family code: ${familyCode}`);
-    res.json({ success: true, senior: norm(senior) });
+    res.json({ success: true, senior: norm(senior), token });
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
@@ -1151,7 +1197,7 @@ app.post("/api/seniors", async (req, res) => {
 // ADMIN CRM API
 // ─────────────────────────────────────────────────────────────────────────────
 
-app.post("/api/admin/login", (req, res) => {
+app.post("/api/admin/login", rateLimit("login"), (req, res) => {
   const { password } = req.body;
   if (!password || password !== (process.env.ADMIN_PASSWORD || "admin123")) {
     return res.status(401).json({ error: "Wrong password" });
@@ -1279,7 +1325,7 @@ app.get("/api/admin/alerts", adminAuth, async (req, res) => {
 // ─────────────────────────────────────────────────────────────────────────────
 
 // Senior login — exchange family code for a 90-day senior token
-app.post("/api/senior/login", async (req, res) => {
+app.post("/api/senior/login", rateLimit("login"), async (req, res) => {
   try {
     const { familyCode } = req.body;
     if (!familyCode) return res.status(400).json({ error: "Family code required" });
@@ -1299,7 +1345,7 @@ app.post("/api/senior/login", async (req, res) => {
 });
 
 // Family login — exchange family code for a 30-day family token
-app.post("/api/family/login", async (req, res) => {
+app.post("/api/family/login", rateLimit("login"), async (req, res) => {
   try {
     const { familyCode } = req.body;
     if (!familyCode) return res.status(400).json({ error: "Family code required" });

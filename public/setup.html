@@ -358,10 +358,11 @@
 
       createdSenior = data.senior;
 
-      // Save to localStorage
+      // Save to localStorage (including auth token)
       localStorage.setItem("sageSeniorId",   data.senior._id);
       localStorage.setItem("sageSeniorName", data.senior.name);
       localStorage.setItem("sageFamilyCode", data.senior.familyCode);
+      if (data.token) localStorage.setItem("sageSeniorToken", data.token);
 
       // Show success state
       document.getElementById("step3Logo").textContent  = "✅";
@@ -405,6 +406,20 @@
       localStorage.setItem("sageSeniorId",   senior._id);
       localStorage.setItem("sageSeniorName", senior.name);
       localStorage.setItem("sageFamilyCode", senior.familyCode);
+      // Get auth token via login
+      if (senior.familyCode) {
+        try {
+          const loginRes = await fetch("/api/senior/login", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ familyCode: senior.familyCode }),
+          });
+          if (loginRes.ok) {
+            const loginData = await loginRes.json();
+            localStorage.setItem("sageSeniorToken", loginData.token);
+          }
+        } catch (e) { /* proceed without token, login screen will catch it */ }
+      }
       window.location.href = "/elder";
     } catch {
       document.getElementById("returningError").style.display = "block";
