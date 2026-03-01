@@ -741,8 +741,8 @@
             document.getElementById('accountMemberSince').textContent = formatted;
           }
 
-          // Load subscription
-          loadSubscription(data.subscriptionStatus);
+          // Load subscription from billing endpoint
+          loadSubscription();
         }
       } catch (error) {
         console.error('Error loading account info:', error);
@@ -751,17 +751,46 @@
     }
 
     // Load Subscription
-    async function loadSubscription(status) {
+    async function loadSubscription() {
       try {
+        const res = await apiCall('/api/billing/status');
+        if (!res.ok) throw new Error('Failed to load billing');
+        const billing = await res.json();
+
         const subscriptionContent = document.getElementById('subscriptionContent');
         const planBadge = document.getElementById('planBadge');
 
-        if (status === 'free') {
-          planBadge.textContent = 'Free Plan';
+        if (billing.status === 'trialing') {
+          const trialEnd = billing.trialEndsAt ? new Date(billing.trialEndsAt) : null;
+          const daysLeft = trialEnd ? Math.max(0, Math.ceil((trialEnd - Date.now()) / (1000 * 60 * 60 * 24))) : '?';
+          planBadge.textContent = 'Free Trial';
+          planBadge.className = 'plan-badge';
+          planBadge.style.background = '#0F766E';
+          subscriptionContent.innerHTML = `
+            <div class="subscription-status">
+              <div class="plan-badge" style="background:#0F766E;">Free Trial — ${daysLeft} day${daysLeft !== 1 ? 's' : ''} left</div>
+              <p style="color: #64748B; font-size: 1.025rem;">Your trial is active. You'll be charged when it ends.</p>
+            </div>
+            <button class="manage-button" onclick="manageSubscription()">Manage Subscription</button>
+          `;
+        } else if (billing.status === 'active') {
+          const planLabel = billing.plan === 'yearly' ? 'Premium Yearly' : 'Premium Monthly';
+          planBadge.textContent = planLabel;
+          planBadge.className = 'plan-badge';
+          subscriptionContent.innerHTML = `
+            <div class="subscription-status">
+              <div class="plan-badge">${planLabel}</div>
+              <p style="color: #64748B; font-size: 1.025rem;">Your subscription is active</p>
+            </div>
+            <button class="manage-button" onclick="manageSubscription()">Manage Subscription</button>
+          `;
+        } else if (billing.status === 'cancelled' || billing.status === 'past_due') {
+          planBadge.textContent = billing.status === 'past_due' ? 'Payment Failed' : 'Cancelled';
           planBadge.className = 'plan-badge free';
           subscriptionContent.innerHTML = `
             <div class="subscription-status">
-              <div class="plan-badge free">Free Plan</div>
+              <div class="plan-badge free">${billing.status === 'past_due' ? 'Payment Failed' : 'Subscription Cancelled'}</div>
+              <p style="color: #64748B; font-size: 1.025rem;">${billing.status === 'past_due' ? 'Please update your payment method.' : 'Subscribe again to continue using Sage.'}</p>
             </div>
             <div class="subscription-buttons">
               <button class="subscription-button" onclick="subscribe('monthly')">
@@ -775,19 +804,27 @@
               </button>
             </div>
           `;
-        } else if (status === 'active' || status === 'premium') {
-          planBadge.textContent = 'Premium';
-          planBadge.className = 'plan-badge';
+        } else {
+          // No subscription — show pricing with 7-day trial
+          planBadge.textContent = 'No Plan';
+          planBadge.className = 'plan-badge free';
           subscriptionContent.innerHTML = `
             <div class="subscription-status">
-              <div class="plan-badge">Premium</div>
-              <p style="color: #64748B; font-size: 1.025rem;">Your subscription is active</p>
+              <div class="plan-badge free">No Active Plan</div>
+              <p style="color: #64748B; font-size: 1.025rem;">Start your 7-day free trial today</p>
             </div>
-            <button class="manage-button" onclick="manageSubscription()">Manage Subscription</button>
-          `;
-        } else {
-          subscriptionContent.innerHTML = `
-            <p class="coming-soon">Subscription management coming soon</p>
+            <div class="subscription-buttons">
+              <button class="subscription-button" onclick="subscribe('monthly')">
+                <div class="subscription-button-price">$9.99</div>
+                <div class="subscription-button-period">Per Month</div>
+                <div class="subscription-button-saving">7-day free trial</div>
+              </button>
+              <button class="subscription-button" onclick="subscribe('yearly')">
+                <div class="subscription-button-price">$89.99</div>
+                <div class="subscription-button-period">Per Year</div>
+                <div class="subscription-button-saving">Save 25% · 7-day free trial</div>
+              </button>
+            </div>
           `;
         }
       } catch (error) {

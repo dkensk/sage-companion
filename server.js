@@ -294,12 +294,16 @@ app.post("/api/stripe/webhook", express.raw({ type: "application/json" }), async
         const session = event.data.object;
         const seniorId = session.metadata?.seniorId;
         if (seniorId) {
+          // Check if subscription is in trial
+          const sub = session.subscription ? await stripe.subscriptions.retrieve(session.subscription) : null;
+          const isTrial = sub?.status === "trialing";
           await supabase.from("seniors").update({
             stripe_customer_id: session.customer,
-            subscription_status: "active",
+            subscription_status: isTrial ? "trialing" : "active",
             subscription_plan: session.metadata?.plan || "premium",
+            trial_ends_at: isTrial && sub.trial_end ? new Date(sub.trial_end * 1000).toISOString() : null,
           }).eq("id", seniorId);
-          console.log(`[Stripe] ✅ Subscription activated for ${seniorId}`);
+          console.log(`[Stripe] ✅ Subscription ${isTrial ? "trial started" : "activated"} for ${seniorId}`);
         }
         break;
       }
@@ -308,10 +312,11 @@ app.post("/api/stripe/webhook", express.raw({ type: "application/json" }), async
         const { data: senior } = await supabase.from("seniors").select("id")
           .eq("stripe_customer_id", sub.customer).single();
         if (senior) {
-          await supabase.from("seniors").update({
-            subscription_status: sub.status === "active" ? "active" : sub.status,
-          }).eq("id", senior.id);
-          console.log(`[Stripe] Subscription updated: ${sub.status} for ${senior.id}`);
+          const status = sub.status === "trialing" ? "trialing" : sub.status === "active" ? "active" : sub.status;
+          const updates = { subscription_status: status };
+          if (sub.trial_end) updates.trial_ends_at = new Date(sub.trial_end * 1000).toISOString();
+          await supabase.from("seniors").update(updates).eq("id", senior.id);
+          console.log(`[Stripe] Subscription updated: ${status} for ${senior.id}`);
         }
         break;
       }
@@ -1594,16 +1599,21 @@ app.post("/api/billing/checkout", seniorAuth, async (req, res) => {
       mode: "subscription",
       payment_method_types: ["card"],
       line_items: [{ price: priceId, quantity: 1 }],
+      subscription_data: {
+        trial_period_days: 7,
+        metadata: { seniorId: req.seniorId, plan },
+      },
       success_url: `${req.protocol}://${req.get("host")}/settings?billing=success`,
       cancel_url: `${req.protocol}://${req.get("host")}/settings?billing=cancelled`,
       metadata: { seniorId: req.seniorId, plan },
       customer_email: senior.email,
     };
 
-    // Reuse existing Stripe customer if available
+    // Reuse existing Stripe customer if available — skip trial if they already had one
     if (senior.stripe_customer_id) {
       sessionParams.customer = senior.stripe_customer_id;
       delete sessionParams.customer_email;
+      delete sessionParams.subscription_data.trial_period_days; // no second free trial
     }
 
     const session = await stripe.checkout.sessions.create(sessionParams);
@@ -1617,11 +1627,12 @@ app.post("/api/billing/checkout", seniorAuth, async (req, res) => {
 // Get subscription status
 app.get("/api/billing/status", seniorAuth, async (req, res) => {
   try {
-    const { data: senior } = await supabase.from("seniors").select("subscription_status, subscription_plan, stripe_customer_id").eq("id", req.seniorId).single();
+    const { data: senior } = await supabase.from("seniors").select("subscription_status, subscription_plan, stripe_customer_id, trial_ends_at").eq("id", req.seniorId).single();
     if (!senior) return res.status(404).json({ error: "Account not found" });
     res.json({
-      status: senior.subscription_status || "free",
-      plan: senior.subscription_plan || "free",
+      status: senior.subscription_status || "none",
+      plan: senior.subscription_plan || "none",
+      trialEndsAt: senior.trial_ends_at || null,
       hasStripe: !!senior.stripe_customer_id,
     });
   } catch (e) { res.status(500).json({ error: e.message }); }
