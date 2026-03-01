@@ -40,7 +40,7 @@ const STRIPE_PRICE_YEARLY   = process.env.STRIPE_PRICE_YEARLY   || ""; // Stripe
 
 // ── Resend (transactional email) ──────────────────────────────────────────────
 const resend = process.env.RESEND_API_KEY ? new Resend(process.env.RESEND_API_KEY) : null;
-const FROM_EMAIL = process.env.FROM_EMAIL || "Sage Companion <noreply@sagecompanion.com>";
+const FROM_EMAIL = process.env.FROM_EMAIL || "Sage Companion <hello@mysagecompanion.com>";
 
 // ── Demo senior ID ────────────────────────────────────────────────────────────
 const DEMO_SENIOR_ID = "00000000-0000-0000-0000-000000000001";
@@ -48,7 +48,7 @@ const DEMO_SENIOR_ID = "00000000-0000-0000-0000-000000000001";
 // ── Web Push (VAPID) setup ────────────────────────────────────────────────────
 const VAPID_PUBLIC  = process.env.VAPID_PUBLIC_KEY  || "";
 const VAPID_PRIVATE = process.env.VAPID_PRIVATE_KEY || "";
-const VAPID_EMAIL   = process.env.VAPID_EMAIL        || "mailto:hello@sagecompanion.com";
+const VAPID_EMAIL   = process.env.VAPID_EMAIL        || "mailto:hello@mysagecompanion.com";
 
 if (VAPID_PUBLIC && VAPID_PRIVATE) {
   webpush.setVapidDetails(VAPID_EMAIL, VAPID_PUBLIC, VAPID_PRIVATE);
