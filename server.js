@@ -159,7 +159,7 @@ function verifySeniorToken(token) {
   } catch { return null; }
 }
 
-async function seniorAuth(req, res, next) {
+function seniorAuth(req, res, next) {
   // Allow demo senior through without a token
   const seniorId = req.params.seniorId || req.body?.seniorId;
   if (seniorId === DEMO_SENIOR_ID) { req.seniorId = DEMO_SENIOR_ID; return next(); }
@@ -170,16 +170,18 @@ async function seniorAuth(req, res, next) {
     console.log(`[Auth] seniorAuth REJECTED — path: ${req.path}, hasToken: ${!!token}, tokenPreview: ${token ? token.substring(0, 20) : "NONE"}`);
     return res.status(401).json({ error: "Please log in to continue" });
   }
+  req.seniorId = payload.seniorId;
+  next();
+}
 
-  // Check if user is suspended
+// Middleware to check if user is suspended (used on key endpoints only)
+async function suspendCheck(req, res, next) {
   try {
-    const { data } = await supabase.from("seniors").select("suspended").eq("id", payload.seniorId).single();
+    const { data } = await supabase.from("seniors").select("suspended").eq("id", req.seniorId).single();
     if (data?.suspended) {
       return res.status(403).json({ error: "Your account has been suspended. Please contact support@mysagecompanion.com." });
     }
   } catch {}
-
-  req.seniorId = payload.seniorId;
   next();
 }
 
@@ -617,7 +619,7 @@ app.post("/api/emergency", seniorAuth, async (req, res) => {
 // CHAT
 // ─────────────────────────────────────────────────────────────────────────────
 
-app.post("/api/chat", seniorAuth, rateLimit(60000, 20), async (req, res) => {
+app.post("/api/chat", seniorAuth, suspendCheck, rateLimit(60000, 20), async (req, res) => {
   try {
     const { seniorId, message, sessionId, clientTime, timezone, location } = req.body;
     if (!message) return res.status(400).json({ error: "Message required" });
@@ -1363,14 +1365,6 @@ app.get("/api/admin/stats", adminAuth, async (req, res) => {
 
     res.json({ totalUsers, activeToday, chatsThisWeek, totalEmergencies, newThisWeek, medsThisWeek, totalAppointments });
   } catch (e) { res.status(500).json({ error: e.message }); }
-});
-
-// Temporary debug endpoint — remove after testing
-app.get("/api/debug/users-check", async (req, res) => {
-  try {
-    const { data, error, count } = await supabase.from("seniors").select("id, name, email, family_code", { count: "exact" });
-    res.json({ count, error: error?.message || null, sample: (data || []).slice(0, 2).map(s => ({ id: s.id, name: s.name })) });
-  } catch (e) { res.json({ error: e.message }); }
 });
 
 app.get("/api/admin/users", adminAuth, async (req, res) => {
