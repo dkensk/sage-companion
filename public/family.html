@@ -822,25 +822,41 @@
   }
 
   function showTab(name, navEl, mobEl) {
-    var tabs = ["overview","meds","activity","alerts","convo","doctorq","visits","calendar"];
-    for (var i = 0; i < tabs.length; i++) { document.getElementById("tab-" + tabs[i]).classList.remove("active"); }
-    document.querySelectorAll(".nav-item").forEach(function(el) { el.classList.remove("active"); });
-    document.querySelectorAll(".mob-tab").forEach(function(el) { el.classList.remove("active"); });
-    document.getElementById("tab-" + name).classList.add("active");
-    if (navEl) navEl.classList.add("active");
-    if (mobEl) mobEl.classList.add("active");
-    // Also sync the other nav (sidebar ↔ mobile)
-    var sidebarNav = document.querySelector('.nav-item[onclick*="showTab(\'" + name + "\'"]');
-    if (!navEl) { document.querySelectorAll(".nav-item").forEach(function(el) { if (el.getAttribute("onclick") && el.getAttribute("onclick").indexOf("'" + name + "'") > -1) el.classList.add("active"); }); }
-    if (!mobEl) { document.querySelectorAll(".mob-tab").forEach(function(el) { if (el.getAttribute("data-tab") === name) el.classList.add("active"); }); }
-    activeTab = name;
-    console.log("[Family] showTab:", name);
     try {
+      var tabs = ["overview","meds","activity","alerts","convo","doctorq","visits","calendar"];
+      for (var i = 0; i < tabs.length; i++) { document.getElementById("tab-" + tabs[i]).classList.remove("active"); }
+      document.getElementById("tab-" + name).classList.add("active");
+
+      // Clear all nav highlights
+      document.querySelectorAll(".nav-item").forEach(function(el) { el.classList.remove("active"); });
+      document.querySelectorAll(".mob-tab").forEach(function(el) { el.classList.remove("active"); });
+
+      // Highlight the clicked nav element
+      if (navEl) navEl.classList.add("active");
+      if (mobEl) mobEl.classList.add("active");
+
+      // Sync sidebar and mobile nav highlights
+      if (!navEl) {
+        document.querySelectorAll(".nav-item").forEach(function(el) {
+          var oc = el.getAttribute("onclick") || "";
+          if (oc.indexOf("'" + name + "'") > -1) el.classList.add("active");
+        });
+      }
+      if (!mobEl) {
+        document.querySelectorAll(".mob-tab").forEach(function(el) {
+          if (el.getAttribute("data-tab") === name) el.classList.add("active");
+        });
+      }
+
+      activeTab = name;
+      console.log("[Family] showTab:", name);
+
+      // Load tab data
       if (name === "convo")    loadConversations().catch(function(e) { console.error("[Family] convo tab error:", e); });
       if (name === "doctorq")  loadDoctorQuestions().catch(function(e) { console.error("[Family] doctorq tab error:", e); });
       if (name === "visits")   loadVisits().catch(function(e) { console.error("[Family] visits tab error:", e); });
       if (name === "calendar") loadCalendar().catch(function(e) { console.error("[Family] calendar tab error:", e); });
-    } catch (e) { console.error("[Family] showTab sync error:", e); }
+    } catch (e) { console.error("[Family] showTab error:", e); }
   }
 
   async function loadCalendar() {
