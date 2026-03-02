@@ -643,6 +643,34 @@
 </head>
 <body>
 
+<!-- ── Consent / Welcome Screen (first use only) ── -->
+<div id="consentScreen" style="display:none; position:fixed; inset:0; background:var(--bg); z-index:250; align-items:center; justify-content:center; padding:24px; overflow-y:auto;">
+  <div style="background:white; border-radius:24px; padding:40px 28px; max-width:460px; width:100%; text-align:center; box-shadow:0 8px 32px rgba(0,0,0,0.12); margin:auto;">
+    <div style="font-size:56px; margin-bottom:16px;">🌿</div>
+    <h2 style="font-size:26px; font-weight:900; color:var(--navy); margin-bottom:12px;">Welcome to Sage Companion</h2>
+    <p style="font-size:18px; color:var(--text); line-height:1.6; margin-bottom:20px; text-align:left;">
+      Before we get started, here's what you should know:
+    </p>
+    <div style="background:#F8FAFC; border-radius:16px; padding:20px; text-align:left; margin-bottom:20px; border:1px solid var(--border);">
+      <p style="font-size:17px; color:var(--text); line-height:1.6; margin-bottom:14px;">
+        <strong>Your conversations are saved</strong> so your family caregiver can stay informed about your health and wellbeing.
+      </p>
+      <p style="font-size:17px; color:var(--text); line-height:1.6; margin-bottom:14px;">
+        <strong>Your family can see</strong> your medications, doctor questions, appointments, and chat history to help coordinate your care.
+      </p>
+      <p style="font-size:17px; color:var(--text); line-height:1.6; margin-bottom:0;">
+        <strong>Sage is not a doctor.</strong> It cannot give medical advice. Always consult your doctor for health concerns.
+      </p>
+    </div>
+    <p style="font-size:14px; color:var(--muted); margin-bottom:20px; line-height:1.5;">
+      By continuing, you agree to our <a href="/terms" target="_blank" style="color:var(--navy); font-weight:600;">Terms of Service</a> and <a href="/privacy" target="_blank" style="color:var(--navy); font-weight:600;">Privacy Policy</a>.
+    </p>
+    <button onclick="acceptConsent()" style="width:100%; background:var(--navy); color:white; border:none; border-radius:16px; padding:18px; font-size:20px; font-weight:700; cursor:pointer; box-shadow:0 4px 16px rgba(30,58,138,0.3);">
+      I Understand — Let's Go
+    </button>
+  </div>
+</div>
+
 <!-- Login Screen -->
 <div id="loginScreen" style="display:none; position:fixed; inset:0; background:var(--bg); z-index:200; align-items:center; justify-content:center; padding:24px;">
   <div style="background:white; border-radius:24px; padding:40px 28px; max-width:400px; width:100%; text-align:center; box-shadow:0 8px 32px rgba(0,0,0,0.12);">
@@ -1087,9 +1115,27 @@
   let recognition = null;
   let userLocation = localStorage.getItem("sageLocation") || null;
 
-  // Check auth on load — show login if needed, then init
+  // ── Consent screen (first use) ───────────────────────────────────────────────
+  function needsConsent() {
+    return !localStorage.getItem("sageConsentAcknowledged");
+  }
+
+  function showConsent() {
+    document.getElementById("consentScreen").style.display = "flex";
+  }
+
+  function acceptConsent() {
+    localStorage.setItem("sageConsentAcknowledged", Date.now().toString());
+    document.getElementById("consentScreen").style.display = "none";
+    init();
+  }
+
+  // Check auth on load — show login if needed, then consent, then init
   checkSeniorAuth().then(authed => {
-    if (authed) init();
+    if (authed) {
+      if (needsConsent()) { showConsent(); }
+      else { init(); }
+    }
   });
 
   // Get location once and cache it
@@ -2117,6 +2163,7 @@
     localStorage.removeItem("sageFamilyCode");
     localStorage.removeItem("sageDemo");
     localStorage.removeItem("sageLocation");
+    localStorage.removeItem("sageConsentAcknowledged");
     window.location.href = "/";
   }
 
