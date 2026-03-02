@@ -524,7 +524,7 @@
         onkeydown="if(event.key==='Enter') doLogin()" autocomplete="current-password" />
     </div>
 
-    <button class="login-btn" onclick="doLogin()">Sign In →</button>
+    <button class="login-btn" id="loginBtn" onclick="doLogin()">Sign In →</button>
     <div class="login-error" id="loginError">Incorrect password. Please try again.</div>
   </div>
 </div>
@@ -698,10 +698,20 @@
   // ── Auth ──────────────────────────────────────────────────────────────────
   const TOKEN_KEY = "sageAdminToken";
   let adminToken = localStorage.getItem(TOKEN_KEY) || "";
+  let loginAttempts = 0;
 
   async function doLogin() {
     const pwd = document.getElementById("loginPwd").value;
-    if (!pwd) return;
+    const errEl = document.getElementById("loginError");
+    const btn = document.getElementById("loginBtn");
+    if (!pwd) {
+      errEl.textContent = "Please enter a password.";
+      errEl.style.display = "block";
+      return;
+    }
+
+    btn.textContent = "Signing in…";
+    btn.disabled = true;
 
     try {
       const res = await fetch("/api/admin/login", {
@@ -712,12 +722,23 @@
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Wrong password");
 
+      loginAttempts = 0;
       adminToken = data.token;
       localStorage.setItem(TOKEN_KEY, adminToken);
       enterApp();
     } catch (e) {
-      document.getElementById("loginError").style.display = "block";
-      document.getElementById("loginError").textContent = e.message;
+      loginAttempts++;
+      errEl.style.display = "block";
+      if (loginAttempts >= 5) {
+        errEl.textContent = `Wrong password (${loginAttempts} attempts). Please verify your ADMIN_PASSWORD in Render.`;
+      } else {
+        errEl.textContent = `Wrong password. Attempt ${loginAttempts} of 5.`;
+      }
+      document.getElementById("loginPwd").value = "";
+      document.getElementById("loginPwd").focus();
+    } finally {
+      btn.textContent = "Sign In →";
+      btn.disabled = false;
     }
   }
 

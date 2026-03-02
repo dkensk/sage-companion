@@ -1299,7 +1299,9 @@ app.post("/api/seniors", async (req, res) => {
 
 app.post("/api/admin/login", rateLimit("login"), (req, res) => {
   const { password } = req.body;
-  if (!password || password !== (process.env.ADMIN_PASSWORD || "admin123")) {
+  const expected = process.env.ADMIN_PASSWORD || "admin123";
+  console.log(`[Admin] Login attempt — password length: ${password?.length || 0}, expected length: ${expected.length}, match: ${password === expected}`);
+  if (!password || password !== expected) {
     return res.status(401).json({ error: "Wrong password" });
   }
   res.json({ token: adminToken() });
