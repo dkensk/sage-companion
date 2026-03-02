@@ -177,6 +177,24 @@ function makeSeniorToken(seniorId) {
   return `${payload}.${sig}`;
 }
 
+// ── Calendar feed token (non-expiring, for webcal:// subscriptions) ──────────
+function makeCalendarFeedToken(seniorId) {
+  const payload = Buffer.from(JSON.stringify({ seniorId, type: "calendar_feed" })).toString("base64url");
+  const sig = crypto.createHmac("sha256", SENIOR_TOKEN_SECRET).update(payload).digest("hex");
+  return `${payload}.${sig}`;
+}
+function verifyCalendarFeedToken(token) {
+  try {
+    const [payload, sig] = (token || "").split(".");
+    if (!payload || !sig) return null;
+    const expected = crypto.createHmac("sha256", SENIOR_TOKEN_SECRET).update(payload).digest("hex");
+    if (sig !== expected) return null;
+    const data = JSON.parse(Buffer.from(payload, "base64url").toString());
+    if (data.type !== "calendar_feed") return null;
+    return data; // no expiry check — feed tokens are permanent
+  } catch { return null; }
+}
+
 function verifySeniorToken(token) {
   try {
     const [payload, sig] = (token || "").split(".");
@@ -1205,12 +1223,13 @@ app.post("/api/appointments/ocr", rateLimit("upload"), upload.single("image"), s
 app.get("/api/calendar/:seniorId/feed.ics", validateUUID("seniorId"), async (req, res) => {
   try {
     const { seniorId } = req.params;
-    // Verify access: accept either a valid token header or a ?token= query param
+    // Verify access: accept senior/family token (header or query) or calendar feed token (query)
     const queryToken = req.query.token;
     const headerToken = req.headers["x-senior-token"] || req.headers["x-family-token"];
-    const isValidSenior = verifySeniorToken(headerToken || queryToken);
-    const isValidFamily = verifyFamilyToken(headerToken || queryToken);
-    if (!isValidSenior && !isValidFamily) {
+    const isValidSenior   = verifySeniorToken(headerToken || queryToken);
+    const isValidFamily   = verifyFamilyToken(headerToken || queryToken);
+    const isValidFeed     = verifyCalendarFeedToken(queryToken);
+    if (!isValidSenior && !isValidFamily && !isValidFeed) {
       return res.status(401).json({ error: "Authentication required — pass token as query param or header" });
     }
     const { data: senior } = await supabase.from("seniors").select("name").eq("id", seniorId).single();
@@ -1232,6 +1251,11 @@ app.get("/api/calendar/:seniorId/feed.ics", validateUUID("seniorId"), async (req
     res.setHeader("Content-Disposition", `attachment; filename="sage-companion.ics"`);
     res.send(cal);
   } catch (e) { res.status(500).json({ error: "Calendar feed error" }); }
+});
+
+// GET /api/calendar/:seniorId/feed-token — returns a permanent feed token for webcal subscriptions
+app.get("/api/calendar/:seniorId/feed-token", anyAuth, validateUUID("seniorId"), async (req, res) => {
+  res.json({ token: makeCalendarFeedToken(req.params.seniorId) });
 });
 
 // ── Google Calendar OAuth ─────────────────────────────────────────────────────

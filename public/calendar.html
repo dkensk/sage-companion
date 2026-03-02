@@ -645,10 +645,16 @@
   }
 
   // ── Apple Calendar ──────────────────────────────────────────────────────────
-  function subscribeApple() {
-    const webcal = `webcal://${window.location.host}/api/calendar/${SENIOR_ID}/feed.ics`;
-    window.location.href = webcal;
-    showToast("Opening Apple Calendar subscription…");
+  async function subscribeApple() {
+    try {
+      const res = await apiCall(`/api/calendar/${SENIOR_ID}/feed-token`);
+      const { token } = await res.json();
+      const webcal = `webcal://${window.location.host}/api/calendar/${SENIOR_ID}/feed.ics?token=${encodeURIComponent(token)}`;
+      window.location.href = webcal;
+      showToast("Opening Apple Calendar subscription…");
+    } catch (e) {
+      showToast("Could not generate calendar link. Please try again.");
+    }
   }
 
   // ── Utilities ───────────────────────────────────────────────────────────────
