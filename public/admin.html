@@ -1022,56 +1022,87 @@
 
       // Users tab: full table
       document.getElementById("usersCount").textContent =
-        `${allUsers.length} user${allUsers.length !== 1 ? "s" : ""} total`;
-      renderUsers(allUsers);
+        allUsers.length + ' user' + (allUsers.length !== 1 ? 's' : '') + ' total';
+
+      if (allUsers.length) {
+        var usersHtml = '';
+        for (var i = 0; i < allUsers.length; i++) {
+          var u = allUsers[i];
+          usersHtml += '<tr>';
+          usersHtml += '<td style="cursor:pointer" onclick="openDetail(\'' + u._id + '\')"><div class="user-name">' + esc(u.name) + '</div><div class="user-email">Age ' + (u.age || '—') + '</div></td>';
+          usersHtml += '<td><span style="font-weight:700;letter-spacing:1px">' + esc(u.familyCode) + '</span></td>';
+          usersHtml += '<td>' + fmtDate(u.createdAt) + '</td>';
+          usersHtml += '<td>' + timeAgo(u.lastActive) + '</td>';
+          usersHtml += '<td>' + (u.totalChats || 0) + '</td>';
+          usersHtml += '<td>' + activeStatus(u.lastActive, u.suspended) + '</td>';
+          usersHtml += '<td><button class="suspend-btn' + (u.suspended ? ' reactivate' : '') + '" onclick="event.stopPropagation(); toggleSuspend(\'' + u._id + '\',' + (!u.suspended) + ')">' + (u.suspended ? 'Reactivate' : 'Suspend') + '</button></td>';
+          usersHtml += '</tr>';
+        }
+        document.getElementById("usersBody").innerHTML = usersHtml;
+      } else {
+        document.getElementById("usersBody").innerHTML =
+          '<tr><td colspan="7" class="table-empty">No users found</td></tr>';
+      }
     } catch (e) {
       document.getElementById("recentUsersBody").innerHTML =
         '<tr><td colspan="4" class="table-empty">Error loading users</td></tr>';
       document.getElementById("usersBody").innerHTML =
-        '<tr><td colspan="7" class="table-empty">Error loading users</td></tr>';
+        '<tr><td colspan="7" class="table-empty">Error: ' + (e.message || 'unknown') + '</td></tr>';
     }
   }
 
   // ── Users page ────────────────────────────────────────────────────────────
   let allUsers = [];
 
-  function loadUsers() {
-    // Users are loaded by loadOverview — just re-render if data exists
-    if (allUsers.length) renderUsers(allUsers);
-  }
-
-  function renderUsers(users) {
-    if (!users || !users.length) {
+  async function loadUsers() {
+    // Standalone reload for Users tab (called by Refresh button and after suspend)
+    try {
+      var res = await fetch("/api/admin/users", { headers: adminHeaders() });
+      if (res.status === 401) { doLogout(); return; }
+      var data = await res.json();
+      if (!Array.isArray(data)) return;
+      allUsers = data;
+      document.getElementById("usersCount").textContent =
+        allUsers.length + ' user' + (allUsers.length !== 1 ? 's' : '') + ' total';
+      var html = '';
+      for (var i = 0; i < allUsers.length; i++) {
+        var u = allUsers[i];
+        html += '<tr>';
+        html += '<td style="cursor:pointer" onclick="openDetail(\'' + u._id + '\')"><div class="user-name">' + esc(u.name) + '</div><div class="user-email">Age ' + (u.age || '—') + '</div></td>';
+        html += '<td><span style="font-weight:700;letter-spacing:1px">' + esc(u.familyCode) + '</span></td>';
+        html += '<td>' + fmtDate(u.createdAt) + '</td>';
+        html += '<td>' + timeAgo(u.lastActive) + '</td>';
+        html += '<td>' + (u.totalChats || 0) + '</td>';
+        html += '<td>' + activeStatus(u.lastActive, u.suspended) + '</td>';
+        html += '<td><button class="suspend-btn' + (u.suspended ? ' reactivate' : '') + '" onclick="event.stopPropagation(); toggleSuspend(\'' + u._id + '\',' + (!u.suspended) + ')">' + (u.suspended ? 'Reactivate' : 'Suspend') + '</button></td>';
+        html += '</tr>';
+      }
+      document.getElementById("usersBody").innerHTML = html || '<tr><td colspan="7" class="table-empty">No users found</td></tr>';
+    } catch (e) {
       document.getElementById("usersBody").innerHTML =
-        '<tr><td colspan="7" class="table-empty">No users found</td></tr>';
-      return;
+        '<tr><td colspan="7" class="table-empty">Error loading users</td></tr>';
     }
-    document.getElementById("usersBody").innerHTML = users.map(u => `
-      <tr>
-        <td style="cursor:pointer;" onclick="openDetail('${u._id}')">
-          <div class="user-name">${esc(u.name)}</div>
-          <div class="user-email">Age ${u.age || "—"}</div>
-        </td>
-        <td><span style="font-weight:700;letter-spacing:1px;">${esc(u.familyCode)}</span></td>
-        <td>${fmtDate(u.createdAt)}</td>
-        <td>${timeAgo(u.lastActive)}</td>
-        <td>${u.totalChats ?? 0}</td>
-        <td>${activeStatus(u.lastActive, u.suspended)}</td>
-        <td>
-          <button class="suspend-btn ${u.suspended ? 'reactivate' : ''}"
-            onclick="event.stopPropagation(); toggleSuspend('${u._id}', ${!u.suspended})">
-            ${u.suspended ? 'Reactivate' : 'Suspend'}
-          </button>
-        </td>
-      </tr>
-    `).join("");
   }
 
   function filterUsers() {
-    const q = document.getElementById("userSearch").value.toLowerCase();
-    renderUsers(allUsers.filter(u =>
-      u.name.toLowerCase().includes(q) || (u.familyCode || "").toLowerCase().includes(q)
-    ));
+    var q = document.getElementById("userSearch").value.toLowerCase();
+    var filtered = allUsers.filter(function(u) {
+      return u.name.toLowerCase().indexOf(q) >= 0 || (u.familyCode || "").toLowerCase().indexOf(q) >= 0;
+    });
+    var html = '';
+    for (var i = 0; i < filtered.length; i++) {
+      var u = filtered[i];
+      html += '<tr>';
+      html += '<td style="cursor:pointer" onclick="openDetail(\'' + u._id + '\')"><div class="user-name">' + esc(u.name) + '</div><div class="user-email">Age ' + (u.age || '—') + '</div></td>';
+      html += '<td><span style="font-weight:700;letter-spacing:1px">' + esc(u.familyCode) + '</span></td>';
+      html += '<td>' + fmtDate(u.createdAt) + '</td>';
+      html += '<td>' + timeAgo(u.lastActive) + '</td>';
+      html += '<td>' + (u.totalChats || 0) + '</td>';
+      html += '<td>' + activeStatus(u.lastActive, u.suspended) + '</td>';
+      html += '<td><button class="suspend-btn' + (u.suspended ? ' reactivate' : '') + '" onclick="event.stopPropagation(); toggleSuspend(\'' + u._id + '\',' + (!u.suspended) + ')">' + (u.suspended ? 'Reactivate' : 'Suspend') + '</button></td>';
+      html += '</tr>';
+    }
+    document.getElementById("usersBody").innerHTML = html || '<tr><td colspan="7" class="table-empty">No users found</td></tr>';
   }
 
   // ── Alerts page ───────────────────────────────────────────────────────────
