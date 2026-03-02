@@ -1293,6 +1293,7 @@
           clientTime: new Date().toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit" }),
           timezone:   Intl.DateTimeFormat().resolvedOptions().timeZone,
           location:   userLocation,
+          includeTTS: true,
         })
       });
       const data = await res.json();
@@ -1300,7 +1301,12 @@
 
       if (data.reply) {
         addBubble("assistant", data.reply);
-        speak(data.reply);
+        // If server bundled TTS audio, play it directly (saves a whole round-trip)
+        if (data.audioBase64) {
+          playBase64Audio(data.audioBase64);
+        } else {
+          speak(data.reply);
+        }
         // If an appointment was saved, show confirmation card
         if (data.appointment) {
           addAppointmentCard(data.appointment);
@@ -1565,6 +1571,49 @@
       .replace(/\n+/g, " ")
       .replace(/\s{2,}/g, " ")
       .trim();
+  }
+
+  // ── Play base64-encoded audio from bundled chat+TTS response ────────────────
+  async function playBase64Audio(b64) {
+    stopCurrentAudio();
+    setSpeakingIndicator(true);
+    try {
+      const raw = atob(b64);
+      const arr = new Uint8Array(raw.length);
+      for (let i = 0; i < raw.length; i++) arr[i] = raw.charCodeAt(i);
+
+      // Try Web Audio API first
+      if (ttsAudioCtx) {
+        try {
+          if (ttsAudioCtx.state === "suspended") await ttsAudioCtx.resume();
+          const audioBuf = await ttsAudioCtx.decodeAudioData(arr.buffer.slice(0));
+          if (ttsAudioCtx.state === "running") {
+            const source = ttsAudioCtx.createBufferSource();
+            source.buffer = audioBuf;
+            source.connect(ttsAudioCtx.destination);
+            source.onended = () => { currentSource = null; currentAudio = null; setSpeakingIndicator(false); };
+            source.start(0);
+            currentSource = source;
+            currentAudio = "webapi";
+            console.log("[tts] Playing bundled audio via WebAudio, duration:", audioBuf.duration.toFixed(1), "s");
+            return;
+          }
+        } catch (e) { console.warn("[tts] WebAudio decode failed:", e.message); }
+      }
+
+      // Fallback: HTMLAudioElement
+      const blob = new Blob([arr], { type: "audio/mpeg" });
+      const url = URL.createObjectURL(blob);
+      const audio = new Audio(url);
+      audio.onended = () => { URL.revokeObjectURL(url); currentAudio = null; setSpeakingIndicator(false); };
+      audio.onerror = () => { URL.revokeObjectURL(url); setSpeakingIndicator(false); };
+      await audio.play();
+      currentAudio = "htmlaudio";
+      console.log("[tts] Playing bundled audio via HTMLAudio");
+    } catch (e) {
+      console.warn("[tts] playBase64Audio failed:", e.message);
+      setSpeakingIndicator(false);
+    }
   }
 
   async function speak(text) {

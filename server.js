@@ -708,28 +708,27 @@ app.post("/api/emergency", seniorAuth, async (req, res) => {
 
 app.post("/api/chat", seniorAuth, suspendCheck, rateLimit(60000, 20), async (req, res) => {
   try {
-    const { seniorId, message, sessionId, clientTime, timezone, location } = req.body;
+    const { seniorId, message, sessionId, clientTime, timezone, location, includeTTS } = req.body;
     if (!message) return res.status(400).json({ error: "Message required" });
     const effectiveSeniorId = seniorId || DEMO_SENIOR_ID;
 
-    const { data: senior } = await supabase.from("seniors").select("*")
-      .eq("id", effectiveSeniorId).single();
+    // ── Parallel DB queries (saves ~300-500ms vs sequential) ──────────────────
+    const todayStart = new Date(); todayStart.setHours(0, 0, 0, 0);
+    const [seniorRes, medsRes, logsRes, historyRes] = await Promise.all([
+      supabase.from("seniors").select("*").eq("id", effectiveSeniorId).single(),
+      supabase.from("medications").select("*").eq("senior_id", effectiveSeniorId).eq("active", true),
+      supabase.from("med_log").select("medication_id").eq("senior_id", effectiveSeniorId).gte("taken_at", todayStart.toISOString()),
+      supabase.from("conversations").select("role, content").eq("senior_id", effectiveSeniorId).order("timestamp", { ascending: false }).limit(20),
+    ]);
+    const senior = seniorRes.data;
     const seniorName = senior?.name || "Friend";
     const conditions = (senior?.conditions || []).join(", ");
-
-    const { data: meds } = await supabase.from("medications").select("*")
-      .eq("senior_id", effectiveSeniorId).eq("active", true);
-    const todayStart = new Date(); todayStart.setHours(0, 0, 0, 0);
-    const { data: logs } = await supabase.from("med_log").select("medication_id")
-      .eq("senior_id", effectiveSeniorId).gte("taken_at", todayStart.toISOString());
-    const takenIds = new Set((logs || []).map(l => l.medication_id));
+    const meds = medsRes.data;
+    const takenIds = new Set((logsRes.data || []).map(l => l.medication_id));
     const medSummary = (meds || []).map(m =>
       `- ${m.name} ${m.dose || ""} at ${m.time || ""}${m.with_food ? " (with food)" : ""}: ${takenIds.has(m.id) ? "taken" : "not yet taken"}`
     ).join("\n");
-
-    const { data: historyRows } = await supabase.from("conversations").select("role, content")
-      .eq("senior_id", effectiveSeniorId).order("timestamp", { ascending: false }).limit(20);
-    const recentHistory = (historyRows || []).reverse();
+    const recentHistory = (historyRes.data || []).reverse();
 
     // Fetch weather if location provided and message seems weather-related
     let weatherInfo = null;
@@ -850,18 +849,56 @@ ${weatherInfo ? `Current weather: ${weatherInfo}` : ""}`;
       .trim();
 
     const sid = sessionId || uuidv4();
-    await supabase.from("conversations").insert([
-      { senior_id: effectiveSeniorId, session_id: sid, role: "user",      content: message,  timestamp: new Date().toISOString() },
-      { senior_id: effectiveSeniorId, session_id: sid, role: "assistant", content: aiReply,  timestamp: new Date().toISOString() },
-    ]);
-    await supabase.from("activity").insert({
-      senior_id: effectiveSeniorId, type: "conversation",
-      description: `Chat: "${message.slice(0, 60)}${message.length > 60 ? "..." : ""}"`,
-      timestamp: new Date().toISOString(),
-    });
-    await trackUsage(effectiveSeniorId, "chat_messages");
 
-    res.json({ reply: aiReply, sessionId: sid, suggestedQuestion, appointment: savedAppointment });
+    // ── Fire TTS + DB saves in parallel (saves ~1-2s) ────────────────────────
+    // Clean text for speech
+    const spokenText = aiReply.replace(/[*#_~`>\[\](){}|]/g, "").replace(/\s+/g, " ").trim().slice(0, 4096);
+
+    // Inline TTS fetch (only if client requested it and OpenAI is configured)
+    const ttsApiKey = (process.env.OPENAI_API_KEY || "").trim();
+    const ttsEnabled = includeTTS && ttsApiKey && !ttsApiKey.startsWith("YOUR_") && ttsApiKey.length >= 20;
+    const ttsPromise = ttsEnabled ? new Promise((resolve) => {
+      const ttsModel = (process.env.TTS_MODEL || "gpt-4o-mini-tts").trim();
+      const voice = (process.env.TTS_VOICE || "coral").trim();
+      const payload = JSON.stringify({
+        model: ttsModel, input: spokenText, voice,
+        ...(ttsModel === "gpt-4o-mini-tts" ? { instructions: "Speak in a warm, caring, gentle tone — like a kind friend checking in. Natural pace, not rushed. Calm and reassuring." } : {}),
+        response_format: "mp3", speed: 1.05,
+      });
+      const https = require("https");
+      const ttsReq = https.request({
+        hostname: "api.openai.com", path: "/v1/audio/speech", method: "POST",
+        headers: { "Authorization": `Bearer ${ttsApiKey}`, "Content-Type": "application/json", "Content-Length": Buffer.byteLength(payload) },
+      }, (ttsRes) => {
+        if (ttsRes.statusCode === 200) {
+          const chunks = [];
+          ttsRes.on("data", d => chunks.push(d));
+          ttsRes.on("end", () => resolve(Buffer.concat(chunks).toString("base64")));
+        } else { resolve(null); }
+      });
+      ttsReq.on("error", () => resolve(null));
+      ttsReq.write(payload);
+      ttsReq.end();
+    }) : Promise.resolve(null);
+
+    const dbPromise = Promise.all([
+      supabase.from("conversations").insert([
+        { senior_id: effectiveSeniorId, session_id: sid, role: "user",      content: message,  timestamp: new Date().toISOString() },
+        { senior_id: effectiveSeniorId, session_id: sid, role: "assistant", content: aiReply,  timestamp: new Date().toISOString() },
+      ]),
+      supabase.from("activity").insert({
+        senior_id: effectiveSeniorId, type: "conversation",
+        description: `Chat: "${message.slice(0, 60)}${message.length > 60 ? "..." : ""}"`,
+        timestamp: new Date().toISOString(),
+      }),
+      trackUsage(effectiveSeniorId, "chat_messages"),
+    ]);
+
+    const [ttsAudioBase64] = await Promise.all([ttsPromise, dbPromise]);
+
+    const result = { reply: aiReply, sessionId: sid, suggestedQuestion, appointment: savedAppointment };
+    if (ttsAudioBase64) result.audioBase64 = ttsAudioBase64;
+    res.json(result);
   } catch (e) {
     console.error("Chat error:", e.message);
     res.status(500).json({ error: "Something went wrong. Please try again." });
