@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <link rel="manifest" href="/manifest.json">
-  <meta name="theme-color" content="#09090B">
+  <meta name="theme-color" content="#1E3A8A">
   <meta name="mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
@@ -14,352 +14,297 @@
   <title>Sage Companion — Family Dashboard</title>
   <style>
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
-    html { overflow-x: hidden; }
 
     :root {
-      --bg:       #09090B;
-      --surface:  #18181B;
-      --surface2: #27272A;
-      --border:   #3F3F46;
-      --border-s: #52525B;
-      --text:     #FAFAFA;
-      --text2:    #A1A1AA;
-      --text3:    #71717A;
-      --accent:   #3B82F6;
-      --accent2:  #2563EB;
-      --green:    #22C55E;
-      --green-bg: rgba(34,197,94,0.1);
-      --green-b:  rgba(34,197,94,0.25);
-      --red:      #EF4444;
-      --red-bg:   rgba(239,68,68,0.1);
-      --red-b:    rgba(239,68,68,0.25);
-      --amber:    #F59E0B;
-      --amber-bg: rgba(245,158,11,0.1);
-      --amber-b:  rgba(245,158,11,0.25);
-      --radius:   12px;
-      --radius-lg:16px;
-      --ease:     cubic-bezier(0.16, 1, 0.3, 1);
-      --font:     'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
+      --navy:      #1E3A8A;
+      --navy-dk:   #0F172A;
+      --navy-lt:   #2D4EAA;
+      --teal:      #0F766E;
+      --teal-lt:   #14B8A6;
+      --green:     #16A34A;
+      --amber:     #D97706;
+      --red:       #DC2626;
+      --purple:    #7C3AED;
+      --bg:        #F8FAFC;
+      --bg2:       #F1F5F9;
+      --white:     #FFFFFF;
+      --text:      #0F172A;
+      --muted:     #64748B;
+      --border:    #E2E8F0;
+      --shadow-sm: 0 1px 3px rgba(0,0,0,0.06), 0 1px 2px rgba(0,0,0,0.04);
+      --shadow-md: 0 4px 16px rgba(0,0,0,0.08), 0 2px 6px rgba(0,0,0,0.04);
+      --shadow-lg: 0 12px 40px rgba(0,0,0,0.12), 0 4px 12px rgba(0,0,0,0.06);
+      --radius:    16px;
+      --radius-sm: 10px;
     }
 
-    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap');
+    html, body { height: 100%; }
 
     body {
-      font-family: var(--font);
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
       background: var(--bg);
       color: var(--text);
-      min-height: 100vh;
-      overflow-x: hidden;
       -webkit-font-smoothing: antialiased;
     }
 
-    /* ── HEADER ─────────────────────────────────────────── */
-    header {
-      background: var(--surface);
-      border-bottom: 1px solid var(--border);
-      padding: 0 24px;
-      height: 56px;
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      position: sticky;
-      top: 0;
-      z-index: 100;
-      backdrop-filter: blur(12px);
-      -webkit-backdrop-filter: blur(12px);
-    }
-
-    .logo {
-      font-size: 15px;
-      font-weight: 700;
-      color: var(--text);
-      display: flex;
-      align-items: center;
-      gap: 10px;
-      letter-spacing: -0.01em;
-    }
-
-    .logo-icon {
-      width: 28px; height: 28px;
-      background: linear-gradient(135deg, #22C55E, #16A34A);
-      border-radius: 8px;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      font-size: 14px;
-    }
-
-    .header-sub {
-      font-size: 12px;
-      color: var(--text3);
-      font-weight: 500;
-      margin-left: 12px;
-      padding-left: 12px;
-      border-left: 1px solid var(--border);
-    }
-
-    .header-right { display: flex; align-items: center; gap: 6px; }
-
-    .h-btn {
-      background: transparent;
-      border: 1px solid var(--border);
-      color: var(--text2);
-      padding: 6px 12px;
-      border-radius: 8px;
-      cursor: pointer;
-      font-size: 13px;
-      font-weight: 500;
-      font-family: var(--font);
-      transition: all 0.15s;
-      -webkit-tap-highlight-color: transparent;
-    }
-    .h-btn:hover { background: var(--surface2); color: var(--text); border-color: var(--border-s); }
-    .h-btn.danger:hover { color: var(--red); border-color: var(--red); }
-
-    /* ── LOGIN ──────────────────────────────────────────── */
+    /* ── LOGIN SCREEN ──────────────────────────────────────── */
     #loginScreen {
+      min-height: 100vh;
       display: flex;
       align-items: center;
       justify-content: center;
-      min-height: calc(100vh - 56px);
+      background: linear-gradient(160deg, #0F172A 0%, #1E3A8A 50%, #0F766E 100%);
       padding: 24px;
     }
 
     .login-card {
-      background: var(--surface);
-      border: 1px solid var(--border);
-      border-radius: var(--radius-lg);
-      padding: 48px 36px;
-      max-width: 420px;
+      background: white;
+      border-radius: 24px;
+      padding: 48px 40px;
       width: 100%;
+      max-width: 400px;
+      box-shadow: var(--shadow-lg);
       text-align: center;
-      animation: fadeUp 0.4s var(--ease) forwards;
     }
 
-    .login-icon {
-      width: 56px; height: 56px;
-      background: linear-gradient(135deg, var(--accent), #6366F1);
-      border-radius: 16px;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      font-size: 24px;
-      margin: 0 auto 20px;
-    }
+    .login-logo { font-size: 48px; margin-bottom: 12px; }
+    .login-title { font-size: 26px; font-weight: 900; color: var(--navy); margin-bottom: 6px; letter-spacing: -0.02em; }
+    .login-sub { font-size: 15px; color: var(--muted); margin-bottom: 32px; }
 
-    .login-card h2 {
-      font-size: 24px;
-      font-weight: 700;
-      color: var(--text);
-      margin-bottom: 8px;
-      letter-spacing: -0.02em;
-    }
-
-    .login-card > p {
-      font-size: 14px;
-      color: var(--text3);
-      margin-bottom: 28px;
-      line-height: 1.6;
-    }
-
-    .login-card input {
+    .login-field { margin-bottom: 16px; text-align: left; }
+    .login-field label { display: block; font-size: 13px; font-weight: 700; color: var(--muted); letter-spacing: 0.05em; text-transform: uppercase; margin-bottom: 8px; }
+    .login-field input {
       width: 100%;
-      background: var(--bg);
-      border: 1px solid var(--border);
-      border-radius: var(--radius);
+      border: 2px solid var(--border);
+      border-radius: 12px;
       padding: 14px 16px;
       font-size: 20px;
       text-align: center;
-      letter-spacing: 6px;
-      font-weight: 700;
+      letter-spacing: 5px;
+      font-weight: 800;
       outline: none;
-      margin-bottom: 12px;
       text-transform: uppercase;
-      color: var(--text);
-      font-family: 'SF Mono', 'Fira Code', monospace;
       transition: border-color 0.15s;
+      background: var(--bg);
+      color: var(--text);
     }
-    .login-card input::placeholder { color: var(--text3); letter-spacing: 3px; font-weight: 500; font-size: 14px; }
-    .login-card input:focus { border-color: var(--accent); box-shadow: 0 0 0 3px rgba(59,130,246,0.15); }
+    .login-field input:focus { border-color: var(--navy); background: white; }
 
-    .login-card button {
+    .login-btn {
       width: 100%;
-      background: var(--accent);
+      background: linear-gradient(135deg, var(--navy), var(--navy-lt));
       color: white;
       border: none;
-      border-radius: var(--radius);
-      padding: 13px;
+      border-radius: 12px;
+      padding: 16px;
+      font-size: 17px;
+      font-weight: 800;
+      cursor: pointer;
+      margin-top: 8px;
+      transition: opacity 0.15s, transform 0.1s;
+    }
+    .login-btn:hover { opacity: 0.92; }
+    .login-btn:active { transform: scale(0.98); }
+    .login-error { color: var(--red); font-size: 14px; font-weight: 600; margin-top: 12px; display: none; }
+    .login-hint { font-size: 13px; color: var(--muted); margin-top: 20px; }
+    .login-hint strong { color: var(--text); font-weight: 700; }
+
+    /* ── APP LAYOUT ────────────────────────────────────────── */
+    #app { display: none; min-height: 100vh; }
+    .layout { display: flex; min-height: 100vh; }
+
+    /* ── SIDEBAR ───────────────────────────────────────────── */
+    .sidebar {
+      width: 240px;
+      flex-shrink: 0;
+      background: linear-gradient(180deg, var(--navy-dk) 0%, #162650 100%);
+      display: flex;
+      flex-direction: column;
+      position: sticky;
+      top: 0;
+      height: 100vh;
+    }
+
+    .sidebar-header {
+      padding: 28px 20px 24px;
+      border-bottom: 1px solid rgba(255,255,255,0.08);
+    }
+    .sidebar-logo { font-size: 28px; }
+    .sidebar-name { font-size: 19px; font-weight: 900; color: white; letter-spacing: -0.02em; margin-top: 6px; }
+    .sidebar-badge {
+      display: inline-block;
+      font-size: 10px; font-weight: 700;
+      color: var(--teal-lt);
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+      background: rgba(20,184,166,0.12);
+      padding: 3px 8px;
+      border-radius: 4px;
+      margin-top: 6px;
+    }
+    .sidebar-sub { font-size: 13px; color: rgba(255,255,255,0.45); margin-top: 8px; font-weight: 500; }
+
+    .sidebar-nav { flex: 1; padding: 16px 12px; }
+    .nav-item {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      padding: 12px 14px;
+      border-radius: var(--radius-sm);
+      color: rgba(255,255,255,0.55);
       font-size: 14px;
       font-weight: 600;
       cursor: pointer;
-      font-family: var(--font);
-      transition: background 0.15s;
+      transition: all 0.15s;
+      margin-bottom: 4px;
     }
-    .login-card button:hover { background: var(--accent2); }
-    .login-card button:active { transform: scale(0.99); }
+    .nav-item:hover { background: rgba(255,255,255,0.07); color: rgba(255,255,255,0.85); }
+    .nav-item.active { background: rgba(255,255,255,0.12); color: white; }
+    .nav-icon { font-size: 18px; width: 22px; text-align: center; }
 
-    .login-error { color: var(--red); font-size: 13px; margin-top: 12px; display: none; font-weight: 500; }
-    .login-hint { font-size: 12px; color: var(--text3); margin-top: 20px; }
-    .login-hint code { background: var(--surface2); padding: 2px 8px; border-radius: 4px; font-weight: 600; color: var(--text2); }
+    .sidebar-footer {
+      padding: 16px 12px;
+      border-top: 1px solid rgba(255,255,255,0.08);
+    }
+    .logout-btn {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 12px 14px;
+      border-radius: var(--radius-sm);
+      color: rgba(255,255,255,0.45);
+      font-size: 14px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: color 0.15s;
+      background: none;
+      border: none;
+      width: 100%;
+    }
+    .logout-btn:hover { color: rgba(255,255,255,0.85); }
 
-    /* ── DASHBOARD ──────────────────────────────────────── */
-    #dashboard { display: none; padding: 24px 20px 40px; max-width: 800px; margin: 0 auto; }
+    /* ── MAIN CONTENT ──────────────────────────────────────── */
+    .main-content {
+      flex: 1;
+      overflow-y: auto;
+      padding: 32px 36px;
+      background: var(--bg);
+    }
 
-    /* ── STATUS BANNER ──────────────────────────────────── */
-    .status-banner {
-      border-radius: var(--radius-lg);
-      padding: 20px 24px;
-      margin-bottom: 20px;
+    .page { display: none; max-width: 1100px; }
+    .page.active { display: block; }
+
+    /* ── PAGE HEADER ───────────────────────────────────────── */
+    .page-header {
       display: flex;
       align-items: center;
       justify-content: space-between;
-      gap: 16px;
-      animation: fadeUp 0.4s var(--ease) forwards;
+      margin-bottom: 28px;
     }
-    .status-ok { background: var(--green-bg); border: 1px solid var(--green-b); }
-    .status-alert { background: var(--red-bg); border: 1px solid var(--red-b); }
+    .page-title { font-size: 26px; font-weight: 900; color: var(--text); letter-spacing: -0.02em; }
+    .page-sub { font-size: 14px; color: var(--muted); margin-top: 2px; }
 
-    .status-left { flex: 1; }
-    .status-indicator { display: flex; align-items: center; gap: 10px; margin-bottom: 4px; }
-    .status-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
-    .dot-green { background: var(--green); box-shadow: 0 0 8px rgba(34,197,94,0.6); }
-    .dot-red   { background: var(--red);   box-shadow: 0 0 8px rgba(239,68,68,0.6); }
-    .status-name { font-size: 20px; font-weight: 700; color: var(--text); letter-spacing: -0.02em; }
-    .status-line { font-size: 13px; color: var(--text3); font-weight: 500; }
-
-    .call-btn {
-      background: var(--surface2);
-      color: var(--text);
-      border: 1px solid var(--border);
-      border-radius: var(--radius);
-      padding: 10px 16px;
-      font-size: 13px;
+    .refresh-btn {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      background: white;
+      border: 1.5px solid var(--border);
+      border-radius: var(--radius-sm);
+      padding: 10px 18px;
+      font-size: 14px;
       font-weight: 600;
+      color: var(--text);
       cursor: pointer;
-      white-space: nowrap;
-      font-family: var(--font);
-      transition: all 0.15s;
-      flex-shrink: 0;
+      transition: border-color 0.15s, box-shadow 0.15s;
     }
-    .call-btn:hover { background: var(--border); }
+    .refresh-btn:hover { border-color: var(--navy); box-shadow: 0 2px 8px rgba(30,58,138,0.08); }
 
-    /* ── STATS ──────────────────────────────────────────── */
-    .stats {
+    /* ── STATS CARDS ───────────────────────────────────────── */
+    .stats-grid {
       display: grid;
-      grid-template-columns: repeat(4, 1fr);
-      gap: 12px;
-      margin-bottom: 24px;
+      grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
+      gap: 14px;
+      margin-bottom: 28px;
     }
 
-    .stat {
-      background: var(--surface);
+    .stat-card {
+      background: white;
       border: 1px solid var(--border);
       border-radius: var(--radius);
-      padding: 16px;
-      transition: border-color 0.15s;
-      animation: fadeUp 0.4s var(--ease) forwards;
-      opacity: 0;
+      padding: 22px 20px;
+      box-shadow: var(--shadow-sm);
+      position: relative;
+      overflow: hidden;
+      transition: box-shadow 0.2s, transform 0.2s;
     }
-    .stat:nth-child(1) { animation-delay: 0.05s; }
-    .stat:nth-child(2) { animation-delay: 0.1s; }
-    .stat:nth-child(3) { animation-delay: 0.15s; }
-    .stat:nth-child(4) { animation-delay: 0.2s; }
-    .stat:hover { border-color: var(--border-s); }
+    .stat-card:hover { box-shadow: var(--shadow-md); transform: translateY(-1px); }
+    .stat-card::before { content: ""; position: absolute; top: 0; left: 0; right: 0; height: 3px; }
+    .stat-card:nth-child(1)::before { background: linear-gradient(90deg, var(--navy), var(--navy-lt)); }
+    .stat-card:nth-child(2)::before { background: linear-gradient(90deg, var(--green), #22C55E); }
+    .stat-card:nth-child(3)::before { background: linear-gradient(90deg, var(--red), #EF4444); }
+    .stat-card:nth-child(4)::before { background: linear-gradient(90deg, var(--teal), var(--teal-lt)); }
 
-    .stat-label { font-size: 11px; color: var(--text3); font-weight: 600; letter-spacing: 0.06em; text-transform: uppercase; margin-bottom: 8px; }
-    .stat-value { font-size: 28px; font-weight: 800; color: var(--text); letter-spacing: -0.03em; line-height: 1; }
-    .stat-sub { font-size: 11px; color: var(--text3); margin-top: 4px; }
+    .stat-row { display: flex; align-items: center; justify-content: space-between; }
+    .stat-icon { font-size: 32px; opacity: 0.85; }
+    .stat-label { font-size: 12px; font-weight: 700; color: var(--muted); letter-spacing: 0.06em; text-transform: uppercase; margin-bottom: 6px; }
+    .stat-value { font-size: 34px; font-weight: 900; color: var(--text); letter-spacing: -0.03em; line-height: 1; }
+    .stat-delta { font-size: 12px; color: var(--muted); margin-top: 6px; }
 
-    .progress-track { height: 4px; background: var(--surface2); border-radius: 2px; overflow: hidden; margin-top: 10px; }
-    .progress-fill  { height: 100%; border-radius: 2px; transition: width 0.8s var(--ease); }
+    .progress-track { height: 4px; background: var(--border); border-radius: 2px; overflow: hidden; margin-top: 10px; }
+    .progress-fill  { height: 100%; border-radius: 2px; transition: width 0.8s ease; }
     .fill-green  { background: var(--green); }
     .fill-yellow { background: var(--amber); }
     .fill-red    { background: var(--red); }
 
-    /* ── TABS ───────────────────────────────────────────── */
-    .tabs {
-      display: flex;
-      gap: 2px;
-      margin-bottom: 20px;
-      overflow-x: auto;
-      scrollbar-width: none;
-      background: var(--surface);
+    /* ── TABLE CARD ────────────────────────────────────────── */
+    .table-card {
+      background: white;
       border: 1px solid var(--border);
       border-radius: var(--radius);
-      padding: 4px;
-    }
-    .tabs::-webkit-scrollbar { display: none; }
-
-    .tab {
-      background: transparent;
-      border: none;
-      border-radius: 8px;
-      padding: 8px 14px;
-      font-size: 13px;
-      font-weight: 500;
-      cursor: pointer;
-      white-space: nowrap;
-      color: var(--text3);
-      font-family: var(--font);
-      transition: all 0.15s;
-      -webkit-tap-highlight-color: transparent;
-    }
-    .tab:hover { color: var(--text2); background: var(--surface2); }
-    .tab.active { background: var(--text); color: var(--bg); font-weight: 600; }
-
-    /* ── CARDS ──────────────────────────────────────────── */
-    .card {
-      background: var(--surface);
-      border: 1px solid var(--border);
-      border-radius: var(--radius-lg);
-      padding: 24px;
-      margin-bottom: 16px;
+      box-shadow: var(--shadow-sm);
+      overflow: hidden;
+      margin-bottom: 20px;
     }
 
-    .card-title {
-      font-size: 13px;
-      font-weight: 600;
-      color: var(--text3);
-      letter-spacing: 0.05em;
-      text-transform: uppercase;
-      margin-bottom: 16px;
+    .table-toolbar {
       display: flex;
       align-items: center;
-      gap: 8px;
+      justify-content: space-between;
+      padding: 18px 22px;
+      border-bottom: 1px solid var(--border);
+      gap: 12px;
     }
+    .table-title { font-size: 16px; font-weight: 800; color: var(--text); }
 
-    .card-subtitle {
-      color: var(--text3);
-      font-size: 13px;
-      margin-bottom: 16px;
-      line-height: 1.5;
-    }
+    .table-body { padding: 20px 22px; }
+    .table-empty { text-align: center; padding: 36px 24px; color: var(--muted); font-size: 15px; }
 
-    /* ── MED LIST ───────────────────────────────────────── */
+    /* ── MED LIST ──────────────────────────────────────────── */
     .med-row {
       display: flex;
       align-items: center;
       justify-content: space-between;
-      padding: 12px 0;
+      padding: 14px 0;
       border-bottom: 1px solid var(--border);
       gap: 12px;
     }
-    .med-info { min-width: 0; flex: 1; }
     .med-row:last-child { border-bottom: none; }
-    .med-name { font-size: 14px; font-weight: 600; color: var(--text); }
-    .med-detail { font-size: 12px; color: var(--text3); margin-top: 2px; }
+    .med-info { min-width: 0; flex: 1; }
+    .med-name { font-size: 15px; font-weight: 700; color: var(--text); }
+    .med-detail { font-size: 13px; color: var(--muted); margin-top: 2px; }
 
-    .med-status {
+    .badge-pill {
+      display: inline-block;
+      padding: 4px 12px;
+      border-radius: 100px;
       font-size: 12px;
-      font-weight: 600;
-      padding: 4px 10px;
-      border-radius: 6px;
-      flex-shrink: 0;
+      font-weight: 700;
     }
-    .med-taken   { background: var(--green-bg); color: var(--green); border: 1px solid var(--green-b); }
-    .med-pending { background: var(--amber-bg); color: var(--amber); border: 1px solid var(--amber-b); }
+    .badge-taken   { background: #DCFCE7; color: #15803D; }
+    .badge-pending { background: #FEF9C3; color: #A16207; }
 
-    /* ── ACTIVITY ───────────────────────────────────────── */
+    /* ── ACTIVITY ──────────────────────────────────────────── */
     .activity-item {
       display: flex;
       gap: 12px;
@@ -368,26 +313,19 @@
       align-items: flex-start;
     }
     .activity-item:last-child { border-bottom: none; }
+    .activity-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; margin-top: 6px; }
+    .dot-med    { background: var(--green); }
+    .dot-alert  { background: var(--red); }
+    .dot-chat   { background: var(--navy); }
+    .dot-system { background: var(--muted); }
+    .activity-text { font-size: 14px; color: var(--text); flex: 1; line-height: 1.5; }
+    .activity-time { font-size: 12px; color: var(--muted); white-space: nowrap; font-weight: 500; }
 
-    .activity-dot {
-      width: 6px; height: 6px;
-      border-radius: 50%;
-      flex-shrink: 0;
-      margin-top: 7px;
-    }
-    .activity-dot.dot-med    { background: var(--green); }
-    .activity-dot.dot-alert  { background: var(--red); }
-    .activity-dot.dot-chat   { background: var(--accent); }
-    .activity-dot.dot-system { background: var(--text3); }
-
-    .activity-text { font-size: 13px; color: var(--text2); flex: 1; line-height: 1.5; }
-    .activity-time { font-size: 11px; color: var(--text3); white-space: nowrap; font-weight: 500; font-variant-numeric: tabular-nums; }
-
-    /* ── ALERTS ─────────────────────────────────────────── */
+    /* ── ALERTS ─────────────────────────────────────────────── */
     .alert-item {
-      background: var(--red-bg);
-      border: 1px solid var(--red-b);
-      border-radius: var(--radius);
+      background: #FEF2F2;
+      border: 1px solid #FECACA;
+      border-radius: var(--radius-sm);
       padding: 14px 16px;
       margin-bottom: 8px;
       display: flex;
@@ -395,141 +333,143 @@
       align-items: flex-start;
       gap: 12px;
     }
-    .alert-msg { font-size: 13px; color: var(--text); font-weight: 500; }
-    .alert-time { font-size: 11px; color: var(--text3); margin-top: 4px; }
+    .alert-msg { font-size: 14px; color: var(--text); font-weight: 500; }
+    .alert-time { font-size: 12px; color: var(--muted); margin-top: 4px; }
 
     .resolve-btn {
-      background: transparent;
-      border: 1px solid var(--border-s);
+      padding: 5px 12px;
       border-radius: 6px;
-      padding: 5px 10px;
+      border: 1.5px solid var(--border);
+      background: white;
       font-size: 12px;
-      font-weight: 600;
+      font-weight: 700;
       cursor: pointer;
-      color: var(--text3);
-      font-family: var(--font);
+      color: var(--muted);
       white-space: nowrap;
       flex-shrink: 0;
       transition: all 0.15s;
     }
     .resolve-btn:hover { border-color: var(--green); color: var(--green); }
-    .no-alerts { color: var(--text3); font-size: 13px; padding: 4px 0; }
 
-    /* ── CONVERSATIONS ──────────────────────────────────── */
-    .convo-item {
-      display: flex;
-      gap: 10px;
-      margin-bottom: 8px;
-    }
+    /* ── CONVERSATIONS ─────────────────────────────────────── */
+    .convo-item { display: flex; gap: 10px; margin-bottom: 8px; }
+    .convo-bubble { padding: 10px 14px; border-radius: 14px; font-size: 14px; line-height: 1.5; max-width: 82%; }
+    .convo-user { background: var(--navy); color: white; }
+    .convo-sage { background: #EEF4FF; color: var(--text); border: 1px solid #DBEAFE; }
+    .convo-label { font-size: 11px; color: var(--muted); margin-bottom: 4px; font-weight: 600; letter-spacing: 0.03em; text-transform: uppercase; }
 
-    .convo-bubble {
-      padding: 10px 14px;
-      border-radius: 12px;
-      font-size: 13px;
-      line-height: 1.55;
-      max-width: 80%;
-    }
-    .convo-user { background: var(--accent); color: white; }
-    .convo-sage { background: var(--surface2); color: var(--text2); border: 1px solid var(--border); }
-    .convo-label { font-size: 10px; color: var(--text3); margin-bottom: 4px; font-weight: 600; letter-spacing: 0.04em; text-transform: uppercase; }
-
-    /* ── ADD MED FORM ───────────────────────────────────── */
+    /* ── ADD MED FORM ──────────────────────────────────────── */
     .add-med-form { display: none; border-top: 1px solid var(--border); padding-top: 16px; margin-top: 16px; }
     .add-med-form.open { display: block; }
-
-    .form-row { display: flex; gap: 8px; margin-bottom: 8px; }
-
+    .form-row { display: flex; gap: 10px; margin-bottom: 10px; }
     .form-row input, .form-row select {
       flex: 1;
-      background: var(--bg);
-      border: 1px solid var(--border);
-      border-radius: 8px;
-      padding: 10px 12px;
-      font-size: 13px;
-      font-family: var(--font);
+      border: 2px solid var(--border);
+      border-radius: var(--radius-sm);
+      padding: 11px 13px;
+      font-size: 14px;
       outline: none;
-      color: var(--text);
       transition: border-color 0.15s;
+      color: var(--text);
+      background: var(--bg);
     }
-    .form-row input::placeholder { color: var(--text3); }
-    .form-row input:focus, .form-row select:focus { border-color: var(--accent); }
-    .form-row select { color: var(--text2); }
-    .form-row select option { background: var(--surface); }
-
+    .form-row input:focus, .form-row select:focus { border-color: var(--navy); background: white; }
     .add-btn {
-      background: var(--green);
-      color: #000;
+      background: var(--teal);
+      color: white;
       border: none;
-      border-radius: 8px;
-      padding: 10px 16px;
-      font-size: 13px;
+      border-radius: var(--radius-sm);
+      padding: 11px 18px;
+      font-size: 14px;
       font-weight: 700;
       cursor: pointer;
-      font-family: var(--font);
       flex-shrink: 0;
-      transition: opacity 0.15s;
     }
-    .add-btn:hover { opacity: 0.9; }
-
+    .add-btn:active { transform: scale(0.97); }
     .toggle-form-btn {
-      background: transparent;
-      border: 1px dashed var(--border);
-      border-radius: var(--radius);
-      padding: 10px 16px;
-      font-size: 13px;
-      color: var(--text3);
+      background: none;
+      border: 2px dashed var(--border);
+      border-radius: var(--radius-sm);
+      padding: 11px 16px;
+      font-size: 14px;
+      color: var(--muted);
       cursor: pointer;
       width: 100%;
-      font-weight: 500;
-      font-family: var(--font);
-      margin-top: 12px;
-      transition: all 0.15s;
+      font-weight: 600;
+      margin-top: 14px;
+      transition: border-color 0.15s, color 0.15s;
     }
-    .toggle-form-btn:hover { border-color: var(--accent); color: var(--accent); }
+    .toggle-form-btn:hover { border-color: var(--teal); color: var(--teal); }
 
-    /* ── EMPTY / TOAST ──────────────────────────────────── */
-    .empty { color: var(--text3); font-size: 13px; padding: 8px 0; line-height: 1.5; }
-
+    /* ── TOAST ──────────────────────────────────────────────── */
     #toast {
       position: fixed;
-      bottom: 24px;
+      top: 24px;
       left: 50%;
-      transform: translateX(-50%) translateY(8px);
-      background: var(--text);
-      color: var(--bg);
-      padding: 10px 20px;
-      border-radius: 8px;
-      font-size: 13px;
+      transform: translateX(-50%) translateY(-8px);
+      background: var(--navy-dk);
+      color: white;
+      padding: 12px 22px;
+      border-radius: 100px;
+      font-size: 14px;
       font-weight: 600;
       opacity: 0;
-      transition: opacity 0.2s, transform 0.2s;
+      transition: opacity 0.25s, transform 0.25s;
       z-index: 999;
       pointer-events: none;
       max-width: calc(100vw - 32px);
-      font-family: var(--font);
+      text-align: center;
     }
     #toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
 
-    @keyframes fadeUp {
-      from { opacity: 0; transform: translateY(8px); }
-      to   { opacity: 1; transform: translateY(0); }
+    /* ── MOBILE TOP BAR ─────────────────────────────────────── */
+    .mobile-bar {
+      display: none;
+      background: var(--navy-dk);
+      color: white;
+      padding: 14px 16px;
+      align-items: center;
+      justify-content: space-between;
+    }
+    .mobile-bar .mob-title { font-size: 17px; font-weight: 800; }
+    .mobile-tabs {
+      display: none;
+      background: white;
+      border-bottom: 1px solid var(--border);
+      padding: 0 8px;
+      gap: 0;
+      overflow-x: auto;
+    }
+    .mob-tab {
+      padding: 12px 14px;
+      font-size: 13px;
+      font-weight: 700;
+      color: var(--muted);
+      cursor: pointer;
+      white-space: nowrap;
+      border-bottom: 3px solid transparent;
+      border-top: none; border-left: none; border-right: none;
+      background: none;
+      transition: color 0.15s, border-color 0.15s;
+    }
+    .mob-tab.active { color: var(--navy); border-bottom-color: var(--navy); }
+
+    /* ── RESPONSIVE ─────────────────────────────────────────── */
+    @media (max-width: 768px) {
+      .sidebar { display: none; }
+      .mobile-bar { display: flex; }
+      .mobile-tabs { display: flex; }
+      .main-content { padding: 20px 16px; }
+      .stats-grid { grid-template-columns: 1fr 1fr; }
+      .page-header { flex-wrap: wrap; gap: 12px; }
+      .stat-value { font-size: 26px; }
     }
 
-    /* ── RESPONSIVE ─────────────────────────────────────── */
-    @media (max-width: 640px) {
-      .stats { grid-template-columns: 1fr 1fr; }
-      .stat-value { font-size: 22px; }
-      #dashboard { padding: 16px 14px 40px; }
-      header { padding: 0 16px; }
-      .header-sub { display: none; }
-      .status-banner { flex-wrap: wrap; }
-      .call-btn { width: 100%; text-align: center; margin-top: 4px; }
-    }
-
-    @media (max-width: 400px) {
-      .stats { gap: 8px; }
-      .stat { padding: 12px; }
-      .h-btn { padding: 5px 8px; font-size: 12px; }
+    @media (max-width: 480px) {
+      .main-content { padding: 16px 12px; }
+      .table-toolbar { flex-wrap: wrap; }
+      .page-title { font-size: 22px; }
+      .stats-grid { grid-template-columns: 1fr; }
     }
   </style>
   <script>
@@ -542,147 +482,159 @@
 </head>
 <body>
 
-<header>
-  <div style="display:flex;align-items:center;">
-    <div class="logo">
-      <div class="logo-icon">S</div>
-      Sage Family
-    </div>
-    <div class="header-sub" id="headerSub">Family Dashboard</div>
-  </div>
-  <div class="header-right">
-    <button class="h-btn" onclick="loadDashboard()">Refresh</button>
-    <button class="h-btn danger" onclick="logout()">Sign out</button>
-  </div>
-</header>
-
-<!-- Login -->
+<!-- ── LOGIN ──────────────────────────────────────────────── -->
 <div id="loginScreen">
   <div class="login-card">
-    <div class="login-icon">S</div>
-    <h2>Family Access</h2>
-    <p>Enter the family code to connect to your loved one's dashboard.</p>
-    <input type="text" id="codeInput" placeholder="CODE" maxlength="10"
-      oninput="this.value=this.value.toUpperCase()"
-      onkeydown="if(event.key==='Enter') joinFamily()" />
-    <button onclick="joinFamily()">Connect</button>
+    <div class="login-logo">🛡️</div>
+    <div class="login-title">Family Access</div>
+    <div class="login-sub">Enter your family code to connect</div>
+    <div class="login-field">
+      <label>Family Code</label>
+      <input type="text" id="codeInput" placeholder="FAMILY123" maxlength="10"
+        oninput="this.value=this.value.toUpperCase()"
+        onkeydown="if(event.key==='Enter') joinFamily()" />
+    </div>
+    <button class="login-btn" onclick="joinFamily()">Connect</button>
     <div class="login-error" id="loginError">Code not found. Please check and try again.</div>
-    <p class="login-hint">Demo: <code>FAMILY123</code></p>
+    <p class="login-hint">Demo code: <strong>FAMILY123</strong></p>
   </div>
 </div>
 
-<!-- Dashboard -->
-<div id="dashboard">
-
-  <!-- Status banner -->
-  <div class="status-banner status-ok" id="statusBanner">
-    <div class="status-left">
-      <div class="status-indicator">
-        <div class="status-dot dot-green" id="statusDot"></div>
-        <div class="status-name" id="seniorNameDisplay">Loading...</div>
-      </div>
-      <div class="status-line" id="statusLine">Checking status...</div>
-    </div>
-    <button class="call-btn" id="callBtn">Call</button>
+<!-- ── APP ────────────────────────────────────────────────── -->
+<div id="app">
+  <!-- Mobile top bar (visible < 768px) -->
+  <div class="mobile-bar">
+    <span class="mob-title">🌿 Sage Family</span>
+    <button class="logout-btn" onclick="logout()" style="width:auto;padding:6px 12px;font-size:12px;">Sign Out</button>
+  </div>
+  <div class="mobile-tabs">
+    <button class="mob-tab active" onclick="showTab('overview',null,this)" data-tab="overview">Overview</button>
+    <button class="mob-tab" onclick="showTab('meds',null,this)" data-tab="meds">Meds</button>
+    <button class="mob-tab" onclick="showTab('activity',null,this)" data-tab="activity">Activity</button>
+    <button class="mob-tab" onclick="showTab('alerts',null,this)" data-tab="alerts">Alerts</button>
+    <button class="mob-tab" onclick="showTab('convo',null,this)" data-tab="convo">Chat</button>
+    <button class="mob-tab" onclick="showTab('doctorq',null,this)" data-tab="doctorq">Dr. Qs</button>
+    <button class="mob-tab" onclick="showTab('visits',null,this)" data-tab="visits">Transcripts</button>
+    <button class="mob-tab" onclick="showTab('calendar',null,this)" data-tab="calendar">Calendar</button>
   </div>
 
-  <!-- Stats -->
-  <div class="stats" id="statsGrid">
-    <div class="stat">
-      <div class="stat-label">Medications</div>
-      <div class="stat-value" id="statMeds">&mdash;</div>
-      <div class="stat-sub" id="statMedsSub">taken today</div>
-    </div>
-    <div class="stat">
-      <div class="stat-label">Adherence</div>
-      <div class="stat-value" id="statAdh">&mdash;%</div>
-      <div class="progress-track"><div class="progress-fill" id="adhBar" style="width:0%"></div></div>
-    </div>
-    <div class="stat">
-      <div class="stat-label">Open Alerts</div>
-      <div class="stat-value" id="statAlerts">&mdash;</div>
-    </div>
-    <div class="stat">
-      <div class="stat-label">AI Chats</div>
-      <div class="stat-value" id="statConvo">&mdash;</div>
-      <div class="stat-sub">today</div>
-    </div>
-  </div>
+  <div class="layout">
 
-  <!-- Tabs -->
-  <div class="tabs">
-    <button class="tab active" onclick="showTab('meds', this)">Medications</button>
-    <button class="tab" onclick="showTab('activity', this)">Activity</button>
-    <button class="tab" onclick="showTab('alerts', this)">Alerts</button>
-    <button class="tab" onclick="showTab('convo', this)">Conversations</button>
-    <button class="tab" onclick="showTab('doctorq', this)">Doctor Qs</button>
-    <button class="tab" onclick="showTab('visits', this)">Transcripts</button>
-    <button class="tab" onclick="showTab('calendar', this)">Calendar</button>
-  </div>
-
-  <!-- Medications tab -->
-  <div id="tab-meds" class="card">
-    <div class="card-title">Medications</div>
-    <div id="medList"><span class="empty">Loading...</span></div>
-    <button class="toggle-form-btn" onclick="toggleAddMed()">+ Add medication</button>
-    <div class="add-med-form" id="addMedForm">
-      <div class="form-row">
-        <input type="text" id="medName" placeholder="Medication name" />
-        <input type="text" id="medDosage" placeholder="Dose (e.g. 10mg)" />
+    <!-- Sidebar -->
+    <div class="sidebar">
+      <div class="sidebar-header">
+        <div class="sidebar-logo">🌿</div>
+        <div class="sidebar-name">Sage Family</div>
+        <div class="sidebar-badge">Family Dashboard</div>
+        <div class="sidebar-sub" id="sidebarSub">Monitoring</div>
       </div>
-      <div class="form-row">
-        <input type="time" id="medTime1" value="08:00" />
-        <input type="time" id="medTime2" placeholder="2nd time (optional)" />
-      </div>
-      <div class="form-row">
-        <select id="medFood">
-          <option value="0">No food required</option>
-          <option value="1">Take with food</option>
-        </select>
-        <button class="add-btn" onclick="addMedication()">Add</button>
+      <nav class="sidebar-nav">
+        <div class="nav-item active" onclick="showTab('overview', this)"><span class="nav-icon">📊</span> Overview</div>
+        <div class="nav-item" onclick="showTab('meds', this)"><span class="nav-icon">💊</span> Medications</div>
+        <div class="nav-item" onclick="showTab('activity', this)"><span class="nav-icon">📋</span> Activity</div>
+        <div class="nav-item" onclick="showTab('alerts', this)"><span class="nav-icon">⚠️</span> Alerts</div>
+        <div class="nav-item" onclick="showTab('convo', this)"><span class="nav-icon">💬</span> Conversations</div>
+        <div class="nav-item" onclick="showTab('doctorq', this)"><span class="nav-icon">❓</span> Doctor Questions</div>
+        <div class="nav-item" onclick="showTab('visits', this)"><span class="nav-icon">🩺</span> Transcripts</div>
+        <div class="nav-item" onclick="showTab('calendar', this)"><span class="nav-icon">📅</span> Calendar</div>
+      </nav>
+      <div class="sidebar-footer">
+        <button class="logout-btn" onclick="logout()">🚪 Sign out</button>
       </div>
     </div>
-  </div>
 
-  <!-- Activity tab -->
-  <div id="tab-activity" class="card" style="display:none">
-    <div class="card-title">Activity Feed</div>
-    <div id="activityList"><span class="empty">Loading...</span></div>
-  </div>
+    <!-- Main -->
+    <div class="main-content">
 
-  <!-- Alerts tab -->
-  <div id="tab-alerts" class="card" style="display:none">
-    <div class="card-title">Alerts</div>
-    <div id="alertList"><span class="empty">Loading...</span></div>
-  </div>
+      <!-- Overview page -->
+      <div id="tab-overview" class="page active">
+        <div class="page-header">
+          <div>
+            <div class="page-title" id="seniorNameDisplay">Loading...</div>
+            <div class="page-sub" id="statusLine">Checking status...</div>
+          </div>
+          <button class="refresh-btn" onclick="loadDashboard()">↻ Refresh</button>
+        </div>
 
-  <!-- Conversations tab -->
-  <div id="tab-convo" class="card" style="display:none">
-    <div class="card-title">Conversations with Sage</div>
-    <div id="convoList"><span class="empty">Loading...</span></div>
-  </div>
+        <!-- Status banner -->
+        <div id="statusBanner" style="background:#F0FDF4;border:1.5px solid #BBF7D0;border-radius:var(--radius);padding:16px 20px;margin-bottom:20px;display:flex;align-items:center;gap:12px;">
+          <div id="statusDot" style="width:10px;height:10px;border-radius:50%;background:var(--green);box-shadow:0 0 8px rgba(22,163,74,0.5);flex-shrink:0;"></div>
+          <div style="flex:1;font-size:15px;font-weight:600;color:var(--text);" id="statusText">All good</div>
+          <button class="refresh-btn" id="callBtn" style="padding:8px 14px;font-size:13px;">📞 Call</button>
+        </div>
 
-  <!-- Doctor Questions tab -->
-  <div id="tab-doctorq" class="card" style="display:none">
-    <div class="card-title">Doctor Questions</div>
-    <p class="card-subtitle">Questions saved from conversations with Sage for the next doctor visit.</p>
-    <div id="doctorqList"><span class="empty">Loading...</span></div>
-  </div>
+        <div class="stats-grid">
+          <div class="stat-card">
+            <div class="stat-row"><div><div class="stat-label">Medications</div><div class="stat-value" id="statMeds">&mdash;</div><div class="stat-delta" id="statMedsSub">taken today</div></div><div class="stat-icon">💊</div></div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-row"><div><div class="stat-label">Adherence</div><div class="stat-value" id="statAdh">&mdash;%</div></div><div class="stat-icon">📋</div></div>
+            <div class="progress-track"><div class="progress-fill" id="adhBar" style="width:0%"></div></div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-row"><div><div class="stat-label">Open Alerts</div><div class="stat-value" id="statAlerts">&mdash;</div></div><div class="stat-icon">⚠️</div></div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-row"><div><div class="stat-label">AI Chats Today</div><div class="stat-value" id="statConvo">&mdash;</div></div><div class="stat-icon">💬</div></div>
+          </div>
+        </div>
+      </div>
 
-  <!-- Visit Transcripts tab -->
-  <div id="tab-visits" class="card" style="display:none">
-    <div class="card-title">Doctor Visit Transcripts</div>
-    <p class="card-subtitle">Recordings from doctor visits captured through the Sage app.</p>
-    <div id="visitsList"><span class="empty">Loading...</span></div>
-  </div>
+      <!-- Medications page -->
+      <div id="tab-meds" class="page">
+        <div class="page-header"><div><div class="page-title">Medications</div><div class="page-sub">Manage and track daily medications</div></div></div>
+        <div class="table-card">
+          <div class="table-toolbar"><div class="table-title">💊 Current Medications</div></div>
+          <div class="table-body">
+            <div id="medList"><div class="table-empty">Loading...</div></div>
+            <button class="toggle-form-btn" onclick="toggleAddMed()">+ Add medication</button>
+            <div class="add-med-form" id="addMedForm">
+              <div class="form-row"><input type="text" id="medName" placeholder="Medication name" /><input type="text" id="medDosage" placeholder="Dose (e.g. 10mg)" /></div>
+              <div class="form-row"><input type="time" id="medTime1" value="08:00" /><input type="time" id="medTime2" placeholder="2nd time (optional)" /></div>
+              <div class="form-row"><select id="medFood"><option value="0">No food required</option><option value="1">Take with food</option></select><button class="add-btn" onclick="addMedication()">Add</button></div>
+            </div>
+          </div>
+        </div>
+      </div>
 
-  <!-- Calendar tab -->
-  <div id="tab-calendar" class="card" style="display:none">
-    <div class="card-title">Upcoming Appointments</div>
-    <p class="card-subtitle">Appointments added by voice, photo scan, or synced from Google Calendar.</p>
-    <div id="calendarList"><span class="empty">Loading...</span></div>
-  </div>
+      <!-- Activity page -->
+      <div id="tab-activity" class="page">
+        <div class="page-header"><div><div class="page-title">Activity Feed</div><div class="page-sub">Recent actions and events</div></div></div>
+        <div class="table-card"><div class="table-toolbar"><div class="table-title">📋 Recent Activity</div></div><div class="table-body" id="activityList"><div class="table-empty">Loading...</div></div></div>
+      </div>
 
+      <!-- Alerts page -->
+      <div id="tab-alerts" class="page">
+        <div class="page-header"><div><div class="page-title">Alerts</div><div class="page-sub">Unresolved alerts and notifications</div></div></div>
+        <div class="table-card"><div class="table-toolbar"><div class="table-title">⚠️ Active Alerts</div></div><div class="table-body" id="alertList"><div class="table-empty">Loading...</div></div></div>
+      </div>
+
+      <!-- Conversations page -->
+      <div id="tab-convo" class="page">
+        <div class="page-header"><div><div class="page-title">Conversations</div><div class="page-sub">Recent conversations with Sage</div></div></div>
+        <div class="table-card"><div class="table-toolbar"><div class="table-title">💬 Chat History</div></div><div class="table-body" id="convoList"><div class="table-empty">Loading...</div></div></div>
+      </div>
+
+      <!-- Doctor Questions page -->
+      <div id="tab-doctorq" class="page">
+        <div class="page-header"><div><div class="page-title">Doctor Questions</div><div class="page-sub">Questions to ask at the next doctor visit</div></div></div>
+        <div class="table-card"><div class="table-toolbar"><div class="table-title">❓ Saved Questions</div></div><div class="table-body" id="doctorqList"><div class="table-empty">Loading...</div></div></div>
+      </div>
+
+      <!-- Visit Transcripts page -->
+      <div id="tab-visits" class="page">
+        <div class="page-header"><div><div class="page-title">Visit Transcripts</div><div class="page-sub">Recordings from doctor visits</div></div></div>
+        <div class="table-card"><div class="table-toolbar"><div class="table-title">🩺 Transcripts</div></div><div class="table-body" id="visitsList"><div class="table-empty">Loading...</div></div></div>
+      </div>
+
+      <!-- Calendar page -->
+      <div id="tab-calendar" class="page">
+        <div class="page-header"><div><div class="page-title">Calendar</div><div class="page-sub">Upcoming appointments</div></div></div>
+        <div class="table-card"><div class="table-toolbar"><div class="table-title">📅 Appointments</div></div><div class="table-body" id="calendarList"><div class="table-empty">Loading...</div></div></div>
+      </div>
+
+    </div>
+  </div>
 </div>
 
 <div id="toast"></div>
@@ -690,40 +642,28 @@
 <script>
   var seniorId = localStorage.getItem("familySeniorId");
   var seniorName = "";
-  var activeTab = "meds";
+  var activeTab = "overview";
   var refreshInterval = null;
 
   function getFamilyToken() { return localStorage.getItem("familyToken"); }
-
   console.log("[Family] Page load — seniorId:", seniorId, "hasToken:", !!getFamilyToken());
 
-  // Wrapper for authenticated API calls
   async function familyApiCall(url, opts, forceLogoutOn401) {
     opts = opts || {};
     if (forceLogoutOn401 === undefined) forceLogoutOn401 = false;
     var token = getFamilyToken();
-    if (token) {
-      opts.headers = opts.headers || {};
-      opts.headers["x-family-token"] = token;
-    }
+    if (token) { opts.headers = opts.headers || {}; opts.headers["x-family-token"] = token; }
     console.log("[Family] API call:", url, "hasToken:", !!token);
     var res;
-    try {
-      res = await fetch(url, opts);
-    } catch (netErr) {
-      console.error("[Family] Network error on", url, netErr);
-      throw netErr;
-    }
+    try { res = await fetch(url, opts); } catch (netErr) { console.error("[Family] Network error on", url, netErr); throw netErr; }
     console.log("[Family] Response:", url, "status:", res.status);
     if (res.status === 401 && forceLogoutOn401) {
       console.warn("[Family] 401 on critical endpoint, logging out:", url);
-      localStorage.removeItem("familyToken");
-      localStorage.removeItem("familySeniorId");
-      localStorage.removeItem("familySeniorName");
-      document.getElementById("dashboard").style.display = "none";
+      localStorage.removeItem("familyToken"); localStorage.removeItem("familySeniorId"); localStorage.removeItem("familySeniorName");
+      document.getElementById("app").style.display = "none";
       document.getElementById("loginScreen").style.display = "flex";
       if (refreshInterval) clearInterval(refreshInterval);
-      throw new Error("Session expired — please log in again.");
+      throw new Error("Session expired");
     }
     return res;
   }
@@ -731,45 +671,16 @@
   async function joinFamily() {
     var code = document.getElementById("codeInput").value.trim().toUpperCase();
     if (!code) return;
-
-    var btn = document.querySelector(".login-card button");
-    btn.textContent = "Connecting...";
-    btn.disabled = true;
-    btn.style.opacity = "0.6";
+    var btn = document.querySelector(".login-btn");
+    btn.textContent = "Connecting..."; btn.disabled = true; btn.style.opacity = "0.6";
     document.getElementById("loginError").style.display = "none";
-
     var res;
-    try {
-      res = await fetch("/api/family/login", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ familyCode: code }),
-      });
-    } catch (e) {
-      document.getElementById("loginError").textContent = "Connection failed. Check your internet.";
-      document.getElementById("loginError").style.display = "block";
-      btn.textContent = "Connect";
-      btn.disabled = false;
-      btn.style.opacity = "1";
-      return;
-    }
-
-    if (!res.ok) {
-      document.getElementById("loginError").textContent = "Code not found. Please check and try again.";
-      document.getElementById("loginError").style.display = "block";
-      btn.textContent = "Connect";
-      btn.disabled = false;
-      btn.style.opacity = "1";
-      return;
-    }
-
+    try { res = await fetch("/api/family/login", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ familyCode: code }) }); }
+    catch (e) { document.getElementById("loginError").textContent = "Connection failed."; document.getElementById("loginError").style.display = "block"; btn.textContent = "Connect"; btn.disabled = false; btn.style.opacity = "1"; return; }
+    if (!res.ok) { document.getElementById("loginError").textContent = "Code not found. Please check and try again."; document.getElementById("loginError").style.display = "block"; btn.textContent = "Connect"; btn.disabled = false; btn.style.opacity = "1"; return; }
     var data = await res.json();
-    seniorId = data.senior._id;
-    seniorName = data.senior.name;
-    localStorage.setItem("familySeniorId", seniorId);
-    localStorage.setItem("familySeniorName", seniorName);
-    localStorage.setItem("familyToken", data.token);
-
+    seniorId = data.senior._id; seniorName = data.senior.name;
+    localStorage.setItem("familySeniorId", seniorId); localStorage.setItem("familySeniorName", seniorName); localStorage.setItem("familyToken", data.token);
     document.getElementById("loginError").style.display = "none";
     showDashboard();
   }
@@ -777,9 +688,9 @@
   async function showDashboard() {
     if (!seniorId) return;
     document.getElementById("loginScreen").style.display = "none";
-    document.getElementById("dashboard").style.display = "block";
+    document.getElementById("app").style.display = "block";
     seniorName = localStorage.getItem("familySeniorName") || seniorName;
-    document.getElementById("headerSub").textContent = "Monitoring " + escHtml(seniorName);
+    document.getElementById("sidebarSub").textContent = "Monitoring " + seniorName;
     await loadDashboard();
     if (refreshInterval) clearInterval(refreshInterval);
     refreshInterval = setInterval(loadDashboard, 30000);
@@ -790,15 +701,19 @@
     try {
       var res = await familyApiCall("/api/dashboard/" + seniorId, {}, true);
       var d = await res.json();
-
-      document.getElementById("seniorNameDisplay").textContent = d.senior.name;
+      document.getElementById("seniorNameDisplay").textContent = d.senior.name + " — Overview";
       var last = d.recentActivity[0];
       var lastTime = last ? formatRelTime(last.timestamp) : "No activity yet";
       document.getElementById("statusLine").textContent = "Last activity: " + lastTime;
 
       var hasAlerts = d.stats.activeAlerts > 0;
-      document.getElementById("statusBanner").className = "status-banner " + (hasAlerts ? "status-alert" : "status-ok");
-      document.getElementById("statusDot").className = "status-dot " + (hasAlerts ? "dot-red" : "dot-green");
+      var banner = document.getElementById("statusBanner");
+      if (hasAlerts) { banner.style.background = "#FEF2F2"; banner.style.borderColor = "#FECACA"; }
+      else { banner.style.background = "#F0FDF4"; banner.style.borderColor = "#BBF7D0"; }
+      var dot = document.getElementById("statusDot");
+      dot.style.background = hasAlerts ? "var(--red)" : "var(--green)";
+      dot.style.boxShadow = hasAlerts ? "0 0 8px rgba(220,38,38,0.5)" : "0 0 8px rgba(22,163,74,0.5)";
+      document.getElementById("statusText").textContent = hasAlerts ? d.stats.activeAlerts + " alert(s) need attention" : "All good — no open alerts";
 
       document.getElementById("callBtn").onclick = function() { showToast("No phone number on file for " + d.senior.name); };
 
@@ -816,67 +731,44 @@
       renderActivity(d.recentActivity);
       renderAlerts(d.alerts);
       loadConversations().catch(function(err) { console.error("Convo load error:", err); });
-
-    } catch (e) {
-      console.error("Dashboard load error:", e);
-    }
+    } catch (e) { console.error("Dashboard load error:", e); }
   }
 
   function renderMeds(meds) {
     var el = document.getElementById("medList");
-    if (!meds || meds.length === 0) {
-      el.innerHTML = '<p class="empty">No medications added yet. Use the button below to add one.</p>';
-      return;
-    }
+    if (!meds || meds.length === 0) { el.innerHTML = '<div class="table-empty">No medications added yet.</div>'; return; }
     var html = '';
     for (var i = 0; i < meds.length; i++) {
       var m = meds[i];
-      html += '<div class="med-row">';
-      html += '<div class="med-info"><div class="med-name">' + escHtml(m.name) + '</div>';
+      html += '<div class="med-row"><div class="med-info"><div class="med-name">' + escHtml(m.name) + '</div>';
       html += '<div class="med-detail">' + (m.dose ? escHtml(m.dose) + ' &middot; ' : '') + escHtml(m.time || '') + (m.withFood ? ' &middot; with food' : '') + '</div></div>';
-      html += '<div class="med-status ' + (m.takenToday ? 'med-taken' : 'med-pending') + '">' + (m.takenToday ? 'Taken' : 'Pending') + '</div>';
-      html += '</div>';
+      html += '<span class="badge-pill ' + (m.takenToday ? 'badge-taken' : 'badge-pending') + '">' + (m.takenToday ? '✓ Taken' : '⏳ Pending') + '</span></div>';
     }
     el.innerHTML = html;
   }
 
   function renderActivity(activity) {
     var el = document.getElementById("activityList");
-    if (!activity || activity.length === 0) {
-      el.innerHTML = '<p class="empty">No activity recorded yet.</p>';
-      return;
-    }
-    var dotClass = function(type) {
-      if (type === "medication_taken" || type === "medication_added") return "dot-med";
-      if (type === "emergency") return "dot-alert";
-      if (type === "conversation") return "dot-chat";
-      return "dot-system";
-    };
+    if (!activity || activity.length === 0) { el.innerHTML = '<div class="table-empty">No activity recorded yet.</div>'; return; }
+    var dotClass = function(type) { if (type === "medication_taken" || type === "medication_added") return "dot-med"; if (type === "emergency") return "dot-alert"; if (type === "conversation") return "dot-chat"; return "dot-system"; };
     var html = '';
     for (var i = 0; i < activity.length; i++) {
       var a = activity[i];
-      html += '<div class="activity-item">';
-      html += '<div class="activity-dot ' + dotClass(a.type) + '"></div>';
+      html += '<div class="activity-item"><div class="activity-dot ' + dotClass(a.type) + '"></div>';
       html += '<div class="activity-text">' + escHtml(a.description) + '</div>';
-      html += '<div class="activity-time">' + formatRelTime(a.timestamp) + '</div>';
-      html += '</div>';
+      html += '<div class="activity-time">' + formatRelTime(a.timestamp) + '</div></div>';
     }
     el.innerHTML = html;
   }
 
   function renderAlerts(alerts) {
     var el = document.getElementById("alertList");
-    if (!alerts || alerts.length === 0) {
-      el.innerHTML = '<p class="no-alerts">No unresolved alerts</p>';
-      return;
-    }
+    if (!alerts || alerts.length === 0) { el.innerHTML = '<div class="table-empty">No unresolved alerts</div>'; return; }
     var html = '';
     for (var i = 0; i < alerts.length; i++) {
       var a = alerts[i];
-      html += '<div class="alert-item"><div>';
-      html += '<div class="alert-msg">' + escHtml(a.message) + '</div>';
-      html += '<div class="alert-time">' + formatRelTime(a.createdAt) + '</div>';
-      html += '</div>';
+      html += '<div class="alert-item"><div><div class="alert-msg">' + escHtml(a.message) + '</div>';
+      html += '<div class="alert-time">' + formatRelTime(a.createdAt) + '</div></div>';
       html += '<button class="resolve-btn" onclick="resolveAlert(\'' + a._id + '\')">Resolve</button></div>';
     }
     el.innerHTML = html;
@@ -888,16 +780,10 @@
       var res = await familyApiCall("/api/conversations/" + seniorId);
       if (!res.ok) throw new Error("API returned " + res.status);
       var sessions = await res.json();
-      if (!sessions || sessions.length === 0) {
-        el.innerHTML = '<p class="empty">No conversations yet. ' + escHtml(seniorName) + ' hasn\'t talked to Sage today.</p>';
-        return;
-      }
+      if (!sessions || sessions.length === 0) { el.innerHTML = '<div class="table-empty">No conversations yet.</div>'; return; }
       var allMessages = sessions.flatMap(function(s) { return s.messages || []; }).slice(-20);
       renderConvos(allMessages);
-    } catch (e) {
-      console.error("loadConversations error:", e);
-      el.innerHTML = '<p class="empty">Couldn\'t load conversations.</p>';
-    }
+    } catch (e) { console.error("loadConversations error:", e); el.innerHTML = '<div class="table-empty">Couldn\'t load conversations.</div>'; }
   }
 
   async function resolveAlert(id) {
@@ -908,10 +794,7 @@
 
   function renderConvos(messages) {
     var el = document.getElementById("convoList");
-    if (!messages || messages.length === 0) {
-      el.innerHTML = '<p class="empty">No conversations yet.</p>';
-      return;
-    }
+    if (!messages || messages.length === 0) { el.innerHTML = '<div class="table-empty">No conversations yet.</div>'; return; }
     var html = '';
     for (var i = 0; i < messages.length; i++) {
       var m = messages[i];
@@ -923,9 +806,7 @@
     el.innerHTML = html;
   }
 
-  function toggleAddMed() {
-    document.getElementById("addMedForm").classList.toggle("open");
-  }
+  function toggleAddMed() { document.getElementById("addMedForm").classList.toggle("open"); }
 
   async function addMedication() {
     var name = document.getElementById("medName").value.trim();
@@ -933,27 +814,25 @@
     var time = document.getElementById("medTime1").value;
     var withFood = document.getElementById("medFood").value === "1";
     if (!name) { showToast("Please enter a medication name"); return; }
-
-    await familyApiCall("/api/medications", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ seniorId: seniorId, name: name, dose: dose, time: time, withFood: withFood })
-    });
-
-    document.getElementById("medName").value = "";
-    document.getElementById("medDosage").value = "";
+    await familyApiCall("/api/medications", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ seniorId: seniorId, name: name, dose: dose, time: time, withFood: withFood }) });
+    document.getElementById("medName").value = ""; document.getElementById("medDosage").value = "";
     document.getElementById("addMedForm").classList.remove("open");
     showToast(name + " added");
     await loadDashboard();
   }
 
-  function showTab(name, btn) {
-    ["meds","activity","alerts","convo","doctorq","visits","calendar"].forEach(function(t) {
-      document.getElementById("tab-" + t).style.display = "none";
-    });
-    document.querySelectorAll(".tab").forEach(function(b) { b.classList.remove("active"); });
-    document.getElementById("tab-" + name).style.display = "block";
-    btn.classList.add("active");
+  function showTab(name, navEl, mobEl) {
+    var tabs = ["overview","meds","activity","alerts","convo","doctorq","visits","calendar"];
+    for (var i = 0; i < tabs.length; i++) { document.getElementById("tab-" + tabs[i]).classList.remove("active"); }
+    document.querySelectorAll(".nav-item").forEach(function(el) { el.classList.remove("active"); });
+    document.querySelectorAll(".mob-tab").forEach(function(el) { el.classList.remove("active"); });
+    document.getElementById("tab-" + name).classList.add("active");
+    if (navEl) navEl.classList.add("active");
+    if (mobEl) mobEl.classList.add("active");
+    // Also sync the other nav (sidebar ↔ mobile)
+    var sidebarNav = document.querySelector('.nav-item[onclick*="showTab(\'" + name + "\'"]');
+    if (!navEl) { document.querySelectorAll(".nav-item").forEach(function(el) { if (el.getAttribute("onclick") && el.getAttribute("onclick").indexOf("'" + name + "'") > -1) el.classList.add("active"); }); }
+    if (!mobEl) { document.querySelectorAll(".mob-tab").forEach(function(el) { if (el.getAttribute("data-tab") === name) el.classList.add("active"); }); }
     activeTab = name;
     console.log("[Family] showTab:", name);
     try {
@@ -961,110 +840,71 @@
       if (name === "doctorq")  loadDoctorQuestions().catch(function(e) { console.error("[Family] doctorq tab error:", e); });
       if (name === "visits")   loadVisits().catch(function(e) { console.error("[Family] visits tab error:", e); });
       if (name === "calendar") loadCalendar().catch(function(e) { console.error("[Family] calendar tab error:", e); });
-    } catch (e) {
-      console.error("[Family] showTab sync error:", e);
-    }
+    } catch (e) { console.error("[Family] showTab sync error:", e); }
   }
 
-  // ── Calendar ──────────────────────────────────────────────────────────────────
   async function loadCalendar() {
     var el = document.getElementById("calendarList");
     try {
       var res = await familyApiCall("/api/appointments/" + seniorId);
       if (!res.ok) throw new Error("API returned " + res.status);
       var appts = await res.json();
-
-      if (!appts || appts.length === 0) {
-        el.innerHTML = '<p class="empty">No upcoming appointments. ' + escHtml(seniorName) + ' can add them by voice or photo scan in the Sage app.</p>';
-        return;
-      }
-
-      var today = new Date();
-      today.setHours(0, 0, 0, 0);
-
+      if (!appts || appts.length === 0) { el.innerHTML = '<div class="table-empty">No upcoming appointments.</div>'; return; }
+      var today = new Date(); today.setHours(0,0,0,0);
       var groups = {};
-      appts.forEach(function(a) {
-        var d = a.date || "Unknown date";
-        if (!groups[d]) groups[d] = [];
-        groups[d].push(a);
-      });
-
+      appts.forEach(function(a) { var d = a.date || "Unknown"; if (!groups[d]) groups[d] = []; groups[d].push(a); });
       var html = "";
       Object.keys(groups).sort().forEach(function(dateKey) {
         var apptDate = new Date(dateKey + "T00:00:00");
         var isToday = apptDate.toDateString() === today.toDateString();
         var isPast = apptDate < today;
         var label = isToday ? "Today" : apptDate.toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric" });
-
-        html += '<div style="margin-bottom:16px;">';
-        html += '<div style="font-size:11px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;';
-        html += 'color:' + (isToday ? 'var(--green)' : isPast ? 'var(--text3)' : 'var(--accent)') + ';';
-        html += 'margin-bottom:8px;">' + label + '</div>';
-
+        html += '<div style="margin-bottom:16px;"><div style="font-size:12px;font-weight:700;color:' + (isToday ? 'var(--teal)' : isPast ? 'var(--muted)' : 'var(--navy)') + ';letter-spacing:.05em;text-transform:uppercase;margin-bottom:8px;">' + label + '</div>';
         groups[dateKey].forEach(function(a) {
-          html += '<div style="padding:12px 14px;background:' + (isToday ? 'var(--green-bg)' : 'var(--surface2)') + ';';
-          html += 'border:1px solid ' + (isToday ? 'var(--green-b)' : 'var(--border)') + ';';
-          html += 'border-radius:var(--radius);margin-bottom:6px;opacity:' + (isPast ? '0.5' : '1') + ';">';
-          html += '<div style="font-size:14px;font-weight:600;color:var(--text);">' + escHtml(a.title) + '</div>';
-          if (a.time) html += '<div style="font-size:12px;color:var(--accent);font-weight:600;margin-top:3px;">' + escHtml(a.time) + '</div>';
-          if (a.location) html += '<div style="font-size:12px;color:var(--text3);margin-top:2px;">' + escHtml(a.location) + '</div>';
-          if (a.notes) html += '<div style="font-size:12px;color:var(--text3);margin-top:4px;font-style:italic;">' + escHtml(a.notes) + '</div>';
+          html += '<div style="padding:12px 14px;background:' + (isToday ? '#F0FDF4' : isPast ? 'var(--bg)' : 'var(--bg2)') + ';border:1px solid ' + (isToday ? '#BBF7D0' : 'var(--border)') + ';border-radius:var(--radius-sm);margin-bottom:6px;opacity:' + (isPast ? '0.6' : '1') + ';">';
+          html += '<div style="font-size:15px;font-weight:700;color:var(--text);">' + escHtml(a.title) + '</div>';
+          if (a.time) html += '<div style="font-size:13px;color:var(--navy);font-weight:600;margin-top:2px;">' + escHtml(a.time) + '</div>';
+          if (a.location) html += '<div style="font-size:13px;color:var(--muted);margin-top:2px;">' + escHtml(a.location) + '</div>';
+          if (a.notes) html += '<div style="font-size:13px;color:var(--muted);margin-top:4px;font-style:italic;">' + escHtml(a.notes) + '</div>';
           html += '</div>';
         });
-
         html += '</div>';
       });
-
       el.innerHTML = html;
-    } catch (e) {
-      el.innerHTML = '<p class="empty">Couldn\'t load appointments.</p>';
-    }
+    } catch (e) { el.innerHTML = '<div class="table-empty">Couldn\'t load appointments.</div>'; }
   }
 
-  // ── Doctor Questions ──────────────────────────────────────────────────────────
   async function loadDoctorQuestions() {
     var el = document.getElementById("doctorqList");
     try {
       var res = await familyApiCall("/api/doctor-questions/" + seniorId);
       if (!res.ok) throw new Error("API returned " + res.status);
       var questions = await res.json();
-
-      if (!questions || questions.length === 0) {
-        el.innerHTML = '<p class="empty">No doctor questions yet. They\'ll appear here when ' + escHtml(seniorName) + ' adds them through Sage.</p>';
-        return;
-      }
-
+      if (!questions || questions.length === 0) { el.innerHTML = '<div class="table-empty">No doctor questions yet.</div>'; return; }
       var pending = questions.filter(function(q) { return !q.asked; });
       var asked = questions.filter(function(q) { return q.asked; });
-
       var html = "";
       if (pending.length > 0) {
-        html += '<div style="font-size:11px;font-weight:700;color:var(--text3);letter-spacing:.06em;text-transform:uppercase;margin-bottom:10px;">Pending (' + pending.length + ')</div>';
+        html += '<div style="font-size:12px;font-weight:700;color:var(--muted);letter-spacing:.05em;text-transform:uppercase;margin-bottom:10px;">Pending (' + pending.length + ')</div>';
         for (var i = 0; i < pending.length; i++) {
-          var q = pending[i];
           html += '<div style="display:flex;align-items:flex-start;gap:12px;padding:12px 0;border-bottom:1px solid var(--border);">';
-          html += '<div style="width:6px;height:6px;border-radius:50%;background:var(--accent);margin-top:7px;flex-shrink:0;"></div>';
-          html += '<div style="flex:1;"><div style="font-size:14px;line-height:1.55;color:var(--text);">' + escHtml(q.question) + '</div>';
-          html += '<div style="font-size:11px;color:var(--text3);margin-top:4px;">' + formatRelTime(q.createdAt) + '</div></div></div>';
+          html += '<div style="width:8px;height:8px;border-radius:50%;background:var(--navy);margin-top:6px;flex-shrink:0;"></div>';
+          html += '<div style="flex:1;"><div style="font-size:15px;line-height:1.5;color:var(--text);">' + escHtml(pending[i].question) + '</div>';
+          html += '<div style="font-size:12px;color:var(--muted);margin-top:3px;">' + formatRelTime(pending[i].createdAt) + '</div></div></div>';
         }
       }
       if (asked.length > 0) {
-        html += '<div style="font-size:11px;font-weight:700;color:var(--text3);letter-spacing:.06em;text-transform:uppercase;margin:16px 0 10px;">Already Asked (' + asked.length + ')</div>';
+        html += '<div style="font-size:12px;font-weight:700;color:var(--muted);letter-spacing:.05em;text-transform:uppercase;margin:16px 0 10px;">Already Asked (' + asked.length + ')</div>';
         for (var j = 0; j < asked.length; j++) {
-          var qa = asked[j];
-          html += '<div style="display:flex;align-items:flex-start;gap:12px;padding:12px 0;border-bottom:1px solid var(--border);opacity:0.45;">';
-          html += '<div style="width:6px;height:6px;border-radius:50%;background:var(--green);margin-top:7px;flex-shrink:0;"></div>';
-          html += '<div style="font-size:14px;line-height:1.55;text-decoration:line-through;color:var(--text3);">' + escHtml(qa.question) + '</div></div>';
+          html += '<div style="display:flex;align-items:flex-start;gap:12px;padding:12px 0;border-bottom:1px solid var(--border);opacity:0.5;">';
+          html += '<div style="width:8px;height:8px;border-radius:50%;background:var(--green);margin-top:6px;flex-shrink:0;"></div>';
+          html += '<div style="font-size:15px;line-height:1.5;text-decoration:line-through;color:var(--muted);">' + escHtml(asked[j].question) + '</div></div>';
         }
       }
-
       el.innerHTML = html;
-    } catch (e) {
-      el.innerHTML = '<p class="empty">Couldn\'t load questions.</p>';
-    }
+    } catch (e) { el.innerHTML = '<div class="table-empty">Couldn\'t load questions.</div>'; }
   }
 
-  // ── Doctor Visit Transcripts ──────────────────────────────────────────────────
   var visitTranscripts = {};
 
   async function loadVisits() {
@@ -1073,12 +913,7 @@
       var res = await familyApiCall("/api/doctor-visits/" + seniorId);
       if (!res.ok) throw new Error("API returned " + res.status);
       var visits = await res.json();
-
-      if (!visits || visits.length === 0) {
-        el.innerHTML = '<p class="empty">No visit recordings yet. ' + escHtml(seniorName) + ' can record doctor visits using the Sage app.</p>';
-        return;
-      }
-
+      if (!visits || visits.length === 0) { el.innerHTML = '<div class="table-empty">No visit recordings yet.</div>'; return; }
       var html = '';
       for (var i = 0; i < visits.length; i++) {
         var v = visits[i];
@@ -1086,63 +921,49 @@
         var dateStr = new Date(v.createdAt).toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric", year: "numeric" });
         var timeStr = new Date(v.createdAt).toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" });
         var preview = v.transcript.length > 300 ? v.transcript.slice(0, 300) + "..." : v.transcript;
-
-        html += '<div style="border:1px solid var(--border);border-radius:var(--radius);padding:18px;margin-bottom:12px;background:var(--surface2);">';
-        html += '<div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:12px;flex-wrap:wrap;gap:8px;">';
-        html += '<div><div style="font-size:14px;font-weight:700;color:var(--text);">' + dateStr + '</div>';
-        html += '<div style="font-size:12px;color:var(--text3);margin-top:2px;">' + timeStr;
+        html += '<div style="border:1px solid var(--border);border-radius:var(--radius-sm);padding:18px;margin-bottom:12px;background:var(--bg);">';
+        html += '<div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:10px;flex-wrap:wrap;gap:8px;">';
+        html += '<div><div style="font-size:16px;font-weight:700;color:var(--navy);">' + dateStr + '</div>';
+        html += '<div style="font-size:13px;color:var(--muted);margin-top:2px;">' + timeStr;
         if (v.doctorName) html += ' &middot; Dr. ' + escHtml(v.doctorName);
         html += ' &middot; ' + v.wordCount + ' words</div></div>';
-        html += '<span style="background:var(--surface);color:var(--accent);border:1px solid var(--border);border-radius:6px;padding:3px 8px;font-size:11px;font-weight:600;">Transcript</span>';
-        html += '</div>';
-        html += '<div id="visit-text-' + i + '" style="font-size:13px;line-height:1.7;color:var(--text2);white-space:pre-wrap;max-height:120px;overflow:hidden;">' + escHtml(preview) + '</div>';
-        if (v.transcript.length > 300) {
-          html += '<button onclick="expandVisit(' + i + ')" id="expand-btn-' + i + '" style="background:none;border:none;color:var(--accent);font-size:12px;font-weight:600;cursor:pointer;margin-top:8px;padding:0;font-family:var(--font);">Show full transcript</button>';
-        }
-        if (v.notes) {
-          html += '<div style="margin-top:12px;padding-top:12px;border-top:1px solid var(--border);font-size:12px;color:var(--text3);"><strong style="color:var(--text2);">Notes:</strong> ' + escHtml(v.notes) + '</div>';
-        }
+        html += '<span style="background:#EEF4FF;color:var(--navy);border-radius:6px;padding:4px 10px;font-size:12px;font-weight:700;">Transcript</span></div>';
+        html += '<div id="visit-text-' + i + '" style="font-size:14px;line-height:1.7;color:var(--text);white-space:pre-wrap;max-height:120px;overflow:hidden;">' + escHtml(preview) + '</div>';
+        if (v.transcript.length > 300) html += '<button onclick="expandVisit(' + i + ')" id="expand-btn-' + i + '" style="background:none;border:none;color:var(--navy);font-size:13px;font-weight:700;cursor:pointer;margin-top:8px;padding:0;">Read full transcript ↓</button>';
+        if (v.notes) html += '<div style="margin-top:10px;padding-top:10px;border-top:1px solid var(--border);font-size:13px;color:var(--muted);"><strong>Notes:</strong> ' + escHtml(v.notes) + '</div>';
         html += '</div>';
       }
       el.innerHTML = html;
-    } catch (e) {
-      el.innerHTML = '<p class="empty">Couldn\'t load visit transcripts.</p>';
-    }
+    } catch (e) { el.innerHTML = '<div class="table-empty">Couldn\'t load transcripts.</div>'; }
   }
 
   function expandVisit(i) {
     var el = document.getElementById("visit-text-" + i);
-    el.style.maxHeight = "none";
-    el.textContent = visitTranscripts[i] || "";
+    el.style.maxHeight = "none"; el.textContent = visitTranscripts[i] || "";
     var btn = document.getElementById("expand-btn-" + i);
     if (btn) btn.style.display = "none";
   }
 
-  function escHtml(s) {
-    return String(s).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;");
-  }
+  function escHtml(s) { return String(s).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;"); }
 
   function formatRelTime(ts) {
     if (!ts) return "";
     var d = new Date(ts);
     var diff = Math.floor((Date.now() - d.getTime()) / 1000);
-    if (diff < 60)    return "just now";
-    if (diff < 3600)  return Math.floor(diff / 60) + "m ago";
+    if (diff < 60) return "just now";
+    if (diff < 3600) return Math.floor(diff / 60) + "m ago";
     if (diff < 86400) return Math.floor(diff / 3600) + "h ago";
     return d.toLocaleDateString();
   }
 
   function showToast(msg) {
     var t = document.getElementById("toast");
-    t.textContent = msg;
-    t.classList.add("show");
+    t.textContent = msg; t.classList.add("show");
     setTimeout(function() { t.classList.remove("show"); }, 3000);
   }
 
   function logout() {
-    localStorage.removeItem("familySeniorId");
-    localStorage.removeItem("familySeniorName");
-    localStorage.removeItem("familyToken");
+    localStorage.removeItem("familySeniorId"); localStorage.removeItem("familySeniorName"); localStorage.removeItem("familyToken");
     location.reload();
   }
 
