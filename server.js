@@ -477,6 +477,31 @@ app.get("/api/senior/:id", seniorAuth, validateUUID("id"), async (req, res) => {
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
+// ── Phone Numbers ─────────────────────────────────────────────────────────────
+// GET phone numbers for a senior (accessible by both senior and family)
+app.get("/api/phones/:seniorId", anyAuth, validateUUID("seniorId"), async (req, res) => {
+  try {
+    const { data } = await supabase.from("seniors")
+      .select("senior_phone, family_phone")
+      .eq("id", req.params.seniorId).single();
+    if (!data) return res.status(404).json({ error: "Senior not found" });
+    res.json({ seniorPhone: data.senior_phone || "", familyPhone: data.family_phone || "" });
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+// PUT update phone numbers (accessible by both senior and family)
+app.put("/api/phones/:seniorId", anyAuth, validateUUID("seniorId"), async (req, res) => {
+  try {
+    const { seniorPhone, familyPhone } = req.body;
+    const updates = {};
+    if (seniorPhone !== undefined) updates.senior_phone = seniorPhone.replace(/[^\d+\-()\s]/g, "").trim();
+    if (familyPhone !== undefined) updates.family_phone = familyPhone.replace(/[^\d+\-()\s]/g, "").trim();
+    if (Object.keys(updates).length === 0) return res.status(400).json({ error: "No phone fields provided" });
+    await supabase.from("seniors").update(updates).eq("id", req.params.seniorId);
+    res.json({ success: true, ...updates });
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
 // ─────────────────────────────────────────────────────────────────────────────
 // MEDICATIONS
 // ─────────────────────────────────────────────────────────────────────────────

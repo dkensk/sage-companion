@@ -455,6 +455,9 @@
     .mob-tab.active { color: var(--navy); border-bottom-color: var(--navy); }
 
     /* ── RESPONSIVE ─────────────────────────────────────────── */
+    @media (max-width: 600px) {
+      #phoneGrid { grid-template-columns: 1fr !important; }
+    }
     @media (max-width: 768px) {
       .sidebar { display: none; }
       .mobile-bar { display: flex; }
@@ -578,6 +581,32 @@
             <div class="stat-row"><div><div class="stat-label">AI Chats Today</div><div class="stat-value" id="statConvo">&mdash;</div></div><div class="stat-icon">💬</div></div>
           </div>
         </div>
+
+        <!-- Contacts card -->
+        <div class="table-card" style="margin-top:20px;">
+          <div class="table-toolbar"><div class="table-title">📞 Phone Numbers</div></div>
+          <div class="table-body" style="padding:18px 20px;">
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;" id="phoneGrid">
+              <div>
+                <label style="display:block;font-size:12px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.05em;margin-bottom:6px;">Senior's Phone</label>
+                <div style="display:flex;gap:8px;align-items:center;">
+                  <input type="tel" id="seniorPhoneInput" placeholder="(555) 123-4567" style="flex:1;padding:10px 14px;border:1.5px solid var(--border);border-radius:var(--radius-sm);font-size:15px;outline:none;transition:border-color 0.15s;" onfocus="this.style.borderColor='var(--navy)'" onblur="this.style.borderColor='var(--border)'" />
+                  <button onclick="callPhone('senior')" id="callSeniorBtn" class="refresh-btn" style="padding:10px 14px;font-size:14px;white-space:nowrap;" title="Call senior">📞</button>
+                </div>
+              </div>
+              <div>
+                <label style="display:block;font-size:12px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.05em;margin-bottom:6px;">Family Phone</label>
+                <div style="display:flex;gap:8px;align-items:center;">
+                  <input type="tel" id="familyPhoneInput" placeholder="(555) 987-6543" style="flex:1;padding:10px 14px;border:1.5px solid var(--border);border-radius:var(--radius-sm);font-size:15px;outline:none;transition:border-color 0.15s;" onfocus="this.style.borderColor='var(--navy)'" onblur="this.style.borderColor='var(--border)'" />
+                  <button onclick="callPhone('family')" id="callFamilyBtn" class="refresh-btn" style="padding:10px 14px;font-size:14px;white-space:nowrap;" title="Call family">📞</button>
+                </div>
+              </div>
+            </div>
+            <button onclick="savePhones()" class="add-btn" style="margin-top:14px;padding:10px 20px;font-size:14px;">Save Phone Numbers</button>
+            <div id="phoneSaveMsg" style="display:none;margin-top:8px;font-size:13px;color:var(--green);font-weight:600;"></div>
+          </div>
+        </div>
+
       </div>
 
       <!-- Medications page -->
@@ -715,7 +744,8 @@
       dot.style.boxShadow = hasAlerts ? "0 0 8px rgba(220,38,38,0.5)" : "0 0 8px rgba(22,163,74,0.5)";
       document.getElementById("statusText").textContent = hasAlerts ? d.stats.activeAlerts + " alert(s) need attention" : "All good — no open alerts";
 
-      document.getElementById("callBtn").onclick = function() { showToast("No phone number on file for " + d.senior.name); };
+      // Call button is now managed by updateCallBtn() after phones load
+      loadPhones().catch(function(e) { console.error("[Family] phone load error:", e); });
 
       document.getElementById("statMeds").textContent = d.stats.medicationsTaken + "/" + d.stats.medicationsTotal;
       var adh = d.stats.adherence;
@@ -976,6 +1006,66 @@
     var t = document.getElementById("toast");
     t.textContent = msg; t.classList.add("show");
     setTimeout(function() { t.classList.remove("show"); }, 3000);
+  }
+
+  // ── Phone Numbers ──────────────────────────────────────────────────────────
+  var storedSeniorPhone = "";
+  var storedFamilyPhone = "";
+
+  async function loadPhones() {
+    try {
+      var res = await familyApiCall("/api/phones/" + seniorId);
+      if (!res.ok) return;
+      var data = await res.json();
+      storedSeniorPhone = data.seniorPhone || "";
+      storedFamilyPhone = data.familyPhone || "";
+      document.getElementById("seniorPhoneInput").value = storedSeniorPhone;
+      document.getElementById("familyPhoneInput").value = storedFamilyPhone;
+      updateCallBtn();
+    } catch (e) { console.error("[Family] loadPhones error:", e); }
+  }
+
+  function updateCallBtn() {
+    var btn = document.getElementById("callBtn");
+    if (storedSeniorPhone) {
+      btn.onclick = function() { window.location.href = "tel:" + storedSeniorPhone.replace(/[^\d+]/g, ""); };
+      btn.title = "Call " + storedSeniorPhone;
+    } else {
+      btn.onclick = function() {
+        showToast("Add a phone number in the Phone Numbers section below");
+        var phoneCard = document.getElementById("phoneGrid");
+        if (phoneCard) phoneCard.scrollIntoView({ behavior: "smooth", block: "center" });
+      };
+    }
+  }
+
+  async function savePhones() {
+    var sp = document.getElementById("seniorPhoneInput").value.trim();
+    var fp = document.getElementById("familyPhoneInput").value.trim();
+    try {
+      var res = await familyApiCall("/api/phones/" + seniorId, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ seniorPhone: sp, familyPhone: fp })
+      });
+      if (!res.ok) throw new Error("Save failed");
+      storedSeniorPhone = sp;
+      storedFamilyPhone = fp;
+      updateCallBtn();
+      var msg = document.getElementById("phoneSaveMsg");
+      msg.textContent = "✓ Phone numbers saved";
+      msg.style.display = "block";
+      setTimeout(function() { msg.style.display = "none"; }, 3000);
+      showToast("Phone numbers saved");
+    } catch (e) { showToast("Error saving phone numbers"); }
+  }
+
+  function callPhone(who) {
+    var phone = who === "senior" ? document.getElementById("seniorPhoneInput").value.trim() : document.getElementById("familyPhoneInput").value.trim();
+    if (!phone) { showToast("Enter a phone number first"); return; }
+    var digits = phone.replace(/[^\d+]/g, "");
+    if (digits.length < 7) { showToast("Please enter a valid phone number"); return; }
+    window.location.href = "tel:" + digits;
   }
 
   function logout() {

@@ -815,6 +815,10 @@
       <span class="icon">❓</span>
       <span>My Questions</span>
     </button>
+    <button class="action-btn" id="callFamilyAction" onclick="callFamily()" style="background:#FEF2F2;border-color:#FECACA;">
+      <span class="icon">📞</span>
+      <span>Call Family</span>
+    </button>
   </div>
 
   <!-- Add to Home Screen (shown when not installed) -->
@@ -931,6 +935,28 @@
     </div>
   </div>
 
+  <!-- Phone Numbers -->
+  <div class="card" id="phoneSection">
+    <div class="section-title">📞 Phone Numbers</div>
+    <div style="margin-bottom:14px;">
+      <label style="display:block;font-size:16px;font-weight:700;color:var(--text);margin-bottom:6px;">My Phone Number</label>
+      <input type="tel" id="elderSeniorPhone" placeholder="(555) 123-4567"
+        style="width:100%;border:2px solid var(--border);border-radius:12px;padding:14px 16px;font-size:20px;outline:none;background:var(--bg);color:var(--text);transition:border-color 0.15s;"
+        onfocus="this.style.borderColor='var(--navy)'" onblur="this.style.borderColor='var(--border)'" />
+    </div>
+    <div style="margin-bottom:14px;">
+      <label style="display:block;font-size:16px;font-weight:700;color:var(--text);margin-bottom:6px;">Family's Phone Number</label>
+      <input type="tel" id="elderFamilyPhone" placeholder="(555) 987-6543"
+        style="width:100%;border:2px solid var(--border);border-radius:12px;padding:14px 16px;font-size:20px;outline:none;background:var(--bg);color:var(--text);transition:border-color 0.15s;"
+        onfocus="this.style.borderColor='var(--navy)'" onblur="this.style.borderColor='var(--border)'" />
+    </div>
+    <button onclick="saveElderPhones()"
+      style="width:100%;background:var(--teal);color:white;border:none;border-radius:12px;padding:16px;font-size:20px;font-weight:700;cursor:pointer;-webkit-tap-highlight-color:transparent;">
+      Save Phone Numbers
+    </button>
+    <div id="elderPhoneMsg" style="display:none;margin-top:10px;font-size:16px;color:var(--green);font-weight:600;text-align:center;"></div>
+  </div>
+
 </div>
 
 <!-- Emergency button moved to header -->
@@ -943,6 +969,7 @@
     <p>Your family will be notified right away. Do you also want to call 911?</p>
     <div class="modal-btns">
       <button class="call911" onclick="confirmEmergency(true)">📞 Call 911 + Alert Family</button>
+      <button class="family-only" onclick="callFamilyFromEmergency()">📞 Call Family</button>
       <button class="family-only" onclick="confirmEmergency(false)">Alert Family Only</button>
       <button class="cancel-btn" onclick="closeEmergencyModal()">I'm okay — cancel</button>
     </div>
@@ -1175,6 +1202,7 @@
 
     await loadMedications();
     await loadDoctorQuestions();
+    loadElderPhones();
     setupVoice();
     setupQuestionVoice();
 
@@ -1800,6 +1828,88 @@
       showToast("🚨 Your family has been alerted!");
       speak("Your family has been alerted and is on their way.");
     }
+  }
+
+  // ── Phone Numbers ────────────────────────────────────────────────────────────
+  let elderFamilyPhoneStored = "";
+  let elderSeniorPhoneStored = "";
+
+  async function loadElderPhones() {
+    try {
+      const res = await apiCall("/api/phones/" + SENIOR_ID);
+      if (!res.ok) return;
+      const data = await res.json();
+      elderSeniorPhoneStored = data.seniorPhone || "";
+      elderFamilyPhoneStored = data.familyPhone || "";
+      document.getElementById("elderSeniorPhone").value = elderSeniorPhoneStored;
+      document.getElementById("elderFamilyPhone").value = elderFamilyPhoneStored;
+      updateCallFamilyBtn();
+    } catch (e) { console.log("[Elder] phone load error:", e); }
+  }
+
+  function updateCallFamilyBtn() {
+    const btn = document.getElementById("callFamilyAction");
+    if (elderFamilyPhoneStored) {
+      btn.style.background = "#F0FDF4";
+      btn.style.borderColor = "#BBF7D0";
+    } else {
+      btn.style.background = "#FEF2F2";
+      btn.style.borderColor = "#FECACA";
+    }
+  }
+
+  function callFamily() {
+    if (elderFamilyPhoneStored) {
+      const digits = elderFamilyPhoneStored.replace(/[^\d+]/g, "");
+      showToast("📞 Calling family…");
+      speak("Calling your family now.");
+      setTimeout(() => { window.location.href = "tel:" + digits; }, 800);
+    } else {
+      showToast("No family phone number saved. Add one in the Phone Numbers section.");
+      speak("No family phone number is saved yet. Please scroll down and add your family's phone number.");
+      document.getElementById("phoneSection").scrollIntoView({ behavior: "smooth", block: "center" });
+    }
+  }
+
+  function callFamilyFromEmergency() {
+    closeEmergencyModal();
+    // Also alert family via the API
+    apiCall("/api/emergency", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ seniorId: SENIOR_ID })
+    }).catch(() => {});
+    if (elderFamilyPhoneStored) {
+      const digits = elderFamilyPhoneStored.replace(/[^\d+]/g, "");
+      showToast("📞 Calling family and sending alert…");
+      speak("Calling your family now and sending an alert.");
+      setTimeout(() => { window.location.href = "tel:" + digits; }, 1000);
+    } else {
+      showToast("🚨 Family alerted! No phone number on file to call.");
+      speak("Your family has been alerted. Add a phone number to call them directly next time.");
+    }
+  }
+
+  async function saveElderPhones() {
+    const sp = document.getElementById("elderSeniorPhone").value.trim();
+    const fp = document.getElementById("elderFamilyPhone").value.trim();
+    try {
+      const res = await apiCall("/api/phones/" + SENIOR_ID, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ seniorPhone: sp, familyPhone: fp })
+      });
+      if (!res.ok) throw new Error("Save failed");
+      elderSeniorPhoneStored = sp;
+      elderFamilyPhoneStored = fp;
+      updateCallFamilyBtn();
+      const msg = document.getElementById("elderPhoneMsg");
+      msg.textContent = "✓ Phone numbers saved!";
+      msg.style.display = "block";
+      setTimeout(() => { msg.style.display = "none"; }, 3000);
+      showToast("Phone numbers saved!");
+      speak("Phone numbers saved.");
+    } catch (e) { showToast("Error saving phone numbers"); }
   }
 
   // ── Doctor Question Voice Input ────────────────────────────────────────────────
