@@ -9,21 +9,25 @@
 
     :root {
       --navy:      #1E3A8A;
+      --navy-dk:   #0F172A;
       --navy-lt:   #2D4EAA;
       --teal:      #0F766E;
       --teal-lt:   #14B8A6;
       --green:     #16A34A;
       --amber:     #D97706;
       --red:       #DC2626;
-      --bg:        #F1F5F9;
+      --purple:    #7C3AED;
+      --bg:        #F8FAFC;
+      --bg2:       #F1F5F9;
       --white:     #FFFFFF;
       --text:      #0F172A;
       --muted:     #64748B;
       --border:    #E2E8F0;
-      --shadow-sm: 0 1px 3px rgba(0,0,0,0.08);
-      --shadow-md: 0 4px 16px rgba(0,0,0,0.10);
-      --shadow-lg: 0 10px 40px rgba(0,0,0,0.14);
+      --shadow-sm: 0 1px 3px rgba(0,0,0,0.06), 0 1px 2px rgba(0,0,0,0.04);
+      --shadow-md: 0 4px 16px rgba(0,0,0,0.08), 0 2px 6px rgba(0,0,0,0.04);
+      --shadow-lg: 0 12px 40px rgba(0,0,0,0.12), 0 4px 12px rgba(0,0,0,0.06);
       --radius:    16px;
+      --radius-sm: 10px;
     }
 
     html, body { height: 100%; }
@@ -41,7 +45,7 @@
       display: flex;
       align-items: center;
       justify-content: center;
-      background: linear-gradient(160deg, #0F172A 0%, #1E3A8A 60%, #0F766E 100%);
+      background: linear-gradient(160deg, #0F172A 0%, #1E3A8A 50%, #0F766E 100%);
       padding: 24px;
     }
 
@@ -84,63 +88,88 @@
       font-weight: 800;
       cursor: pointer;
       margin-top: 8px;
-      transition: opacity 0.15s;
+      transition: opacity 0.15s, transform 0.1s;
     }
-    .login-btn:hover { opacity: 0.9; }
+    .login-btn:hover { opacity: 0.92; }
+    .login-btn:active { transform: scale(0.98); }
     .login-error { color: var(--red); font-size: 14px; font-weight: 600; margin-top: 12px; display: none; }
 
     /* ── APP LAYOUT ────────────────────────────────────────────── */
     #app { display: none; height: 100vh; overflow: hidden; }
-
     .layout { display: flex; height: 100%; }
 
-    /* sidebar */
+    /* ── SIDEBAR ───────────────────────────────────────────────── */
     .sidebar {
-      width: 220px;
+      width: 240px;
       flex-shrink: 0;
-      background: var(--navy);
+      background: linear-gradient(180deg, var(--navy-dk) 0%, #162650 100%);
       display: flex;
       flex-direction: column;
-      padding: 0;
     }
 
     .sidebar-header {
-      padding: 24px 20px 20px;
-      border-bottom: 1px solid rgba(255,255,255,0.1);
+      padding: 28px 20px 24px;
+      border-bottom: 1px solid rgba(255,255,255,0.08);
     }
     .sidebar-logo { font-size: 28px; }
-    .sidebar-name { font-size: 18px; font-weight: 900; color: white; letter-spacing: -0.02em; margin-top: 4px; }
-    .sidebar-badge { font-size: 11px; font-weight: 700; color: rgba(255,255,255,0.5); letter-spacing: 0.08em; text-transform: uppercase; }
+    .sidebar-name { font-size: 19px; font-weight: 900; color: white; letter-spacing: -0.02em; margin-top: 6px; }
+    .sidebar-badge {
+      display: inline-block;
+      font-size: 10px; font-weight: 700;
+      color: var(--teal-lt);
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+      background: rgba(20,184,166,0.12);
+      padding: 3px 8px;
+      border-radius: 4px;
+      margin-top: 6px;
+    }
 
     .sidebar-nav { flex: 1; padding: 16px 12px; }
     .nav-item {
       display: flex;
       align-items: center;
-      gap: 10px;
-      padding: 11px 12px;
-      border-radius: 10px;
-      color: rgba(255,255,255,0.65);
+      gap: 12px;
+      padding: 12px 14px;
+      border-radius: var(--radius-sm);
+      color: rgba(255,255,255,0.55);
       font-size: 14px;
       font-weight: 600;
       cursor: pointer;
-      transition: background 0.15s, color 0.15s;
-      margin-bottom: 2px;
+      transition: all 0.15s;
+      margin-bottom: 4px;
+      position: relative;
     }
-    .nav-item:hover  { background: rgba(255,255,255,0.08); color: rgba(255,255,255,0.9); }
-    .nav-item.active { background: rgba(255,255,255,0.15); color: white; }
-    .nav-icon { font-size: 18px; }
+    .nav-item:hover  { background: rgba(255,255,255,0.07); color: rgba(255,255,255,0.85); }
+    .nav-item.active { background: rgba(255,255,255,0.12); color: white; }
+    .nav-icon { font-size: 18px; width: 22px; text-align: center; }
+    .nav-badge {
+      position: absolute;
+      right: 12px;
+      background: var(--red);
+      color: white;
+      font-size: 11px;
+      font-weight: 800;
+      min-width: 20px;
+      height: 20px;
+      border-radius: 10px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 0 5px;
+    }
 
     .sidebar-footer {
       padding: 16px 12px;
-      border-top: 1px solid rgba(255,255,255,0.1);
+      border-top: 1px solid rgba(255,255,255,0.08);
     }
     .logout-btn {
       display: flex;
       align-items: center;
-      gap: 8px;
-      padding: 10px 12px;
-      border-radius: 10px;
-      color: rgba(255,255,255,0.5);
+      gap: 10px;
+      padding: 12px 14px;
+      border-radius: var(--radius-sm);
+      color: rgba(255,255,255,0.45);
       font-size: 14px;
       font-weight: 600;
       cursor: pointer;
@@ -149,16 +178,17 @@
       border: none;
       width: 100%;
     }
-    .logout-btn:hover { color: rgba(255,255,255,0.9); }
+    .logout-btn:hover { color: rgba(255,255,255,0.85); }
 
-    /* main */
+    /* ── MAIN CONTENT ─────────────────────────────────────────── */
     .main {
       flex: 1;
       overflow-y: auto;
-      padding: 32px;
+      padding: 32px 36px;
+      background: var(--bg);
     }
 
-    .page { display: none; }
+    .page { display: none; max-width: 1100px; }
     .page.active { display: block; }
 
     /* ── PAGE HEADER ───────────────────────────────────────────── */
@@ -177,36 +207,53 @@
       gap: 8px;
       background: white;
       border: 1.5px solid var(--border);
-      border-radius: 10px;
-      padding: 9px 16px;
+      border-radius: var(--radius-sm);
+      padding: 10px 18px;
       font-size: 14px;
       font-weight: 600;
       color: var(--text);
       cursor: pointer;
-      transition: border-color 0.15s;
+      transition: border-color 0.15s, box-shadow 0.15s;
     }
-    .refresh-btn:hover { border-color: var(--navy); }
+    .refresh-btn:hover { border-color: var(--navy); box-shadow: 0 2px 8px rgba(30,58,138,0.08); }
 
     /* ── STATS CARDS ───────────────────────────────────────────── */
     .stats-grid {
       display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
-      gap: 16px;
-      margin-bottom: 32px;
+      grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
+      gap: 14px;
+      margin-bottom: 28px;
     }
 
     .stat-card {
       background: white;
       border: 1px solid var(--border);
       border-radius: var(--radius);
-      padding: 24px 20px;
+      padding: 22px 20px;
       box-shadow: var(--shadow-sm);
+      position: relative;
+      overflow: hidden;
+      transition: box-shadow 0.2s, transform 0.2s;
     }
+    .stat-card:hover { box-shadow: var(--shadow-md); transform: translateY(-1px); }
+    .stat-card::before {
+      content: "";
+      position: absolute;
+      top: 0; left: 0; right: 0;
+      height: 3px;
+    }
+    .stat-card:nth-child(1)::before { background: linear-gradient(90deg, var(--navy), var(--navy-lt)); }
+    .stat-card:nth-child(2)::before { background: linear-gradient(90deg, var(--green), #22C55E); }
+    .stat-card:nth-child(3)::before { background: linear-gradient(90deg, var(--teal), var(--teal-lt)); }
+    .stat-card:nth-child(4)::before { background: linear-gradient(90deg, var(--red), #EF4444); }
+    .stat-card:nth-child(5)::before { background: linear-gradient(90deg, var(--purple), #8B5CF6); }
+    .stat-card:nth-child(6)::before { background: linear-gradient(90deg, var(--amber), #F59E0B); }
 
-    .stat-icon  { font-size: 28px; margin-bottom: 12px; }
-    .stat-label { font-size: 12px; font-weight: 700; color: var(--muted); letter-spacing: 0.06em; text-transform: uppercase; margin-bottom: 4px; }
-    .stat-value { font-size: 36px; font-weight: 900; color: var(--text); letter-spacing: -0.03em; line-height: 1; }
-    .stat-delta { font-size: 13px; color: var(--muted); margin-top: 4px; }
+    .stat-row { display: flex; align-items: center; justify-content: space-between; }
+    .stat-icon  { font-size: 32px; opacity: 0.85; }
+    .stat-label { font-size: 12px; font-weight: 700; color: var(--muted); letter-spacing: 0.06em; text-transform: uppercase; margin-bottom: 6px; }
+    .stat-value { font-size: 34px; font-weight: 900; color: var(--text); letter-spacing: -0.03em; line-height: 1; }
+    .stat-delta { font-size: 12px; color: var(--muted); margin-top: 6px; }
     .stat-delta.up   { color: var(--green); }
     .stat-delta.warn { color: var(--amber); }
 
@@ -223,7 +270,7 @@
       display: flex;
       align-items: center;
       justify-content: space-between;
-      padding: 18px 20px;
+      padding: 18px 22px;
       border-bottom: 1px solid var(--border);
       gap: 12px;
     }
@@ -236,11 +283,13 @@
       gap: 8px;
       background: var(--bg);
       border: 1.5px solid var(--border);
-      border-radius: 10px;
-      padding: 8px 14px;
+      border-radius: var(--radius-sm);
+      padding: 9px 14px;
       flex: 1;
       max-width: 280px;
+      transition: border-color 0.15s;
     }
+    .search-wrap:focus-within { border-color: var(--navy); }
     .search-wrap input {
       border: none;
       background: transparent;
@@ -255,16 +304,16 @@
     thead tr { background: var(--bg); }
     th {
       text-align: left;
-      padding: 11px 16px;
-      font-size: 12px;
+      padding: 12px 18px;
+      font-size: 11px;
       font-weight: 700;
       color: var(--muted);
-      letter-spacing: 0.05em;
+      letter-spacing: 0.06em;
       text-transform: uppercase;
       white-space: nowrap;
     }
     td {
-      padding: 14px 16px;
+      padding: 14px 18px;
       font-size: 14px;
       border-top: 1px solid var(--border);
       vertical-align: middle;
@@ -273,19 +322,20 @@
     tbody tr:hover { background: #F8FAFF; }
 
     .user-name { font-weight: 700; color: var(--text); }
-    .user-email { font-size: 12px; color: var(--muted); margin-top: 1px; }
+    .user-email { font-size: 12px; color: var(--muted); margin-top: 2px; }
 
     .badge-pill {
       display: inline-block;
-      padding: 3px 10px;
+      padding: 4px 12px;
       border-radius: 100px;
       font-size: 12px;
       font-weight: 700;
       letter-spacing: 0.02em;
     }
-    .badge-active { background: #DCFCE7; color: #15803D; }
-    .badge-idle   { background: #FEF9C3; color: #A16207; }
-    .badge-new    { background: #EFF6FF; color: #1D4ED8; }
+    .badge-active   { background: #DCFCE7; color: #15803D; }
+    .badge-idle     { background: #FEF9C3; color: #A16207; }
+    .badge-new      { background: #EFF6FF; color: #1D4ED8; }
+    .badge-trialing { background: #F3E8FF; color: #7C3AED; }
 
     .table-empty {
       text-align: center;
@@ -294,14 +344,59 @@
       font-size: 15px;
     }
 
+    /* ── ALERT TYPE BADGES ────────────────────────────────────── */
+    .alert-type-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 5px;
+      padding: 4px 10px;
+      border-radius: 6px;
+      font-size: 12px;
+      font-weight: 700;
+      text-transform: capitalize;
+    }
+    .atb-emergency    { background: #FEE2E2; color: var(--red); }
+    .atb-missed       { background: #FEF3C7; color: var(--amber); }
+    .atb-signup       { background: #DCFCE7; color: #15803D; }
+    .atb-cancellation { background: #FEE2E2; color: var(--red); }
+    .atb-info         { background: #EFF6FF; color: #1D4ED8; }
+    .atb-default      { background: var(--bg2); color: var(--muted); }
+
+    .severity-badge {
+      display: inline-block;
+      padding: 4px 10px;
+      border-radius: 100px;
+      font-size: 12px;
+      font-weight: 700;
+    }
+    .sev-critical { background: #FEE2E2; color: var(--red); }
+    .sev-high     { background: #FEE2E2; color: var(--red); }
+    .sev-warning  { background: #FEF3C7; color: var(--amber); }
+    .sev-medium   { background: #FEF3C7; color: var(--amber); }
+    .sev-info     { background: #EFF6FF; color: #1D4ED8; }
+    .sev-low      { background: #F0FDF4; color: var(--green); }
+
+    .resolve-btn {
+      padding: 5px 12px;
+      border-radius: 6px;
+      border: 1.5px solid var(--border);
+      background: white;
+      font-size: 12px;
+      font-weight: 700;
+      cursor: pointer;
+      transition: all 0.15s;
+    }
+    .resolve-btn:hover { border-color: var(--green); color: var(--green); }
+    .resolved-tag { color: var(--green); font-size: 13px; font-weight: 700; }
+
     /* ── USER DETAIL PANEL ────────────────────────────────────── */
     .detail-overlay {
       position: fixed;
       inset: 0;
-      background: rgba(0,0,0,0.4);
+      background: rgba(0,0,0,0.45);
       z-index: 100;
       display: none;
-      backdrop-filter: blur(2px);
+      backdrop-filter: blur(3px);
     }
     .detail-overlay.open { display: flex; justify-content: flex-end; }
 
@@ -387,7 +482,7 @@
     .metrics-grid {
       display: grid;
       grid-template-columns: 1fr 1fr 1fr;
-      gap: 12px;
+      gap: 10px;
     }
 
     .metric-box {
@@ -427,7 +522,7 @@
       align-items: center;
       justify-content: space-between;
       background: var(--bg);
-      border-radius: 10px;
+      border-radius: var(--radius-sm);
       padding: 10px 14px;
       font-size: 14px;
     }
@@ -437,7 +532,7 @@
     /* ── LOADING ───────────────────────────────────────────────── */
     .spinner {
       display: inline-block;
-      width: 20px; height: 20px;
+      width: 22px; height: 22px;
       border: 3px solid var(--border);
       border-top-color: var(--navy);
       border-radius: 50%;
@@ -447,26 +542,10 @@
 
     .loading-row td { text-align: center; padding: 32px; }
 
-    /* ── ALERTS PAGE ───────────────────────────────────────────── */
-    .alert-row { }
-    .alert-type-emergency td:first-child { border-left: 3px solid var(--red); }
-    .alert-type-missed     td:first-child { border-left: 3px solid var(--amber); }
-
-    .severity-badge {
-      display: inline-block;
-      padding: 3px 10px;
-      border-radius: 100px;
-      font-size: 12px;
-      font-weight: 700;
-    }
-    .sev-high   { background: #FEE2E2; color: var(--red); }
-    .sev-medium { background: #FEF3C7; color: var(--amber); }
-    .sev-low    { background: #F0FDF4; color: var(--green); }
-
     /* ── MOBILE TOP BAR ────────────────────────────────────────── */
     .mobile-bar {
       display: none;
-      background: var(--navy);
+      background: var(--navy-dk);
       color: white;
       padding: 14px 16px;
       align-items: center;
@@ -477,7 +556,7 @@
       display: none;
       background: white;
       border-bottom: 1px solid var(--border);
-      padding: 0 12px;
+      padding: 0 8px;
       gap: 0;
       overflow-x: auto;
     }
@@ -492,8 +571,16 @@
       transition: color 0.15s, border-color 0.15s;
       background: none;
       border-top: none; border-left: none; border-right: none;
+      position: relative;
     }
     .mob-tab.active { color: var(--navy); border-bottom-color: var(--navy); }
+    .mob-tab .mob-badge {
+      position: absolute;
+      top: 8px; right: 4px;
+      background: var(--red);
+      width: 8px; height: 8px;
+      border-radius: 50%;
+    }
 
     /* ── RESPONSIVE ────────────────────────────────────────────── */
     @media (max-width: 768px) {
@@ -506,6 +593,13 @@
       .page-header { flex-wrap: wrap; gap: 10px; }
       .table-toolbar { flex-wrap: wrap; }
       .search-wrap { max-width: 100%; }
+      .metrics-grid { grid-template-columns: 1fr 1fr; }
+    }
+    @media (max-width: 480px) {
+      .stats-grid { grid-template-columns: 1fr; }
+      .main { padding: 16px 12px; }
+      .page-title { font-size: 22px; }
+      th, td { padding: 10px 12px; font-size: 13px; }
     }
   </style>
 </head>
@@ -524,7 +618,7 @@
         onkeydown="if(event.key==='Enter') doLogin()" autocomplete="current-password" />
     </div>
 
-    <button class="login-btn" id="loginBtn" onclick="doLogin()">Sign In →</button>
+    <button class="login-btn" id="loginBtn" onclick="doLogin()">Sign In</button>
     <div class="login-error" id="loginError">Incorrect password. Please try again.</div>
   </div>
 </div>
@@ -536,12 +630,12 @@
     <!-- Mobile top bar (visible < 768px) -->
     <div class="mobile-bar" id="mobileBar">
       <span class="mob-title">🌿 Sage Admin</span>
-      <button class="logout-btn" onclick="doLogout()" style="width:auto;padding:6px 10px;font-size:12px;">↩ Sign Out</button>
+      <button class="logout-btn" onclick="doLogout()" style="width:auto;padding:6px 12px;font-size:12px;">Sign Out</button>
     </div>
     <div class="mobile-tabs" id="mobileTabs">
-      <button class="mob-tab active" onclick="showPage('overview',this)" data-page="overview">📊 Overview</button>
-      <button class="mob-tab" onclick="showPage('users',this)" data-page="users">👥 Users</button>
-      <button class="mob-tab" onclick="showPage('alerts',this)" data-page="alerts">🚨 Alerts</button>
+      <button class="mob-tab active" onclick="showPage('overview',this)" data-page="overview">Overview</button>
+      <button class="mob-tab" onclick="showPage('users',this)" data-page="users">Users</button>
+      <button class="mob-tab" onclick="showPage('alerts',this)" data-page="alerts">Alerts <span class="mob-badge" id="mobAlertBadge" style="display:none;"></span></button>
     </div>
 
     <!-- Sidebar -->
@@ -560,7 +654,8 @@
           <span class="nav-icon">👥</span> Users
         </div>
         <div class="nav-item" onclick="showPage('alerts')" id="nav-alerts">
-          <span class="nav-icon">🚨</span> Alerts
+          <span class="nav-icon">🔔</span> Alerts
+          <span class="nav-badge" id="alertBadge" style="display:none;">0</span>
         </div>
       </div>
 
@@ -579,7 +674,7 @@
         <div class="page-header">
           <div>
             <div class="page-title">Overview</div>
-            <div class="page-sub" id="overviewDate">Loading…</div>
+            <div class="page-sub" id="overviewDate">Loading...</div>
           </div>
           <button class="refresh-btn" onclick="loadOverview()">↻ Refresh</button>
         </div>
@@ -614,7 +709,7 @@
         <div class="page-header">
           <div>
             <div class="page-title">All Users</div>
-            <div class="page-sub" id="usersCount">Loading…</div>
+            <div class="page-sub" id="usersCount">Loading...</div>
           </div>
           <button class="refresh-btn" onclick="loadUsers()">↻ Refresh</button>
         </div>
@@ -624,7 +719,7 @@
             <div class="table-title">User List</div>
             <div class="search-wrap">
               <span>🔍</span>
-              <input type="text" id="userSearch" placeholder="Search by name…" oninput="filterUsers()" />
+              <input type="text" id="userSearch" placeholder="Search by name or code..." oninput="filterUsers()" />
             </div>
           </div>
           <table>
@@ -650,19 +745,18 @@
         <div class="page-header">
           <div>
             <div class="page-title">Alerts</div>
-            <div class="page-sub">Emergency and system alerts across all users</div>
+            <div class="page-sub" id="alertsSub">Signups, cancellations, emergencies, and system alerts</div>
           </div>
           <button class="refresh-btn" onclick="loadAlerts()">↻ Refresh</button>
         </div>
 
         <div class="table-card">
           <div class="table-toolbar">
-            <div class="table-title">Recent Alerts</div>
+            <div class="table-title">All Alerts</div>
           </div>
           <table>
             <thead>
               <tr>
-                <th>User</th>
                 <th>Type</th>
                 <th>Message</th>
                 <th>Severity</th>
@@ -671,7 +765,7 @@
               </tr>
             </thead>
             <tbody id="alertsBody">
-              <tr class="loading-row"><td colspan="6"><div class="spinner"></div></td></tr>
+              <tr class="loading-row"><td colspan="5"><div class="spinner"></div></td></tr>
             </tbody>
           </table>
         </div>
@@ -710,7 +804,7 @@
       return;
     }
 
-    btn.textContent = "Signing in…";
+    btn.textContent = "Signing in...";
     btn.disabled = true;
 
     try {
@@ -737,7 +831,7 @@
       document.getElementById("loginPwd").value = "";
       document.getElementById("loginPwd").focus();
     } finally {
-      btn.textContent = "Sign In →";
+      btn.textContent = "Sign In";
       btn.disabled = false;
     }
   }
@@ -819,12 +913,29 @@
     return '<span class="badge-pill badge-new">Inactive</span>';
   }
 
+  function alertTypeBadge(type) {
+    const map = {
+      emergency:    { cls: "atb-emergency",    label: "Emergency" },
+      missed:       { cls: "atb-missed",       label: "Missed Med" },
+      signup:       { cls: "atb-signup",        label: "New Signup" },
+      cancellation: { cls: "atb-cancellation", label: "Cancellation" },
+    };
+    const m = map[type] || { cls: "atb-default", label: type || "System" };
+    return `<span class="alert-type-badge ${m.cls}">${m.label}</span>`;
+  }
+
+  function severityBadge(sev) {
+    const cls = sev === "critical" ? "sev-critical" : sev === "high" ? "sev-high" :
+                sev === "warning" ? "sev-warning" : sev === "medium" ? "sev-medium" :
+                sev === "info" ? "sev-info" : "sev-low";
+    return `<span class="severity-badge ${cls}">${sev || "low"}</span>`;
+  }
+
   // ── Overview ──────────────────────────────────────────────────────────────
   async function loadOverview() {
     document.getElementById("overviewDate").textContent =
       "Last refreshed: " + new Date().toLocaleTimeString();
 
-    // Stats
     try {
       const res = await fetch("/api/admin/stats", { headers: adminHeaders() });
       if (res.status === 401) { doLogout(); return; }
@@ -832,40 +943,34 @@
 
       document.getElementById("statsGrid").innerHTML = `
         <div class="stat-card">
-          <div class="stat-icon">👥</div>
-          <div class="stat-label">Total Users</div>
+          <div class="stat-row"><div><div class="stat-label">Total Users</div>
           <div class="stat-value">${s.totalUsers ?? 0}</div>
-          <div class="stat-delta">All time</div>
+          <div class="stat-delta">All time</div></div><div class="stat-icon">👥</div></div>
         </div>
         <div class="stat-card">
-          <div class="stat-icon">🟢</div>
-          <div class="stat-label">Active Today</div>
+          <div class="stat-row"><div><div class="stat-label">Active Today</div>
           <div class="stat-value">${s.activeToday ?? 0}</div>
-          <div class="stat-delta up">Last 24 hours</div>
+          <div class="stat-delta up">Last 24 hours</div></div><div class="stat-icon">🟢</div></div>
         </div>
         <div class="stat-card">
-          <div class="stat-icon">💬</div>
-          <div class="stat-label">Chats This Week</div>
+          <div class="stat-row"><div><div class="stat-label">Chats This Week</div>
           <div class="stat-value">${s.chatsThisWeek ?? 0}</div>
-          <div class="stat-delta">Past 7 days</div>
+          <div class="stat-delta">Past 7 days</div></div><div class="stat-icon">💬</div></div>
         </div>
         <div class="stat-card">
-          <div class="stat-icon">🚨</div>
-          <div class="stat-label">Emergencies</div>
+          <div class="stat-row"><div><div class="stat-label">Emergencies</div>
           <div class="stat-value" style="color:${s.totalEmergencies > 0 ? 'var(--red)' : 'var(--text)'}">${s.totalEmergencies ?? 0}</div>
-          <div class="stat-delta ${s.totalEmergencies > 0 ? 'warn' : ''}">All time</div>
+          <div class="stat-delta ${s.totalEmergencies > 0 ? 'warn' : ''}">All time</div></div><div class="stat-icon">🚨</div></div>
         </div>
         <div class="stat-card">
-          <div class="stat-icon">💊</div>
-          <div class="stat-label">Meds Taken</div>
+          <div class="stat-row"><div><div class="stat-label">Meds Taken</div>
           <div class="stat-value">${s.medsThisWeek ?? 0}</div>
-          <div class="stat-delta">Past 7 days</div>
+          <div class="stat-delta">Past 7 days</div></div><div class="stat-icon">💊</div></div>
         </div>
         <div class="stat-card">
-          <div class="stat-icon">📅</div>
-          <div class="stat-label">Appointments</div>
+          <div class="stat-row"><div><div class="stat-label">Appointments</div>
           <div class="stat-value">${s.totalAppointments ?? 0}</div>
-          <div class="stat-delta">All time</div>
+          <div class="stat-delta">All time</div></div><div class="stat-icon">📅</div></div>
         </div>
       `;
     } catch (e) {
@@ -951,36 +1056,55 @@
   }
 
   // ── Alerts page ───────────────────────────────────────────────────────────
+  let unresolvedCount = 0;
+
   async function loadAlerts() {
     document.getElementById("alertsBody").innerHTML =
-      '<tr class="loading-row"><td colspan="6"><div class="spinner"></div></td></tr>';
+      '<tr class="loading-row"><td colspan="5"><div class="spinner"></div></td></tr>';
 
     try {
       const res = await fetch("/api/admin/alerts", { headers: adminHeaders() });
       if (res.status === 401) { doLogout(); return; }
       const alerts = await res.json();
 
+      // Update unresolved badge count
+      unresolvedCount = (alerts || []).filter(a => !a.resolved).length;
+      updateAlertBadges();
+
       if (!alerts.length) {
         document.getElementById("alertsBody").innerHTML =
-          '<tr><td colspan="6" class="table-empty">🎉 No alerts — all clear!</td></tr>';
+          '<tr><td colspan="5" class="table-empty">No alerts — all clear!</td></tr>';
         return;
       }
 
-      document.getElementById("alertsBody").innerHTML = alerts.map(a => {
-        const sevClass = a.severity === "high" ? "sev-high" : a.severity === "medium" ? "sev-medium" : "sev-low";
-        return `
-        <tr class="alert-row alert-type-${a.type}">
-          <td><div class="user-name">${esc(a.userName || "Unknown")}</div></td>
-          <td>${esc(a.type || "—")}</td>
-          <td style="max-width:200px;">${esc(a.message || "—")}</td>
-          <td><span class="severity-badge ${sevClass}">${a.severity || "low"}</span></td>
-          <td>${fmtDateTime(a.createdAt)}</td>
-          <td>${a.resolved ? '✅ Resolved' : '🔴 Open'}</td>
+      document.getElementById("alertsBody").innerHTML = alerts.map(a => `
+        <tr>
+          <td>${alertTypeBadge(a.type)}</td>
+          <td style="max-width:280px;line-height:1.4;">${esc(a.message || "—")}</td>
+          <td>${severityBadge(a.severity)}</td>
+          <td style="white-space:nowrap;">${fmtDateTime(a.createdAt)}</td>
+          <td>${a.resolved
+            ? '<span class="resolved-tag">✓ Resolved</span>'
+            : '<span style="color:var(--red);font-weight:700;">Open</span>'
+          }</td>
         </tr>
-      `}).join("");
+      `).join("");
     } catch (e) {
       document.getElementById("alertsBody").innerHTML =
-        '<tr><td colspan="6" class="table-empty">Error loading alerts</td></tr>';
+        '<tr><td colspan="5" class="table-empty">Error loading alerts</td></tr>';
+    }
+  }
+
+  function updateAlertBadges() {
+    const badge = document.getElementById("alertBadge");
+    const mobBadge = document.getElementById("mobAlertBadge");
+    if (unresolvedCount > 0) {
+      badge.textContent = unresolvedCount;
+      badge.style.display = "flex";
+      if (mobBadge) mobBadge.style.display = "block";
+    } else {
+      badge.style.display = "none";
+      if (mobBadge) mobBadge.style.display = "none";
     }
   }
 
@@ -1006,7 +1130,6 @@
     const conditions = (u.conditions || []);
     const meds = (u.medications || []);
     const activity = (u.recentActivity || []).slice(0, 8);
-    const metrics = u.usageMetrics || {};
 
     document.getElementById("detailContent").innerHTML = `
       <div class="detail-user">
@@ -1016,7 +1139,7 @@
           Age ${u.age || "—"} · Joined ${fmtDate(u.createdAt)}<br>
           Last active: ${timeAgo(u.lastActive)}
         </div>
-        <div class="detail-code">🏠 ${esc(u.familyCode)}</div>
+        <div class="detail-code">${esc(u.familyCode)}</div>
       </div>
 
       <div class="detail-section">
@@ -1066,7 +1189,7 @@
           ${meds.map(m => `
             <div class="med-row">
               <div>
-                <div class="med-name">💊 ${esc(m.name)}</div>
+                <div class="med-name">${esc(m.name)}</div>
                 <div class="med-info">${esc(m.dose || "")} · ${esc(m.time || "")}</div>
               </div>
               <span class="badge-pill ${m.active ? 'badge-active' : 'badge-idle'}">${m.active ? "Active" : "Inactive"}</span>

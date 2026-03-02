@@ -740,10 +740,10 @@
     }
 
     .photo-strip {
-      max-width: 960px;
+      max-width: 720px;
       margin: 0 auto;
       display: grid;
-      grid-template-columns: 1fr 1fr 1fr;
+      grid-template-columns: 1fr 1fr;
       gap: 16px;
       align-items: stretch;
     }
@@ -818,7 +818,7 @@
       .two-col      { grid-template-columns: 1fr; }
       .steps        { grid-template-columns: 1fr; gap: 16px; }
       .steps::before { display: none; }
-      .photo-strip  { grid-template-columns: 1fr 1fr; }
+      .photo-strip  { grid-template-columns: 1fr 1fr; gap: 12px; }
       .photo-strip-card img { height: 220px; }
       /* hero stacks vertically on tablet */
       .hero { padding: 100px 28px 56px; }
@@ -845,6 +845,8 @@
       /* on small phones, photo col stacks */
       .hero-photo-col { flex-direction: column; }
       .hero-photo-secondary { width: 70%; align-self: flex-end; margin-top: -32px; height: 160px; }
+      .photo-strip { grid-template-columns: 1fr; max-width: 360px; }
+      .photo-strip-card img { height: 200px; }
     }
   </style>
   <script>
@@ -940,17 +942,8 @@
 <section class="photo-strip-section">
   <div class="photo-strip">
 
-    <!-- Grandmother with grandchildren smiling -->
-    <div class="photo-strip-card reveal">
-      <img src="https://images.pexels.com/photos/6248452/pexels-photo-6248452.jpeg?auto=compress&cs=tinysrgb&w=800&h=560&fit=crop"
-           alt="Smiling grandmother with grandchildren on the couch" loading="lazy" />
-      <div class="photo-strip-overlay">
-        <div class="photo-strip-caption">Extend independence.</div>
-      </div>
-    </div>
-
     <!-- Grandparents with grandchildren -->
-    <div class="photo-strip-card reveal reveal-delay-1">
+    <div class="photo-strip-card reveal">
       <img src="https://images.pexels.com/photos/8317785/pexels-photo-8317785.jpeg?auto=compress&cs=tinysrgb&w=600&h=420&fit=crop"
            alt="Grandfather and grandmother with grandchildren smiling" loading="lazy" />
       <div class="photo-strip-overlay">
@@ -959,11 +952,11 @@
     </div>
 
     <!-- Elderly woman and child looking at flowers -->
-    <div class="photo-strip-card reveal reveal-delay-2">
+    <div class="photo-strip-card reveal reveal-delay-1">
       <img src="https://images.pexels.com/photos/5960695/pexels-photo-5960695.jpeg?auto=compress&cs=tinysrgb&w=600&h=420&fit=crop"
            alt="Grandmother and grandchild enjoying time together" loading="lazy" />
       <div class="photo-strip-overlay">
-        <div class="photo-strip-caption">Making every moment count.</div>
+        <div class="photo-strip-caption">Extend independence.</div>
       </div>
     </div>
 

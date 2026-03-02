@@ -322,10 +322,16 @@ app.post("/api/stripe/webhook", express.raw({ type: "application/json" }), async
       }
       case "customer.subscription.deleted": {
         const sub = event.data.object;
-        const { data: senior } = await supabase.from("seniors").select("id")
+        const { data: senior } = await supabase.from("seniors").select("id, name, email")
           .eq("stripe_customer_id", sub.customer).single();
         if (senior) {
           await supabase.from("seniors").update({ subscription_status: "cancelled" }).eq("id", senior.id);
+          // Admin notification for cancellation
+          await supabase.from("alerts").insert({
+            senior_id: senior.id, type: "cancellation",
+            message: `Subscription cancelled: ${senior.name || "Unknown"} (${senior.email || senior.id})`,
+            severity: "warning", resolved: false,
+          }).catch(() => {});
           console.log(`[Stripe] Subscription cancelled for ${senior.id}`);
         }
         break;
@@ -1291,6 +1297,13 @@ app.post("/api/seniors", async (req, res) => {
     // Issue a senior token so the user is logged in immediately after setup
     const token = makeSeniorToken(senior.id);
     console.log(`✅ New user: ${name} | Family code: ${familyCode}`);
+
+    // Admin notification for new signup
+    await supabase.from("alerts").insert({
+      senior_id: senior.id, type: "signup",
+      message: `New user registered: ${name} (${email.trim().toLowerCase()})`,
+      severity: "info", resolved: false,
+    }).catch(() => {});
 
     // Send welcome email with family code (non-blocking)
     sendWelcomeEmail(email.trim().toLowerCase(), name.trim(), familyCode).catch(e => {
