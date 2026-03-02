@@ -3,9 +3,8 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <!-- PWA -->
   <link rel="manifest" href="/manifest.json">
-  <meta name="theme-color" content="#1E3A8A">
+  <meta name="theme-color" content="#09090B">
   <meta name="mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
@@ -15,272 +14,313 @@
   <title>Sage Companion — Family Dashboard</title>
   <style>
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
-
     html { overflow-x: hidden; }
 
     :root {
-      --navy:   #1E3A8A;
-      --teal:   #0F766E;
-      --bg:     #F1F5F9;
-      --white:  #FFFFFF;
-      --text:   #0F172A;
-      --muted:  #64748B;
-      --border: #E2E8F0;
-      --red:    #DC2626;
-      --green:  #16A34A;
-      --yellow: #D97706;
-      --ease:   cubic-bezier(0.25, 0.46, 0.45, 0.94);
-      --shadow: 0 1px 4px rgba(0,0,0,0.07), 0 2px 12px rgba(0,0,0,0.05);
-      --shadow-lg: 0 8px 32px rgba(0,0,0,0.12);
+      --bg:       #09090B;
+      --surface:  #18181B;
+      --surface2: #27272A;
+      --border:   #3F3F46;
+      --border-s: #52525B;
+      --text:     #FAFAFA;
+      --text2:    #A1A1AA;
+      --text3:    #71717A;
+      --accent:   #3B82F6;
+      --accent2:  #2563EB;
+      --green:    #22C55E;
+      --green-bg: rgba(34,197,94,0.1);
+      --green-b:  rgba(34,197,94,0.25);
+      --red:      #EF4444;
+      --red-bg:   rgba(239,68,68,0.1);
+      --red-b:    rgba(239,68,68,0.25);
+      --amber:    #F59E0B;
+      --amber-bg: rgba(245,158,11,0.1);
+      --amber-b:  rgba(245,158,11,0.25);
+      --radius:   12px;
+      --radius-lg:16px;
+      --ease:     cubic-bezier(0.16, 1, 0.3, 1);
+      --font:     'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
     }
 
+    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap');
+
     body {
-      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
+      font-family: var(--font);
       background: var(--bg);
       color: var(--text);
       min-height: 100vh;
-      width: 100%;
-      max-width: 100vw;
       overflow-x: hidden;
-      padding-bottom: 40px;
       -webkit-font-smoothing: antialiased;
     }
 
-    /* ── HEADER ──────────────────────────────────────────── */
+    /* ── HEADER ─────────────────────────────────────────── */
     header {
-      background: linear-gradient(135deg, var(--navy) 0%, #1E4DA0 100%);
-      color: white;
-      padding: 18px 24px;
+      background: var(--surface);
+      border-bottom: 1px solid var(--border);
+      padding: 0 24px;
+      height: 56px;
       display: flex;
       align-items: center;
       justify-content: space-between;
-      gap: 12px;
       position: sticky;
       top: 0;
       z-index: 100;
-      width: 100%;
-      box-shadow: 0 2px 16px rgba(30,58,138,0.25);
+      backdrop-filter: blur(12px);
+      -webkit-backdrop-filter: blur(12px);
     }
 
-    .logo { font-size: 20px; font-weight: 900; letter-spacing: -0.3px; display: flex; align-items: center; gap: 8px; }
-    .header-sub { font-size: 13px; opacity: 0.75; margin-top: 3px; font-weight: 500; }
+    .logo {
+      font-size: 15px;
+      font-weight: 700;
+      color: var(--text);
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      letter-spacing: -0.01em;
+    }
 
-    .header-actions { display: flex; gap: 8px; }
+    .logo-icon {
+      width: 28px; height: 28px;
+      background: linear-gradient(135deg, #22C55E, #16A34A);
+      border-radius: 8px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 14px;
+    }
 
-    .header-btn {
-      background: rgba(255,255,255,0.15);
-      border: 1px solid rgba(255,255,255,0.2);
-      color: white;
-      padding: 8px 14px;
-      border-radius: 10px;
+    .header-sub {
+      font-size: 12px;
+      color: var(--text3);
+      font-weight: 500;
+      margin-left: 12px;
+      padding-left: 12px;
+      border-left: 1px solid var(--border);
+    }
+
+    .header-right { display: flex; align-items: center; gap: 6px; }
+
+    .h-btn {
+      background: transparent;
+      border: 1px solid var(--border);
+      color: var(--text2);
+      padding: 6px 12px;
+      border-radius: 8px;
       cursor: pointer;
       font-size: 13px;
-      font-weight: 600;
-      transition: background 0.15s;
+      font-weight: 500;
+      font-family: var(--font);
+      transition: all 0.15s;
       -webkit-tap-highlight-color: transparent;
     }
+    .h-btn:hover { background: var(--surface2); color: var(--text); border-color: var(--border-s); }
+    .h-btn.danger:hover { color: var(--red); border-color: var(--red); }
 
-    .header-btn:hover { background: rgba(255,255,255,0.25); }
-
-    /* ── LOGIN ───────────────────────────────────────────── */
+    /* ── LOGIN ──────────────────────────────────────────── */
     #loginScreen {
       display: flex;
       align-items: center;
       justify-content: center;
-      min-height: calc(100vh - 64px);
+      min-height: calc(100vh - 56px);
       padding: 24px;
     }
 
     .login-card {
-      background: white;
-      border-radius: 24px;
-      padding: 40px 32px;
-      max-width: 400px;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-lg);
+      padding: 48px 36px;
+      max-width: 420px;
       width: 100%;
-      box-shadow: var(--shadow-lg);
       text-align: center;
-      animation: fadeUp 0.5s var(--ease) forwards;
+      animation: fadeUp 0.4s var(--ease) forwards;
     }
 
-    .login-shield { font-size: 56px; margin-bottom: 16px; }
+    .login-icon {
+      width: 56px; height: 56px;
+      background: linear-gradient(135deg, var(--accent), #6366F1);
+      border-radius: 16px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 24px;
+      margin: 0 auto 20px;
+    }
 
     .login-card h2 {
-      font-size: 28px;
-      font-weight: 900;
-      color: var(--navy);
+      font-size: 24px;
+      font-weight: 700;
+      color: var(--text);
       margin-bottom: 8px;
       letter-spacing: -0.02em;
     }
 
-    .login-card p {
-      font-size: 16px;
-      color: var(--muted);
-      margin-bottom: 32px;
-      line-height: 1.55;
+    .login-card > p {
+      font-size: 14px;
+      color: var(--text3);
+      margin-bottom: 28px;
+      line-height: 1.6;
     }
 
     .login-card input {
       width: 100%;
-      border: 2px solid var(--border);
-      border-radius: 14px;
-      padding: 18px;
-      font-size: 22px;
+      background: var(--bg);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 14px 16px;
+      font-size: 20px;
       text-align: center;
       letter-spacing: 6px;
-      font-weight: 800;
+      font-weight: 700;
       outline: none;
-      margin-bottom: 14px;
+      margin-bottom: 12px;
       text-transform: uppercase;
-      transition: border-color 0.15s;
       color: var(--text);
+      font-family: 'SF Mono', 'Fira Code', monospace;
+      transition: border-color 0.15s;
     }
-
-    .login-card input:focus { border-color: var(--navy); }
+    .login-card input::placeholder { color: var(--text3); letter-spacing: 3px; font-weight: 500; font-size: 14px; }
+    .login-card input:focus { border-color: var(--accent); box-shadow: 0 0 0 3px rgba(59,130,246,0.15); }
 
     .login-card button {
       width: 100%;
-      background: linear-gradient(135deg, var(--navy), #2D4EAA);
+      background: var(--accent);
       color: white;
       border: none;
-      border-radius: 14px;
-      padding: 17px;
-      font-size: 17px;
-      font-weight: 700;
+      border-radius: var(--radius);
+      padding: 13px;
+      font-size: 14px;
+      font-weight: 600;
       cursor: pointer;
-      box-shadow: 0 4px 16px rgba(30,58,138,0.3);
-      transition: transform 0.15s var(--ease), box-shadow 0.15s;
-      -webkit-tap-highlight-color: transparent;
+      font-family: var(--font);
+      transition: background 0.15s;
     }
+    .login-card button:hover { background: var(--accent2); }
+    .login-card button:active { transform: scale(0.99); }
 
-    .login-card button:active { transform: scale(0.98); box-shadow: 0 2px 8px rgba(30,58,138,0.25); }
+    .login-error { color: var(--red); font-size: 13px; margin-top: 12px; display: none; font-weight: 500; }
+    .login-hint { font-size: 12px; color: var(--text3); margin-top: 20px; }
+    .login-hint code { background: var(--surface2); padding: 2px 8px; border-radius: 4px; font-weight: 600; color: var(--text2); }
 
-    .login-error { color: var(--red); font-size: 14px; margin-top: 12px; display: none; font-weight: 500; }
-    .login-hint { font-size: 13px; color: var(--muted); margin-top: 20px; }
-    .login-hint strong { color: var(--text); }
+    /* ── DASHBOARD ──────────────────────────────────────── */
+    #dashboard { display: none; padding: 24px 20px 40px; max-width: 800px; margin: 0 auto; }
 
-    /* ── DASHBOARD ───────────────────────────────────────── */
-    #dashboard { display: none; padding: 20px 18px; max-width: 720px; margin: 0 auto; }
-
-    /* ── STATUS BANNER ───────────────────────────────────── */
+    /* ── STATUS BANNER ──────────────────────────────────── */
     .status-banner {
-      border-radius: 20px;
-      padding: 20px 22px;
-      margin-bottom: 16px;
+      border-radius: var(--radius-lg);
+      padding: 20px 24px;
+      margin-bottom: 20px;
       display: flex;
       align-items: center;
       justify-content: space-between;
-      gap: 12px;
+      gap: 16px;
       animation: fadeUp 0.4s var(--ease) forwards;
     }
-
-    .status-ok    { background: linear-gradient(135deg, #F0FDF4, #DCFCE7); border: 1.5px solid #BBF7D0; }
-    .status-alert { background: linear-gradient(135deg, #FEF2F2, #FEE2E2); border: 1.5px solid #FECACA; }
+    .status-ok { background: var(--green-bg); border: 1px solid var(--green-b); }
+    .status-alert { background: var(--red-bg); border: 1px solid var(--red-b); }
 
     .status-left { flex: 1; }
-    .status-indicator { display: flex; align-items: center; gap: 8px; margin-bottom: 4px; }
-    .status-dot { width: 10px; height: 10px; border-radius: 50%; flex-shrink: 0; }
-    .dot-green { background: var(--green); box-shadow: 0 0 8px rgba(22,163,74,0.5); }
-    .dot-red   { background: var(--red);   box-shadow: 0 0 8px rgba(220,38,38,0.5);   }
-    .status-name { font-size: 24px; font-weight: 900; color: var(--text); letter-spacing: -0.02em; }
-    .status-line { font-size: 14px; color: var(--muted); font-weight: 500; }
+    .status-indicator { display: flex; align-items: center; gap: 10px; margin-bottom: 4px; }
+    .status-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
+    .dot-green { background: var(--green); box-shadow: 0 0 8px rgba(34,197,94,0.6); }
+    .dot-red   { background: var(--red);   box-shadow: 0 0 8px rgba(239,68,68,0.6); }
+    .status-name { font-size: 20px; font-weight: 700; color: var(--text); letter-spacing: -0.02em; }
+    .status-line { font-size: 13px; color: var(--text3); font-weight: 500; }
 
     .call-btn {
-      background: var(--navy);
-      color: white;
-      border: none;
-      border-radius: 12px;
-      padding: 11px 18px;
-      font-size: 14px;
-      font-weight: 700;
+      background: var(--surface2);
+      color: var(--text);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 10px 16px;
+      font-size: 13px;
+      font-weight: 600;
       cursor: pointer;
       white-space: nowrap;
-      transition: transform 0.15s var(--ease);
+      font-family: var(--font);
+      transition: all 0.15s;
       flex-shrink: 0;
     }
+    .call-btn:hover { background: var(--border); }
 
-    .call-btn:active { transform: scale(0.96); }
-
-    /* ── STATS GRID ──────────────────────────────────────── */
+    /* ── STATS ──────────────────────────────────────────── */
     .stats {
       display: grid;
-      grid-template-columns: 1fr 1fr;
+      grid-template-columns: repeat(4, 1fr);
       gap: 12px;
-      margin-bottom: 16px;
+      margin-bottom: 24px;
     }
 
     .stat {
-      background: var(--white);
-      border-radius: 18px;
-      padding: 18px 16px;
-      box-shadow: var(--shadow);
-      transition: transform 0.18s var(--ease), box-shadow 0.18s var(--ease);
-      animation: fadeUp 0.45s var(--ease) forwards;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 16px;
+      transition: border-color 0.15s;
+      animation: fadeUp 0.4s var(--ease) forwards;
       opacity: 0;
     }
-
     .stat:nth-child(1) { animation-delay: 0.05s; }
     .stat:nth-child(2) { animation-delay: 0.1s; }
     .stat:nth-child(3) { animation-delay: 0.15s; }
     .stat:nth-child(4) { animation-delay: 0.2s; }
+    .stat:hover { border-color: var(--border-s); }
 
-    .stat:hover { transform: translateY(-3px); box-shadow: var(--shadow-lg); }
+    .stat-label { font-size: 11px; color: var(--text3); font-weight: 600; letter-spacing: 0.06em; text-transform: uppercase; margin-bottom: 8px; }
+    .stat-value { font-size: 28px; font-weight: 800; color: var(--text); letter-spacing: -0.03em; line-height: 1; }
+    .stat-sub { font-size: 11px; color: var(--text3); margin-top: 4px; }
 
-    .stat-emoji { font-size: 26px; margin-bottom: 8px; }
-    .stat-label { font-size: 12px; color: var(--muted); font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; margin-bottom: 4px; }
-    .stat-value { font-size: 24px; font-weight: 900; color: var(--text); letter-spacing: -0.02em; }
-    .stat-sub { font-size: 12px; color: var(--muted); margin-top: 2px; }
-    .stat.warn .stat-value { color: var(--yellow); }
-    .stat.good .stat-value { color: var(--green); }
-
-    .progress-track { height: 6px; background: var(--border); border-radius: 3px; overflow: hidden; margin-top: 10px; }
-    .progress-fill  { height: 100%; border-radius: 3px; transition: width 0.8s var(--ease); }
+    .progress-track { height: 4px; background: var(--surface2); border-radius: 2px; overflow: hidden; margin-top: 10px; }
+    .progress-fill  { height: 100%; border-radius: 2px; transition: width 0.8s var(--ease); }
     .fill-green  { background: var(--green); }
-    .fill-yellow { background: var(--yellow); }
+    .fill-yellow { background: var(--amber); }
     .fill-red    { background: var(--red); }
 
-    /* ── TABS ────────────────────────────────────────────── */
+    /* ── TABS ───────────────────────────────────────────── */
     .tabs {
       display: flex;
-      gap: 8px;
-      margin-bottom: 16px;
+      gap: 2px;
+      margin-bottom: 20px;
       overflow-x: auto;
-      padding-bottom: 2px;
       scrollbar-width: none;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 4px;
     }
-
     .tabs::-webkit-scrollbar { display: none; }
 
     .tab {
-      background: var(--white);
-      border: 1.5px solid var(--border);
-      border-radius: 100px;
-      padding: 9px 18px;
-      font-size: 14px;
-      font-weight: 600;
+      background: transparent;
+      border: none;
+      border-radius: 8px;
+      padding: 8px 14px;
+      font-size: 13px;
+      font-weight: 500;
       cursor: pointer;
       white-space: nowrap;
-      color: var(--muted);
-      transition: all 0.15s var(--ease);
+      color: var(--text3);
+      font-family: var(--font);
+      transition: all 0.15s;
       -webkit-tap-highlight-color: transparent;
     }
+    .tab:hover { color: var(--text2); background: var(--surface2); }
+    .tab.active { background: var(--text); color: var(--bg); font-weight: 600; }
 
-    .tab:hover { border-color: var(--navy); color: var(--navy); }
-    .tab.active { background: var(--navy); color: white; border-color: var(--navy); }
-
-    /* ── CARDS ───────────────────────────────────────────── */
+    /* ── CARDS ──────────────────────────────────────────── */
     .card {
-      background: var(--white);
-      border-radius: 20px;
-      padding: 20px;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-lg);
+      padding: 24px;
       margin-bottom: 16px;
-      box-shadow: var(--shadow);
     }
 
     .card-title {
-      font-size: 16px;
-      font-weight: 700;
-      color: var(--muted);
-      letter-spacing: 0.04em;
+      font-size: 13px;
+      font-weight: 600;
+      color: var(--text3);
+      letter-spacing: 0.05em;
       text-transform: uppercase;
       margin-bottom: 16px;
       display: flex;
@@ -288,35 +328,38 @@
       gap: 8px;
     }
 
-    /* ── MED LIST ────────────────────────────────────────── */
+    .card-subtitle {
+      color: var(--text3);
+      font-size: 13px;
+      margin-bottom: 16px;
+      line-height: 1.5;
+    }
+
+    /* ── MED LIST ───────────────────────────────────────── */
     .med-row {
       display: flex;
       align-items: center;
       justify-content: space-between;
-      padding: 13px 0;
+      padding: 12px 0;
       border-bottom: 1px solid var(--border);
       gap: 12px;
-      min-width: 0;
     }
-
-    .med-info { min-width: 0; flex: 1; overflow-wrap: break-word; word-break: break-word; }
-
+    .med-info { min-width: 0; flex: 1; }
     .med-row:last-child { border-bottom: none; }
-    .med-name { font-size: 16px; font-weight: 700; }
-    .med-detail { font-size: 13px; color: var(--muted); margin-top: 2px; }
+    .med-name { font-size: 14px; font-weight: 600; color: var(--text); }
+    .med-detail { font-size: 12px; color: var(--text3); margin-top: 2px; }
 
     .med-status {
-      font-size: 13px;
-      font-weight: 700;
-      padding: 6px 12px;
-      border-radius: 8px;
+      font-size: 12px;
+      font-weight: 600;
+      padding: 4px 10px;
+      border-radius: 6px;
       flex-shrink: 0;
     }
+    .med-taken   { background: var(--green-bg); color: var(--green); border: 1px solid var(--green-b); }
+    .med-pending { background: var(--amber-bg); color: var(--amber); border: 1px solid var(--amber-b); }
 
-    .med-taken   { background: #DCFCE7; color: #15803D; border: 1px solid #BBF7D0; }
-    .med-pending { background: #FEF9C3; color: #92400E; border: 1px solid #FDE68A; }
-
-    /* ── ACTIVITY ────────────────────────────────────────── */
+    /* ── ACTIVITY ───────────────────────────────────────── */
     .activity-item {
       display: flex;
       gap: 12px;
@@ -324,172 +367,175 @@
       border-bottom: 1px solid var(--border);
       align-items: flex-start;
     }
-
     .activity-item:last-child { border-bottom: none; }
 
     .activity-dot {
-      width: 8px; height: 8px;
+      width: 6px; height: 6px;
       border-radius: 50%;
-      background: var(--navy);
       flex-shrink: 0;
-      margin-top: 6px;
+      margin-top: 7px;
     }
-
     .activity-dot.dot-med    { background: var(--green); }
     .activity-dot.dot-alert  { background: var(--red); }
-    .activity-dot.dot-chat   { background: var(--navy); }
-    .activity-dot.dot-system { background: var(--muted); }
+    .activity-dot.dot-chat   { background: var(--accent); }
+    .activity-dot.dot-system { background: var(--text3); }
 
-    .activity-text { font-size: 14px; color: var(--text); flex: 1; line-height: 1.4; }
-    .activity-time { font-size: 12px; color: var(--muted); white-space: nowrap; font-weight: 500; }
+    .activity-text { font-size: 13px; color: var(--text2); flex: 1; line-height: 1.5; }
+    .activity-time { font-size: 11px; color: var(--text3); white-space: nowrap; font-weight: 500; font-variant-numeric: tabular-nums; }
 
-    /* ── ALERTS ──────────────────────────────────────────── */
+    /* ── ALERTS ─────────────────────────────────────────── */
     .alert-item {
-      background: #FEF2F2;
-      border: 1px solid #FECACA;
-      border-radius: 14px;
+      background: var(--red-bg);
+      border: 1px solid var(--red-b);
+      border-radius: var(--radius);
       padding: 14px 16px;
-      margin-bottom: 10px;
+      margin-bottom: 8px;
       display: flex;
       justify-content: space-between;
       align-items: flex-start;
       gap: 12px;
     }
-
-    .alert-msg { font-size: 14px; color: var(--text); font-weight: 500; }
-    .alert-time { font-size: 12px; color: var(--muted); margin-top: 4px; }
+    .alert-msg { font-size: 13px; color: var(--text); font-weight: 500; }
+    .alert-time { font-size: 11px; color: var(--text3); margin-top: 4px; }
 
     .resolve-btn {
-      background: var(--white);
-      border: 1.5px solid var(--border);
-      border-radius: 8px;
-      padding: 7px 13px;
-      font-size: 13px;
+      background: transparent;
+      border: 1px solid var(--border-s);
+      border-radius: 6px;
+      padding: 5px 10px;
+      font-size: 12px;
       font-weight: 600;
       cursor: pointer;
-      color: var(--muted);
+      color: var(--text3);
+      font-family: var(--font);
       white-space: nowrap;
       flex-shrink: 0;
-      transition: border-color 0.15s, color 0.15s;
+      transition: all 0.15s;
     }
-
     .resolve-btn:hover { border-color: var(--green); color: var(--green); }
-    .no-alerts { color: var(--muted); font-size: 15px; padding: 6px 0; }
+    .no-alerts { color: var(--text3); font-size: 13px; padding: 4px 0; }
 
-    /* ── CONVERSATIONS ───────────────────────────────────── */
+    /* ── CONVERSATIONS ──────────────────────────────────── */
     .convo-item {
       display: flex;
       gap: 10px;
-      margin-bottom: 10px;
+      margin-bottom: 8px;
     }
 
     .convo-bubble {
       padding: 10px 14px;
-      border-radius: 14px;
-      font-size: 14px;
-      line-height: 1.5;
-      max-width: 82%;
+      border-radius: 12px;
+      font-size: 13px;
+      line-height: 1.55;
+      max-width: 80%;
     }
+    .convo-user { background: var(--accent); color: white; }
+    .convo-sage { background: var(--surface2); color: var(--text2); border: 1px solid var(--border); }
+    .convo-label { font-size: 10px; color: var(--text3); margin-bottom: 4px; font-weight: 600; letter-spacing: 0.04em; text-transform: uppercase; }
 
-    .convo-user { background: var(--navy); color: white; }
-    .convo-sage { background: #EEF4FF; color: var(--text); border: 1px solid #DBEAFE; }
-    .convo-label { font-size: 11px; color: var(--muted); margin-bottom: 4px; font-weight: 600; letter-spacing: 0.03em; text-transform: uppercase; }
-
-    /* ── ADD MED FORM ────────────────────────────────────── */
+    /* ── ADD MED FORM ───────────────────────────────────── */
     .add-med-form { display: none; border-top: 1px solid var(--border); padding-top: 16px; margin-top: 16px; }
     .add-med-form.open { display: block; }
 
-    .form-row { display: flex; gap: 10px; margin-bottom: 10px; }
+    .form-row { display: flex; gap: 8px; margin-bottom: 8px; }
 
     .form-row input, .form-row select {
       flex: 1;
-      border: 2px solid var(--border);
-      border-radius: 10px;
-      padding: 11px 13px;
-      font-size: 14px;
-      outline: none;
-      transition: border-color 0.15s;
-      color: var(--text);
       background: var(--bg);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 10px 12px;
+      font-size: 13px;
+      font-family: var(--font);
+      outline: none;
+      color: var(--text);
+      transition: border-color 0.15s;
     }
-
-    .form-row input:focus, .form-row select:focus { border-color: var(--navy); background: white; }
+    .form-row input::placeholder { color: var(--text3); }
+    .form-row input:focus, .form-row select:focus { border-color: var(--accent); }
+    .form-row select { color: var(--text2); }
+    .form-row select option { background: var(--surface); }
 
     .add-btn {
-      background: var(--teal);
-      color: white;
+      background: var(--green);
+      color: #000;
       border: none;
-      border-radius: 10px;
-      padding: 11px 18px;
-      font-size: 14px;
+      border-radius: 8px;
+      padding: 10px 16px;
+      font-size: 13px;
       font-weight: 700;
       cursor: pointer;
+      font-family: var(--font);
       flex-shrink: 0;
-      transition: transform 0.15s var(--ease);
+      transition: opacity 0.15s;
     }
-
-    .add-btn:active { transform: scale(0.96); }
+    .add-btn:hover { opacity: 0.9; }
 
     .toggle-form-btn {
-      background: none;
-      border: 2px dashed var(--border);
-      border-radius: 12px;
-      padding: 11px 16px;
-      font-size: 14px;
-      color: var(--muted);
+      background: transparent;
+      border: 1px dashed var(--border);
+      border-radius: var(--radius);
+      padding: 10px 16px;
+      font-size: 13px;
+      color: var(--text3);
       cursor: pointer;
       width: 100%;
-      font-weight: 600;
-      margin-top: 14px;
-      transition: border-color 0.15s, color 0.15s;
+      font-weight: 500;
+      font-family: var(--font);
+      margin-top: 12px;
+      transition: all 0.15s;
     }
+    .toggle-form-btn:hover { border-color: var(--accent); color: var(--accent); }
 
-    .toggle-form-btn:hover { border-color: var(--teal); color: var(--teal); }
-
-    /* ── EMPTY / TOAST ───────────────────────────────────── */
-    .empty { color: var(--muted); font-size: 14px; padding: 8px 0; }
+    /* ── EMPTY / TOAST ──────────────────────────────────── */
+    .empty { color: var(--text3); font-size: 13px; padding: 8px 0; line-height: 1.5; }
 
     #toast {
       position: fixed;
-      top: 24px;
+      bottom: 24px;
       left: 50%;
-      transform: translateX(-50%) translateY(-8px);
-      background: #0F172A;
-      color: white;
-      padding: 12px 22px;
-      border-radius: 100px;
-      font-size: 14px;
+      transform: translateX(-50%) translateY(8px);
+      background: var(--text);
+      color: var(--bg);
+      padding: 10px 20px;
+      border-radius: 8px;
+      font-size: 13px;
       font-weight: 600;
       opacity: 0;
-      transition: opacity 0.25s var(--ease), transform 0.25s var(--ease);
+      transition: opacity 0.2s, transform 0.2s;
       z-index: 999;
       pointer-events: none;
       max-width: calc(100vw - 32px);
-      white-space: normal;
-      text-align: center;
+      font-family: var(--font);
     }
-
     #toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
 
-    /* ── ANIMATIONS ──────────────────────────────────────── */
     @keyframes fadeUp {
-      to { opacity: 1; transform: translateY(0); }
+      from { opacity: 0; transform: translateY(8px); }
+      to   { opacity: 1; transform: translateY(0); }
     }
 
-    @media (max-width: 480px) {
+    /* ── RESPONSIVE ─────────────────────────────────────── */
+    @media (max-width: 640px) {
       .stats { grid-template-columns: 1fr 1fr; }
-      #dashboard { padding: 16px 14px; }
-      header { padding: 14px 16px; }
-      .header-btn { padding: 7px 11px; font-size: 12px; }
-      .logo { font-size: 18px; }
+      .stat-value { font-size: 22px; }
+      #dashboard { padding: 16px 14px 40px; }
+      header { padding: 0 16px; }
+      .header-sub { display: none; }
       .status-banner { flex-wrap: wrap; }
-      .call-btn { width: 100%; text-align: center; }
+      .call-btn { width: 100%; text-align: center; margin-top: 4px; }
+    }
+
+    @media (max-width: 400px) {
+      .stats { gap: 8px; }
+      .stat { padding: 12px; }
+      .h-btn { padding: 5px 8px; font-size: 12px; }
     }
   </style>
   <script>
     if ('serviceWorker' in navigator) {
-      window.addEventListener('load', () => {
-        navigator.serviceWorker.register('/sw.js').catch(() => {});
+      window.addEventListener('load', function() {
+        navigator.serviceWorker.register('/sw.js').catch(function() {});
       });
     }
   </script>
@@ -497,28 +543,31 @@
 <body>
 
 <header>
-  <div>
-    <div class="logo">🌿 Sage Family</div>
+  <div style="display:flex;align-items:center;">
+    <div class="logo">
+      <div class="logo-icon">S</div>
+      Sage Family
+    </div>
     <div class="header-sub" id="headerSub">Family Dashboard</div>
   </div>
-  <div class="header-actions">
-    <button class="header-btn" onclick="loadDashboard()">↻ Refresh</button>
-    <button class="header-btn" onclick="logout()">Sign out</button>
+  <div class="header-right">
+    <button class="h-btn" onclick="loadDashboard()">Refresh</button>
+    <button class="h-btn danger" onclick="logout()">Sign out</button>
   </div>
 </header>
 
 <!-- Login -->
 <div id="loginScreen">
   <div class="login-card">
-    <div class="login-shield">🛡️</div>
+    <div class="login-icon">S</div>
     <h2>Family Access</h2>
-    <p>Enter your family code to monitor your loved one and stay connected.</p>
-    <input type="text" id="codeInput" placeholder="FAMILY123" maxlength="10"
+    <p>Enter the family code to connect to your loved one's dashboard.</p>
+    <input type="text" id="codeInput" placeholder="CODE" maxlength="10"
       oninput="this.value=this.value.toUpperCase()"
       onkeydown="if(event.key==='Enter') joinFamily()" />
-    <button onclick="joinFamily()">Connect →</button>
+    <button onclick="joinFamily()">Connect</button>
     <div class="login-error" id="loginError">Code not found. Please check and try again.</div>
-    <p class="login-hint">Demo code: <strong>FAMILY123</strong></p>
+    <p class="login-hint">Demo: <code>FAMILY123</code></p>
   </div>
 </div>
 
@@ -530,54 +579,51 @@
     <div class="status-left">
       <div class="status-indicator">
         <div class="status-dot dot-green" id="statusDot"></div>
-        <div class="status-name" id="seniorNameDisplay">Loading…</div>
+        <div class="status-name" id="seniorNameDisplay">Loading...</div>
       </div>
-      <div class="status-line" id="statusLine">Checking status…</div>
+      <div class="status-line" id="statusLine">Checking status...</div>
     </div>
-    <button class="call-btn" id="callBtn">📞 Call</button>
+    <button class="call-btn" id="callBtn">Call</button>
   </div>
 
   <!-- Stats -->
   <div class="stats" id="statsGrid">
     <div class="stat">
-      <div class="stat-emoji">💊</div>
       <div class="stat-label">Medications</div>
-      <div class="stat-value" id="statMeds">—</div>
+      <div class="stat-value" id="statMeds">&mdash;</div>
       <div class="stat-sub" id="statMedsSub">taken today</div>
     </div>
     <div class="stat">
-      <div class="stat-emoji">📋</div>
       <div class="stat-label">Adherence</div>
-      <div class="stat-value" id="statAdh">—%</div>
+      <div class="stat-value" id="statAdh">&mdash;%</div>
       <div class="progress-track"><div class="progress-fill" id="adhBar" style="width:0%"></div></div>
     </div>
     <div class="stat">
-      <div class="stat-emoji">⚠️</div>
       <div class="stat-label">Open Alerts</div>
-      <div class="stat-value" id="statAlerts">—</div>
+      <div class="stat-value" id="statAlerts">&mdash;</div>
     </div>
     <div class="stat">
-      <div class="stat-emoji">💬</div>
-      <div class="stat-label">AI Chats Today</div>
-      <div class="stat-value" id="statConvo">—</div>
+      <div class="stat-label">AI Chats</div>
+      <div class="stat-value" id="statConvo">&mdash;</div>
+      <div class="stat-sub">today</div>
     </div>
   </div>
 
   <!-- Tabs -->
   <div class="tabs">
-    <button class="tab active" onclick="showTab('meds', this)">💊 Medications</button>
-    <button class="tab" onclick="showTab('activity', this)">📋 Activity</button>
-    <button class="tab" onclick="showTab('alerts', this)">⚠️ Alerts</button>
-    <button class="tab" onclick="showTab('convo', this)">💬 Conversations</button>
-    <button class="tab" onclick="showTab('doctorq', this)">❓ Doctor Questions</button>
-    <button class="tab" onclick="showTab('visits', this)">🩺 Visit Transcripts</button>
-    <button class="tab" onclick="showTab('calendar', this)">📅 Calendar</button>
+    <button class="tab active" onclick="showTab('meds', this)">Medications</button>
+    <button class="tab" onclick="showTab('activity', this)">Activity</button>
+    <button class="tab" onclick="showTab('alerts', this)">Alerts</button>
+    <button class="tab" onclick="showTab('convo', this)">Conversations</button>
+    <button class="tab" onclick="showTab('doctorq', this)">Doctor Qs</button>
+    <button class="tab" onclick="showTab('visits', this)">Transcripts</button>
+    <button class="tab" onclick="showTab('calendar', this)">Calendar</button>
   </div>
 
   <!-- Medications tab -->
   <div id="tab-meds" class="card">
-    <div class="card-title">💊 Medications</div>
-    <div id="medList">Loading…</div>
+    <div class="card-title">Medications</div>
+    <div id="medList"><span class="empty">Loading...</span></div>
     <button class="toggle-form-btn" onclick="toggleAddMed()">+ Add medication</button>
     <div class="add-med-form" id="addMedForm">
       <div class="form-row">
@@ -600,41 +646,41 @@
 
   <!-- Activity tab -->
   <div id="tab-activity" class="card" style="display:none">
-    <div class="card-title">📋 Activity Feed</div>
-    <div id="activityList">Loading…</div>
+    <div class="card-title">Activity Feed</div>
+    <div id="activityList"><span class="empty">Loading...</span></div>
   </div>
 
   <!-- Alerts tab -->
   <div id="tab-alerts" class="card" style="display:none">
-    <div class="card-title">⚠️ Alerts</div>
-    <div id="alertList">Loading…</div>
+    <div class="card-title">Alerts</div>
+    <div id="alertList"><span class="empty">Loading...</span></div>
   </div>
 
   <!-- Conversations tab -->
   <div id="tab-convo" class="card" style="display:none">
-    <div class="card-title">💬 Conversations with Sage</div>
-    <div id="convoList">Loading…</div>
+    <div class="card-title">Conversations with Sage</div>
+    <div id="convoList"><span class="empty">Loading...</span></div>
   </div>
 
   <!-- Doctor Questions tab -->
   <div id="tab-doctorq" class="card" style="display:none">
-    <div class="card-title">❓ Doctor Questions</div>
-    <p style="color:var(--muted);font-size:15px;margin-bottom:16px;">Questions saved from conversations with Sage — to be asked at the next doctor visit.</p>
-    <div id="doctorqList">Loading…</div>
+    <div class="card-title">Doctor Questions</div>
+    <p class="card-subtitle">Questions saved from conversations with Sage for the next doctor visit.</p>
+    <div id="doctorqList"><span class="empty">Loading...</span></div>
   </div>
 
-  <!-- Doctor Visit Transcripts tab -->
+  <!-- Visit Transcripts tab -->
   <div id="tab-visits" class="card" style="display:none">
-    <div class="card-title">🩺 Doctor Visit Transcripts</div>
-    <p style="color:var(--muted);font-size:15px;margin-bottom:16px;">Recordings made during doctor visits using the Sage companion app.</p>
-    <div id="visitsList">Loading…</div>
+    <div class="card-title">Doctor Visit Transcripts</div>
+    <p class="card-subtitle">Recordings from doctor visits captured through the Sage app.</p>
+    <div id="visitsList"><span class="empty">Loading...</span></div>
   </div>
 
   <!-- Calendar tab -->
   <div id="tab-calendar" class="card" style="display:none">
-    <div class="card-title">📅 Upcoming Appointments</div>
-    <p style="color:var(--muted);font-size:15px;margin-bottom:16px;">Appointments added by voice, photo scan, or synced from Google Calendar.</p>
-    <div id="calendarList">Loading…</div>
+    <div class="card-title">Upcoming Appointments</div>
+    <p class="card-subtitle">Appointments added by voice, photo scan, or synced from Google Calendar.</p>
+    <div id="calendarList"><span class="empty">Loading...</span></div>
   </div>
 
 </div>
@@ -642,18 +688,16 @@
 <div id="toast"></div>
 
 <script>
-  let seniorId = localStorage.getItem("familySeniorId");
-  let seniorName = "";
-  let activeTab = "meds";
-  let refreshInterval = null;
+  var seniorId = localStorage.getItem("familySeniorId");
+  var seniorName = "";
+  var activeTab = "meds";
+  var refreshInterval = null;
 
   function getFamilyToken() { return localStorage.getItem("familyToken"); }
 
-  // Debug: log auth state on load
   console.log("[Family] Page load — seniorId:", seniorId, "hasToken:", !!getFamilyToken());
 
   // Wrapper for authenticated API calls
-  // logout param: only force logout on critical calls (dashboard), not tab loads
   async function familyApiCall(url, opts, forceLogoutOn401) {
     opts = opts || {};
     if (forceLogoutOn401 === undefined) forceLogoutOn401 = false;
@@ -685,16 +729,16 @@
   }
 
   async function joinFamily() {
-    const code = document.getElementById("codeInput").value.trim().toUpperCase();
+    var code = document.getElementById("codeInput").value.trim().toUpperCase();
     if (!code) return;
 
-    const btn = document.querySelector(".login-card button");
-    btn.textContent = "Connecting…";
+    var btn = document.querySelector(".login-card button");
+    btn.textContent = "Connecting...";
     btn.disabled = true;
-    btn.style.opacity = "0.7";
+    btn.style.opacity = "0.6";
     document.getElementById("loginError").style.display = "none";
 
-    let res;
+    var res;
     try {
       res = await fetch("/api/family/login", {
         method: "POST",
@@ -702,9 +746,9 @@
         body: JSON.stringify({ familyCode: code }),
       });
     } catch (e) {
-      document.getElementById("loginError").textContent = "Connection failed. Please check your internet.";
+      document.getElementById("loginError").textContent = "Connection failed. Check your internet.";
       document.getElementById("loginError").style.display = "block";
-      btn.textContent = "Connect →";
+      btn.textContent = "Connect";
       btn.disabled = false;
       btn.style.opacity = "1";
       return;
@@ -713,18 +757,18 @@
     if (!res.ok) {
       document.getElementById("loginError").textContent = "Code not found. Please check and try again.";
       document.getElementById("loginError").style.display = "block";
-      btn.textContent = "Connect →";
+      btn.textContent = "Connect";
       btn.disabled = false;
       btn.style.opacity = "1";
       return;
     }
 
-    const { token, senior } = await res.json();
-    seniorId = senior._id;
-    seniorName = senior.name;
-    localStorage.setItem("familySeniorId",    seniorId);
-    localStorage.setItem("familySeniorName",  seniorName);
-    localStorage.setItem("familyToken",       token);
+    var data = await res.json();
+    seniorId = data.senior._id;
+    seniorName = data.senior.name;
+    localStorage.setItem("familySeniorId", seniorId);
+    localStorage.setItem("familySeniorName", seniorName);
+    localStorage.setItem("familyToken", data.token);
 
     document.getElementById("loginError").style.display = "none";
     showDashboard();
@@ -735,7 +779,7 @@
     document.getElementById("loginScreen").style.display = "none";
     document.getElementById("dashboard").style.display = "block";
     seniorName = localStorage.getItem("familySeniorName") || seniorName;
-    document.getElementById("headerSub").textContent = `Monitoring ${seniorName}`;
+    document.getElementById("headerSub").textContent = "Monitoring " + escHtml(seniorName);
     await loadDashboard();
     if (refreshInterval) clearInterval(refreshInterval);
     refreshInterval = setInterval(loadDashboard, 30000);
@@ -744,27 +788,26 @@
   async function loadDashboard() {
     if (!seniorId) return;
     try {
-      const res = await familyApiCall(`/api/dashboard/${seniorId}`, {}, true);
-      const d = await res.json();
+      var res = await familyApiCall("/api/dashboard/" + seniorId, {}, true);
+      var d = await res.json();
 
       document.getElementById("seniorNameDisplay").textContent = d.senior.name;
-      const last = d.recentActivity[0];
-      const lastTime = last ? formatRelTime(last.timestamp) : "No activity yet";
-      document.getElementById("statusLine").textContent = `Last activity: ${lastTime}`;
+      var last = d.recentActivity[0];
+      var lastTime = last ? formatRelTime(last.timestamp) : "No activity yet";
+      document.getElementById("statusLine").textContent = "Last activity: " + lastTime;
 
-      const hasAlerts = d.stats.activeAlerts > 0;
-      document.getElementById("statusBanner").className = `status-banner ${hasAlerts ? "status-alert" : "status-ok"}`;
-      const dot = document.getElementById("statusDot");
-      dot.className = `status-dot ${hasAlerts ? "dot-red" : "dot-green"}`;
+      var hasAlerts = d.stats.activeAlerts > 0;
+      document.getElementById("statusBanner").className = "status-banner " + (hasAlerts ? "status-alert" : "status-ok");
+      document.getElementById("statusDot").className = "status-dot " + (hasAlerts ? "dot-red" : "dot-green");
 
-      document.getElementById("callBtn").onclick = () => showToast("No phone number on file for " + d.senior.name);
+      document.getElementById("callBtn").onclick = function() { showToast("No phone number on file for " + d.senior.name); };
 
-      document.getElementById("statMeds").textContent = `${d.stats.medicationsTaken}/${d.stats.medicationsTotal}`;
-      const adh = d.stats.adherence;
-      document.getElementById("statAdh").textContent = `${adh}%`;
-      const bar = document.getElementById("adhBar");
-      bar.style.width = `${adh}%`;
-      bar.className = `progress-fill ${adh >= 80 ? "fill-green" : adh >= 50 ? "fill-yellow" : "fill-red"}`;
+      document.getElementById("statMeds").textContent = d.stats.medicationsTaken + "/" + d.stats.medicationsTotal;
+      var adh = d.stats.adherence;
+      document.getElementById("statAdh").textContent = adh + "%";
+      var bar = document.getElementById("adhBar");
+      bar.style.width = adh + "%";
+      bar.className = "progress-fill " + (adh >= 80 ? "fill-green" : adh >= 50 ? "fill-yellow" : "fill-red");
 
       document.getElementById("statAlerts").textContent = d.stats.activeAlerts;
       document.getElementById("statConvo").textContent = d.stats.conversationsToday;
@@ -772,7 +815,6 @@
       renderMeds(d.medications);
       renderActivity(d.recentActivity);
       renderAlerts(d.alerts);
-      // Load conversations separately so failure doesn't kill dashboard
       loadConversations().catch(function(err) { console.error("Convo load error:", err); });
 
     } catch (e) {
@@ -781,97 +823,104 @@
   }
 
   function renderMeds(meds) {
-    const el = document.getElementById("medList");
+    var el = document.getElementById("medList");
     if (!meds || meds.length === 0) {
-      el.innerHTML = `<p class="empty">No medications added yet. Use the + button below to add one.</p>`;
+      el.innerHTML = '<p class="empty">No medications added yet. Use the button below to add one.</p>';
       return;
     }
-    el.innerHTML = meds.map(m => `
-      <div class="med-row">
-        <div class="med-info">
-          <div class="med-name">${m.name}</div>
-          <div class="med-detail">${m.dose ? m.dose + " · " : ""}${m.time}${m.withFood ? " · with food" : ""}</div>
-        </div>
-        <div class="med-status ${m.takenToday ? "med-taken" : "med-pending"}">
-          ${m.takenToday ? "✓ Taken" : "⏳ Pending"}
-        </div>
-      </div>`).join("");
+    var html = '';
+    for (var i = 0; i < meds.length; i++) {
+      var m = meds[i];
+      html += '<div class="med-row">';
+      html += '<div class="med-info"><div class="med-name">' + escHtml(m.name) + '</div>';
+      html += '<div class="med-detail">' + (m.dose ? escHtml(m.dose) + ' &middot; ' : '') + escHtml(m.time || '') + (m.withFood ? ' &middot; with food' : '') + '</div></div>';
+      html += '<div class="med-status ' + (m.takenToday ? 'med-taken' : 'med-pending') + '">' + (m.takenToday ? 'Taken' : 'Pending') + '</div>';
+      html += '</div>';
+    }
+    el.innerHTML = html;
   }
 
   function renderActivity(activity) {
-    const el = document.getElementById("activityList");
+    var el = document.getElementById("activityList");
     if (!activity || activity.length === 0) {
-      el.innerHTML = `<p class="empty">No activity recorded yet.</p>`;
+      el.innerHTML = '<p class="empty">No activity recorded yet.</p>';
       return;
     }
-    const icons = { wake:"⏰", meal:"🍽️", medication_taken:"💊", conversation:"💬", emergency:"🚨", medication_added:"💊", system:"🛡️" };
-    const dotClass = (type) => {
+    var dotClass = function(type) {
       if (type === "medication_taken" || type === "medication_added") return "dot-med";
       if (type === "emergency") return "dot-alert";
       if (type === "conversation") return "dot-chat";
       return "dot-system";
     };
-    el.innerHTML = activity.map(a => `
-      <div class="activity-item">
-        <div class="activity-dot ${dotClass(a.type)}"></div>
-        <div class="activity-text">${icons[a.type] || "•"} ${a.description}</div>
-        <div class="activity-time">${formatRelTime(a.timestamp)}</div>
-      </div>`).join("");
+    var html = '';
+    for (var i = 0; i < activity.length; i++) {
+      var a = activity[i];
+      html += '<div class="activity-item">';
+      html += '<div class="activity-dot ' + dotClass(a.type) + '"></div>';
+      html += '<div class="activity-text">' + escHtml(a.description) + '</div>';
+      html += '<div class="activity-time">' + formatRelTime(a.timestamp) + '</div>';
+      html += '</div>';
+    }
+    el.innerHTML = html;
   }
 
   function renderAlerts(alerts) {
-    const el = document.getElementById("alertList");
+    var el = document.getElementById("alertList");
     if (!alerts || alerts.length === 0) {
-      el.innerHTML = `<p class="no-alerts">✅ No unresolved alerts</p>`;
+      el.innerHTML = '<p class="no-alerts">No unresolved alerts</p>';
       return;
     }
-    el.innerHTML = alerts.map(a => `
-      <div class="alert-item">
-        <div>
-          <div class="alert-msg">${a.message}</div>
-          <div class="alert-time">${formatRelTime(a.createdAt)}</div>
-        </div>
-        <button class="resolve-btn" onclick="resolveAlert('${a._id}')">Resolve</button>
-      </div>`).join("");
+    var html = '';
+    for (var i = 0; i < alerts.length; i++) {
+      var a = alerts[i];
+      html += '<div class="alert-item"><div>';
+      html += '<div class="alert-msg">' + escHtml(a.message) + '</div>';
+      html += '<div class="alert-time">' + formatRelTime(a.createdAt) + '</div>';
+      html += '</div>';
+      html += '<button class="resolve-btn" onclick="resolveAlert(\'' + a._id + '\')">Resolve</button></div>';
+    }
+    el.innerHTML = html;
   }
 
   async function loadConversations() {
-    const el = document.getElementById("convoList");
+    var el = document.getElementById("convoList");
     try {
-      const res = await familyApiCall(`/api/conversations/${seniorId}`);
+      var res = await familyApiCall("/api/conversations/" + seniorId);
       if (!res.ok) throw new Error("API returned " + res.status);
-      const sessions = await res.json();
+      var sessions = await res.json();
       if (!sessions || sessions.length === 0) {
         el.innerHTML = '<p class="empty">No conversations yet. ' + escHtml(seniorName) + ' hasn\'t talked to Sage today.</p>';
         return;
       }
-      const allMessages = sessions.flatMap(function(s) { return s.messages || []; }).slice(-20);
+      var allMessages = sessions.flatMap(function(s) { return s.messages || []; }).slice(-20);
       renderConvos(allMessages);
     } catch (e) {
       console.error("loadConversations error:", e);
-      el.innerHTML = '<p style="color:var(--muted);">Couldn\'t load conversations.</p>';
+      el.innerHTML = '<p class="empty">Couldn\'t load conversations.</p>';
     }
   }
 
   async function resolveAlert(id) {
-    await familyApiCall(`/api/alerts/${id}/resolve`, { method: "POST" });
+    await familyApiCall("/api/alerts/" + id + "/resolve", { method: "POST" });
     showToast("Alert resolved");
     await loadDashboard();
   }
 
   function renderConvos(messages) {
-    const el = document.getElementById("convoList");
+    var el = document.getElementById("convoList");
     if (!messages || messages.length === 0) {
-      el.innerHTML = `<p class="empty">No conversations yet.</p>`;
+      el.innerHTML = '<p class="empty">No conversations yet.</p>';
       return;
     }
-    el.innerHTML = messages.map(m => `
-      <div class="convo-item" style="${m.role === "user" ? "justify-content:flex-end" : "justify-content:flex-start"}">
-        <div>
-          <div class="convo-label">${m.role === "user" ? seniorName : "Sage"}</div>
-          <div class="convo-bubble ${m.role === "user" ? "convo-user" : "convo-sage"}">${m.content}</div>
-        </div>
-      </div>`).join("");
+    var html = '';
+    for (var i = 0; i < messages.length; i++) {
+      var m = messages[i];
+      var isUser = m.role === "user";
+      html += '<div class="convo-item" style="justify-content:' + (isUser ? 'flex-end' : 'flex-start') + '">';
+      html += '<div><div class="convo-label">' + (isUser ? escHtml(seniorName) : 'Sage') + '</div>';
+      html += '<div class="convo-bubble ' + (isUser ? 'convo-user' : 'convo-sage') + '">' + escHtml(m.content) + '</div></div></div>';
+    }
+    el.innerHTML = html;
   }
 
   function toggleAddMed() {
@@ -879,27 +928,27 @@
   }
 
   async function addMedication() {
-    const name     = document.getElementById("medName").value.trim();
-    const dose     = document.getElementById("medDosage").value.trim();
-    const time     = document.getElementById("medTime1").value;
-    const withFood = document.getElementById("medFood").value === "1";
+    var name = document.getElementById("medName").value.trim();
+    var dose = document.getElementById("medDosage").value.trim();
+    var time = document.getElementById("medTime1").value;
+    var withFood = document.getElementById("medFood").value === "1";
     if (!name) { showToast("Please enter a medication name"); return; }
 
     await familyApiCall("/api/medications", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ seniorId, name, dose, time, withFood })
+      body: JSON.stringify({ seniorId: seniorId, name: name, dose: dose, time: time, withFood: withFood })
     });
 
     document.getElementById("medName").value = "";
     document.getElementById("medDosage").value = "";
     document.getElementById("addMedForm").classList.remove("open");
-    showToast(`✓ ${name} added`);
+    showToast(name + " added");
     await loadDashboard();
   }
 
   function showTab(name, btn) {
-    ["meds","activity","alerts","convo","doctorq","visits","calendar"].forEach(t => {
+    ["meds","activity","alerts","convo","doctorq","visits","calendar"].forEach(function(t) {
       document.getElementById("tab-" + t).style.display = "none";
     });
     document.querySelectorAll(".tab").forEach(function(b) { b.classList.remove("active"); });
@@ -917,166 +966,155 @@
     }
   }
 
-  // ── Calendar ────────────────────────────────────────────────────────────────
+  // ── Calendar ──────────────────────────────────────────────────────────────────
   async function loadCalendar() {
-    const el = document.getElementById("calendarList");
+    var el = document.getElementById("calendarList");
     try {
-      const res = await familyApiCall(`/api/appointments/${seniorId}`);
+      var res = await familyApiCall("/api/appointments/" + seniorId);
       if (!res.ok) throw new Error("API returned " + res.status);
-      const appts = await res.json();
+      var appts = await res.json();
 
       if (!appts || appts.length === 0) {
-        el.innerHTML = `<p style="color:var(--muted);font-style:italic;font-size:15px;">No upcoming appointments. ${seniorName} can add them by voice or photo scan in the Sage app.</p>`;
+        el.innerHTML = '<p class="empty">No upcoming appointments. ' + escHtml(seniorName) + ' can add them by voice or photo scan in the Sage app.</p>';
         return;
       }
 
-      const today = new Date();
+      var today = new Date();
       today.setHours(0, 0, 0, 0);
 
-      // Group by date
-      const groups = {};
-      appts.forEach(a => {
-        const d = a.date || "Unknown date";
+      var groups = {};
+      appts.forEach(function(a) {
+        var d = a.date || "Unknown date";
         if (!groups[d]) groups[d] = [];
         groups[d].push(a);
       });
 
-      let html = "";
-      Object.keys(groups).sort().forEach(dateKey => {
-        const apptDate = new Date(dateKey + "T00:00:00");
-        const isToday  = apptDate.toDateString() === today.toDateString();
-        const isPast   = apptDate < today;
-        const label    = isToday ? "Today" : apptDate.toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric" });
+      var html = "";
+      Object.keys(groups).sort().forEach(function(dateKey) {
+        var apptDate = new Date(dateKey + "T00:00:00");
+        var isToday = apptDate.toDateString() === today.toDateString();
+        var isPast = apptDate < today;
+        var label = isToday ? "Today" : apptDate.toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric" });
 
-        html += `
-          <div style="margin-bottom:18px;">
-            <div style="font-size:13px;font-weight:700;letter-spacing:.05em;text-transform:uppercase;
-              color:${isToday ? "var(--teal)" : isPast ? "var(--muted)" : "var(--navy)"};
-              margin-bottom:8px;display:flex;align-items:center;gap:6px;">
-              ${isToday ? "📍" : isPast ? "✓" : "📅"} ${label}
-            </div>`;
+        html += '<div style="margin-bottom:16px;">';
+        html += '<div style="font-size:11px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;';
+        html += 'color:' + (isToday ? 'var(--green)' : isPast ? 'var(--text3)' : 'var(--accent)') + ';';
+        html += 'margin-bottom:8px;">' + label + '</div>';
 
-        groups[dateKey].forEach(a => {
-          html += `
-            <div style="display:flex;align-items:flex-start;gap:12px;padding:12px 14px;
-              background:${isToday ? "#F0FDF4" : isPast ? "#F8FAFC" : "#FAFAFA"};
-              border:1px solid ${isToday ? "#BBF7D0" : "var(--border)"};
-              border-radius:12px;margin-bottom:8px;opacity:${isPast ? "0.65" : "1"};">
-              <div style="flex:1;">
-                <div style="font-size:15px;font-weight:700;color:var(--text);">${escHtml(a.title)}</div>
-                ${a.time ? `<div style="font-size:13px;color:var(--navy);font-weight:600;margin-top:2px;">⏰ ${escHtml(a.time)}</div>` : ""}
-                ${a.location ? `<div style="font-size:13px;color:var(--muted);margin-top:2px;">📍 ${escHtml(a.location)}</div>` : ""}
-                ${a.notes ? `<div style="font-size:13px;color:var(--muted);margin-top:4px;font-style:italic;">${escHtml(a.notes)}</div>` : ""}
-              </div>
-              ${a.source ? `<span style="font-size:11px;font-weight:700;color:var(--muted);padding:3px 8px;background:var(--bg);border-radius:6px;white-space:nowrap;align-self:flex-start;">${escHtml(a.source)}</span>` : ""}
-            </div>`;
+        groups[dateKey].forEach(function(a) {
+          html += '<div style="padding:12px 14px;background:' + (isToday ? 'var(--green-bg)' : 'var(--surface2)') + ';';
+          html += 'border:1px solid ' + (isToday ? 'var(--green-b)' : 'var(--border)') + ';';
+          html += 'border-radius:var(--radius);margin-bottom:6px;opacity:' + (isPast ? '0.5' : '1') + ';">';
+          html += '<div style="font-size:14px;font-weight:600;color:var(--text);">' + escHtml(a.title) + '</div>';
+          if (a.time) html += '<div style="font-size:12px;color:var(--accent);font-weight:600;margin-top:3px;">' + escHtml(a.time) + '</div>';
+          if (a.location) html += '<div style="font-size:12px;color:var(--text3);margin-top:2px;">' + escHtml(a.location) + '</div>';
+          if (a.notes) html += '<div style="font-size:12px;color:var(--text3);margin-top:4px;font-style:italic;">' + escHtml(a.notes) + '</div>';
+          html += '</div>';
         });
 
-        html += `</div>`;
+        html += '</div>';
       });
 
       el.innerHTML = html;
     } catch (e) {
-      el.innerHTML = `<p style="color:var(--muted);">Couldn't load appointments.</p>`;
+      el.innerHTML = '<p class="empty">Couldn\'t load appointments.</p>';
     }
   }
 
-  // ── Doctor Questions ────────────────────────────────────────────────────────
+  // ── Doctor Questions ──────────────────────────────────────────────────────────
   async function loadDoctorQuestions() {
-    const el = document.getElementById("doctorqList");
+    var el = document.getElementById("doctorqList");
     try {
-      const res = await familyApiCall(`/api/doctor-questions/${seniorId}`);
+      var res = await familyApiCall("/api/doctor-questions/" + seniorId);
       if (!res.ok) throw new Error("API returned " + res.status);
-      const questions = await res.json();
+      var questions = await res.json();
 
       if (!questions || questions.length === 0) {
-        el.innerHTML = `<p style="color:var(--muted);font-style:italic;font-size:16px;">No doctor questions yet. They'll appear here when ${seniorName} adds them through Sage.</p>`;
+        el.innerHTML = '<p class="empty">No doctor questions yet. They\'ll appear here when ' + escHtml(seniorName) + ' adds them through Sage.</p>';
         return;
       }
 
-      const pending = questions.filter(q => !q.asked);
-      const asked   = questions.filter(q => q.asked);
+      var pending = questions.filter(function(q) { return !q.asked; });
+      var asked = questions.filter(function(q) { return q.asked; });
 
-      let html = "";
+      var html = "";
       if (pending.length > 0) {
-        html += `<div style="font-size:13px;font-weight:700;color:var(--muted);letter-spacing:.05em;text-transform:uppercase;margin-bottom:10px;">Pending (${pending.length})</div>`;
-        html += pending.map(q => `
-          <div style="display:flex;align-items:flex-start;gap:12px;padding:12px 0;border-bottom:1px solid var(--border);">
-            <span style="font-size:18px;margin-top:2px;color:var(--navy);">❓</span>
-            <div style="flex:1;">
-              <div style="font-size:16px;line-height:1.5;color:var(--text);">${escHtml(q.question)}</div>
-              <div style="font-size:13px;color:var(--muted);margin-top:3px;">${formatRelTime(q.createdAt)}</div>
-            </div>
-          </div>
-        `).join("");
+        html += '<div style="font-size:11px;font-weight:700;color:var(--text3);letter-spacing:.06em;text-transform:uppercase;margin-bottom:10px;">Pending (' + pending.length + ')</div>';
+        for (var i = 0; i < pending.length; i++) {
+          var q = pending[i];
+          html += '<div style="display:flex;align-items:flex-start;gap:12px;padding:12px 0;border-bottom:1px solid var(--border);">';
+          html += '<div style="width:6px;height:6px;border-radius:50%;background:var(--accent);margin-top:7px;flex-shrink:0;"></div>';
+          html += '<div style="flex:1;"><div style="font-size:14px;line-height:1.55;color:var(--text);">' + escHtml(q.question) + '</div>';
+          html += '<div style="font-size:11px;color:var(--text3);margin-top:4px;">' + formatRelTime(q.createdAt) + '</div></div></div>';
+        }
       }
       if (asked.length > 0) {
-        html += `<div style="font-size:13px;font-weight:700;color:var(--muted);letter-spacing:.05em;text-transform:uppercase;margin:16px 0 10px;">Already Asked (${asked.length})</div>`;
-        html += asked.map(q => `
-          <div style="display:flex;align-items:flex-start;gap:12px;padding:12px 0;border-bottom:1px solid var(--border);opacity:0.6;">
-            <span style="font-size:18px;margin-top:2px;color:var(--green);">✓</span>
-            <div style="font-size:16px;line-height:1.5;text-decoration:line-through;color:var(--muted);">${escHtml(q.question)}</div>
-          </div>
-        `).join("");
+        html += '<div style="font-size:11px;font-weight:700;color:var(--text3);letter-spacing:.06em;text-transform:uppercase;margin:16px 0 10px;">Already Asked (' + asked.length + ')</div>';
+        for (var j = 0; j < asked.length; j++) {
+          var qa = asked[j];
+          html += '<div style="display:flex;align-items:flex-start;gap:12px;padding:12px 0;border-bottom:1px solid var(--border);opacity:0.45;">';
+          html += '<div style="width:6px;height:6px;border-radius:50%;background:var(--green);margin-top:7px;flex-shrink:0;"></div>';
+          html += '<div style="font-size:14px;line-height:1.55;text-decoration:line-through;color:var(--text3);">' + escHtml(qa.question) + '</div></div>';
+        }
       }
 
       el.innerHTML = html;
     } catch (e) {
-      el.innerHTML = `<p style="color:var(--muted);">Couldn't load questions.</p>`;
+      el.innerHTML = '<p class="empty">Couldn\'t load questions.</p>';
     }
   }
 
-  // ── Doctor Visit Transcripts ────────────────────────────────────────────────
+  // ── Doctor Visit Transcripts ──────────────────────────────────────────────────
+  var visitTranscripts = {};
+
   async function loadVisits() {
-    const el = document.getElementById("visitsList");
+    var el = document.getElementById("visitsList");
     try {
-      const res = await familyApiCall(`/api/doctor-visits/${seniorId}`);
+      var res = await familyApiCall("/api/doctor-visits/" + seniorId);
       if (!res.ok) throw new Error("API returned " + res.status);
-      const visits = await res.json();
+      var visits = await res.json();
 
       if (!visits || visits.length === 0) {
-        el.innerHTML = `<p style="color:var(--muted);font-style:italic;font-size:16px;">No visit recordings yet. ${seniorName} can record doctor visits using the Sage companion app at <strong>/doctor</strong>.</p>`;
+        el.innerHTML = '<p class="empty">No visit recordings yet. ' + escHtml(seniorName) + ' can record doctor visits using the Sage app.</p>';
         return;
       }
 
-      el.innerHTML = visits.map((v, i) => {
-        // Store full transcript safely for expand
+      var html = '';
+      for (var i = 0; i < visits.length; i++) {
+        var v = visits[i];
         visitTranscripts[i] = v.transcript;
-        const date = new Date(v.createdAt).toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric", year: "numeric" });
-        const time = new Date(v.createdAt).toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" });
-        const preview = v.transcript.length > 300 ? v.transcript.slice(0, 300) + "…" : v.transcript;
-        return `
-          <div style="border:1px solid var(--border);border-radius:14px;padding:18px;margin-bottom:14px;background:#F8FAFC;">
-            <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:10px;flex-wrap:wrap;gap:8px;">
-              <div>
-                <div style="font-size:16px;font-weight:700;color:var(--navy);">🩺 ${date}</div>
-                <div style="font-size:14px;color:var(--muted);margin-top:2px;">${time}${v.doctorName ? ` · Dr. ${escHtml(v.doctorName)}` : ""} · ${v.wordCount} words</div>
-              </div>
-              <span style="background:#EEF4FF;color:var(--navy);border-radius:8px;padding:4px 10px;font-size:13px;font-weight:700;">Transcript</span>
-            </div>
-            <div id="visit-text-${i}" style="font-size:15px;line-height:1.7;color:var(--text);white-space:pre-wrap;max-height:140px;overflow:hidden;position:relative;">${escHtml(preview)}</div>
-            ${v.transcript.length > 300 ? `
-              <button onclick="expandVisit(${i})" id="expand-btn-${i}"
-                style="background:none;border:none;color:var(--navy);font-size:14px;font-weight:700;cursor:pointer;margin-top:8px;padding:0;">
-                Read full transcript ↓
-              </button>` : ""}
-            ${v.notes ? `<div style="margin-top:10px;padding-top:10px;border-top:1px solid var(--border);font-size:14px;color:var(--muted);"><strong>Notes:</strong> ${escHtml(v.notes)}</div>` : ""}
-          </div>
-        `;
-      }).join("");
+        var dateStr = new Date(v.createdAt).toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric", year: "numeric" });
+        var timeStr = new Date(v.createdAt).toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" });
+        var preview = v.transcript.length > 300 ? v.transcript.slice(0, 300) + "..." : v.transcript;
+
+        html += '<div style="border:1px solid var(--border);border-radius:var(--radius);padding:18px;margin-bottom:12px;background:var(--surface2);">';
+        html += '<div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:12px;flex-wrap:wrap;gap:8px;">';
+        html += '<div><div style="font-size:14px;font-weight:700;color:var(--text);">' + dateStr + '</div>';
+        html += '<div style="font-size:12px;color:var(--text3);margin-top:2px;">' + timeStr;
+        if (v.doctorName) html += ' &middot; Dr. ' + escHtml(v.doctorName);
+        html += ' &middot; ' + v.wordCount + ' words</div></div>';
+        html += '<span style="background:var(--surface);color:var(--accent);border:1px solid var(--border);border-radius:6px;padding:3px 8px;font-size:11px;font-weight:600;">Transcript</span>';
+        html += '</div>';
+        html += '<div id="visit-text-' + i + '" style="font-size:13px;line-height:1.7;color:var(--text2);white-space:pre-wrap;max-height:120px;overflow:hidden;">' + escHtml(preview) + '</div>';
+        if (v.transcript.length > 300) {
+          html += '<button onclick="expandVisit(' + i + ')" id="expand-btn-' + i + '" style="background:none;border:none;color:var(--accent);font-size:12px;font-weight:600;cursor:pointer;margin-top:8px;padding:0;font-family:var(--font);">Show full transcript</button>';
+        }
+        if (v.notes) {
+          html += '<div style="margin-top:12px;padding-top:12px;border-top:1px solid var(--border);font-size:12px;color:var(--text3);"><strong style="color:var(--text2);">Notes:</strong> ' + escHtml(v.notes) + '</div>';
+        }
+        html += '</div>';
+      }
+      el.innerHTML = html;
     } catch (e) {
-      el.innerHTML = `<p style="color:var(--muted);">Couldn't load visit transcripts.</p>`;
+      el.innerHTML = '<p class="empty">Couldn\'t load visit transcripts.</p>';
     }
   }
 
-  // Store full transcripts safely (avoids XSS from inline onclick)
-  const visitTranscripts = {};
-
   function expandVisit(i) {
-    const el = document.getElementById(`visit-text-${i}`);
+    var el = document.getElementById("visit-text-" + i);
     el.style.maxHeight = "none";
     el.textContent = visitTranscripts[i] || "";
-    const btn = document.getElementById(`expand-btn-${i}`);
+    var btn = document.getElementById("expand-btn-" + i);
     if (btn) btn.style.display = "none";
   }
 
@@ -1086,19 +1124,19 @@
 
   function formatRelTime(ts) {
     if (!ts) return "";
-    const d = new Date(ts);
-    const diff = Math.floor((Date.now() - d.getTime()) / 1000);
+    var d = new Date(ts);
+    var diff = Math.floor((Date.now() - d.getTime()) / 1000);
     if (diff < 60)    return "just now";
-    if (diff < 3600)  return `${Math.floor(diff / 60)}m ago`;
-    if (diff < 86400) return `${Math.floor(diff / 3600)}h ago`;
+    if (diff < 3600)  return Math.floor(diff / 60) + "m ago";
+    if (diff < 86400) return Math.floor(diff / 3600) + "h ago";
     return d.toLocaleDateString();
   }
 
   function showToast(msg) {
-    const t = document.getElementById("toast");
+    var t = document.getElementById("toast");
     t.textContent = msg;
     t.classList.add("show");
-    setTimeout(() => t.classList.remove("show"), 3000);
+    setTimeout(function() { t.classList.remove("show"); }, 3000);
   }
 
   function logout() {
