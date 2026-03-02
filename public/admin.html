@@ -376,6 +376,21 @@
     .sev-info     { background: #EFF6FF; color: #1D4ED8; }
     .sev-low      { background: #F0FDF4; color: var(--green); }
 
+    .badge-suspended { background: #FEE2E2; color: var(--red); }
+
+    .suspend-btn {
+      padding: 5px 12px;
+      border-radius: 6px;
+      border: 1.5px solid var(--border);
+      background: white;
+      font-size: 12px;
+      font-weight: 700;
+      cursor: pointer;
+      transition: all 0.15s;
+    }
+    .suspend-btn:hover { border-color: var(--red); color: var(--red); }
+    .suspend-btn.reactivate:hover { border-color: var(--green); color: var(--green); }
+
     .resolve-btn {
       padding: 5px 12px;
       border-radius: 6px;
@@ -731,10 +746,11 @@
                 <th>Last Active</th>
                 <th>Chats</th>
                 <th>Status</th>
+                <th>Action</th>
               </tr>
             </thead>
             <tbody id="usersBody">
-              <tr class="loading-row"><td colspan="6"><div class="spinner"></div></td></tr>
+              <tr class="loading-row"><td colspan="7"><div class="spinner"></div></td></tr>
             </tbody>
           </table>
         </div>
@@ -905,7 +921,8 @@
     return days + "d ago";
   }
 
-  function activeStatus(lastActive) {
+  function activeStatus(lastActive, suspended) {
+    if (suspended) return '<span class="badge-pill badge-suspended">Suspended</span>';
     if (!lastActive) return '<span class="badge-pill badge-new">New</span>';
     const hours = (Date.now() - new Date(lastActive).getTime()) / 3600000;
     if (hours < 24) return '<span class="badge-pill badge-active">Active</span>';
@@ -998,7 +1015,7 @@
           </td>
           <td>${timeAgo(u.lastActive)}</td>
           <td>${u.totalChats ?? 0}</td>
-          <td>${activeStatus(u.lastActive)}</td>
+          <td>${activeStatus(u.lastActive, u.suspended)}</td>
         </tr>
       `).join("");
     } catch (e) {
@@ -1030,12 +1047,12 @@
   function renderUsers(users) {
     if (!users.length) {
       document.getElementById("usersBody").innerHTML =
-        '<tr><td colspan="6" class="table-empty">No users found</td></tr>';
+        '<tr><td colspan="7" class="table-empty">No users found</td></tr>';
       return;
     }
     document.getElementById("usersBody").innerHTML = users.map(u => `
-      <tr onclick="openDetail('${u._id}')">
-        <td>
+      <tr>
+        <td onclick="openDetail('${u._id}')" style="cursor:pointer;">
           <div class="user-name">${esc(u.name)}</div>
           <div class="user-email">Age ${u.age || "—"}</div>
         </td>
@@ -1043,7 +1060,12 @@
         <td>${fmtDate(u.createdAt)}</td>
         <td>${timeAgo(u.lastActive)}</td>
         <td>${u.totalChats ?? 0}</td>
-        <td>${activeStatus(u.lastActive)}</td>
+        <td>${activeStatus(u.lastActive, u.suspended)}</td>
+        <td>
+          <button class="suspend-btn ${u.suspended ? 'reactivate' : ''}" onclick="toggleSuspend('${u._id}', ${!u.suspended})">
+            ${u.suspended ? 'Reactivate' : 'Suspend'}
+          </button>
+        </td>
       </tr>
     `).join("");
   }
@@ -1108,6 +1130,28 @@
     }
   }
 
+  // ── Suspend / Reactivate ──────────────────────────────────────────────────
+  async function toggleSuspend(userId, suspend) {
+    const action = suspend ? "suspend" : "reactivate";
+    if (!confirm(`Are you sure you want to ${action} this user?`)) return;
+
+    try {
+      const res = await fetch(`/api/admin/users/${userId}/suspend`, {
+        method: "POST",
+        headers: { ...adminHeaders(), "Content-Type": "application/json" },
+        body: JSON.stringify({ suspended: suspend }),
+      });
+      if (!res.ok) throw new Error("Failed");
+
+      // Refresh data
+      loadUsers();
+      loadOverview();
+      loadAlerts();
+    } catch (e) {
+      alert("Failed to " + action + " user. Please try again.");
+    }
+  }
+
   // ── User Detail ───────────────────────────────────────────────────────────
   async function openDetail(userId) {
     document.getElementById("detailOverlay").classList.add("open");
@@ -1138,8 +1182,15 @@
         <div class="detail-meta">
           Age ${u.age || "—"} · Joined ${fmtDate(u.createdAt)}<br>
           Last active: ${timeAgo(u.lastActive)}
+          ${u.suspended ? '<br><span class="badge-pill badge-suspended" style="margin-top:6px;display:inline-block;">Suspended</span>' : ''}
         </div>
-        <div class="detail-code">${esc(u.familyCode)}</div>
+        <div style="display:flex;align-items:center;gap:10px;margin-top:8px;">
+          <div class="detail-code">${esc(u.familyCode)}</div>
+          <button class="suspend-btn ${u.suspended ? 'reactivate' : ''}"
+            onclick="toggleSuspend('${u._id}', ${!u.suspended}); closeDetailPanel();">
+            ${u.suspended ? 'Reactivate' : 'Suspend User'}
+          </button>
+        </div>
       </div>
 
       <div class="detail-section">

@@ -159,7 +159,7 @@ function verifySeniorToken(token) {
   } catch { return null; }
 }
 
-function seniorAuth(req, res, next) {
+async function seniorAuth(req, res, next) {
   // Allow demo senior through without a token
   const seniorId = req.params.seniorId || req.body?.seniorId;
   if (seniorId === DEMO_SENIOR_ID) { req.seniorId = DEMO_SENIOR_ID; return next(); }
@@ -170,6 +170,15 @@ function seniorAuth(req, res, next) {
     console.log(`[Auth] seniorAuth REJECTED — path: ${req.path}, hasToken: ${!!token}, tokenPreview: ${token ? token.substring(0, 20) : "NONE"}`);
     return res.status(401).json({ error: "Please log in to continue" });
   }
+
+  // Check if user is suspended
+  try {
+    const { data } = await supabase.from("seniors").select("suspended").eq("id", payload.seniorId).single();
+    if (data?.suspended) {
+      return res.status(403).json({ error: "Your account has been suspended. Please contact support@mysagecompanion.com." });
+    }
+  } catch {}
+
   req.seniorId = payload.seniorId;
   next();
 }
@@ -1358,25 +1367,31 @@ app.get("/api/admin/stats", adminAuth, async (req, res) => {
 
 app.get("/api/admin/users", adminAuth, async (req, res) => {
   try {
-    const { data: seniors } = await supabase.from("seniors").select("*").order("created_at", { ascending: false });
+    const { data: seniors, error: sErr } = await supabase.from("seniors").select("*").order("created_at", { ascending: false });
+    if (sErr) { console.error("[Admin] Users fetch error:", sErr.message); return res.status(500).json({ error: sErr.message }); }
+
     const enriched = await Promise.all((seniors || []).map(async (s) => {
-      const [
-        { count: totalChats },
-        { count: totalMeds },
-        { count: openAlerts },
-        { count: totalAppts },
-        { count: totalDoctorQ },
-      ] = await Promise.all([
-        supabase.from("conversations").select("*", { count: "exact", head: true }).eq("senior_id", s.id).eq("role", "user"),
-        supabase.from("med_log").select("*", { count: "exact", head: true }).eq("senior_id", s.id),
-        supabase.from("alerts").select("*", { count: "exact", head: true }).eq("senior_id", s.id).eq("resolved", false),
-        supabase.from("appointments").select("*", { count: "exact", head: true }).eq("senior_id", s.id),
-        supabase.from("doctor_questions").select("*", { count: "exact", head: true }).eq("senior_id", s.id),
+      // Safe count helper — returns 0 if table doesn't exist or query fails
+      const safeCount = async (table, filters = {}) => {
+        try {
+          let q = supabase.from(table).select("*", { count: "exact", head: true }).eq("senior_id", s.id);
+          for (const [k, v] of Object.entries(filters)) q = q.eq(k, v);
+          const { count } = await q;
+          return count ?? 0;
+        } catch { return 0; }
+      };
+
+      const [totalChats, totalMeds, openAlerts, totalAppts, totalDoctorQ] = await Promise.all([
+        safeCount("conversations", { role: "user" }),
+        safeCount("med_log"),
+        safeCount("alerts", { resolved: false }),
+        safeCount("appointments"),
+        safeCount("doctor_questions"),
       ]);
       return { ...norm(s), totalChats, totalMeds, openAlerts, totalAppts, totalDoctorQ };
     }));
     res.json(enriched);
-  } catch (e) { res.status(500).json({ error: e.message }); }
+  } catch (e) { console.error("[Admin] Users error:", e.message); res.status(500).json({ error: e.message }); }
 });
 
 app.get("/api/admin/users/:id", adminAuth, async (req, res) => {
@@ -1440,6 +1455,28 @@ app.get("/api/admin/alerts", adminAuth, async (req, res) => {
       userName: a.seniors?.name || "Unknown",
     }));
     res.json(enriched);
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+// Suspend / unsuspend a user
+app.post("/api/admin/users/:id/suspend", adminAuth, async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { suspended } = req.body; // true to suspend, false to unsuspend
+    const { data: senior, error } = await supabase.from("seniors").update({ suspended: !!suspended }).eq("id", id).select("id, name, email").single();
+    if (error) return res.status(400).json({ error: error.message });
+
+    // Log the action as an alert
+    await supabase.from("alerts").insert({
+      senior_id: id,
+      type: suspended ? "suspension" : "reactivation",
+      message: `User ${suspended ? "suspended" : "reactivated"}: ${senior.name || "Unknown"} (${senior.email || id})`,
+      severity: suspended ? "warning" : "info",
+      resolved: true,
+    }).catch(() => {});
+
+    console.log(`[Admin] User ${id} ${suspended ? "suspended" : "reactivated"}`);
+    res.json({ success: true, suspended: !!suspended });
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
