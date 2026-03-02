@@ -1029,18 +1029,24 @@
 
   async function loadUsers() {
     document.getElementById("usersBody").innerHTML =
-      '<tr class="loading-row"><td colspan="6"><div class="spinner"></div></td></tr>';
+      '<tr class="loading-row"><td colspan="7"><div class="spinner"></div></td></tr>';
 
     try {
       const res = await fetch("/api/admin/users", { headers: adminHeaders() });
       if (res.status === 401) { doLogout(); return; }
-      allUsers = await res.json();
+      const data = await res.json();
+      console.log("[Admin] /api/admin/users response:", res.status, Array.isArray(data) ? data.length + " users" : data);
+      if (!res.ok || !Array.isArray(data)) {
+        throw new Error(data?.error || "Unexpected response");
+      }
+      allUsers = data;
       document.getElementById("usersCount").textContent =
         `${allUsers.length} user${allUsers.length !== 1 ? "s" : ""} total`;
       renderUsers(allUsers);
     } catch (e) {
+      console.error("[Admin] loadUsers error:", e);
       document.getElementById("usersBody").innerHTML =
-        '<tr><td colspan="7" class="table-empty">Error loading users</td></tr>';
+        `<tr><td colspan="7" class="table-empty">Error loading users: ${esc(e.message)}</td></tr>`;
     }
   }
 

@@ -1371,23 +1371,7 @@ app.get("/api/admin/users", adminAuth, async (req, res) => {
     if (sErr) { console.error("[Admin] Users fetch error:", sErr.message); return res.status(500).json({ error: sErr.message }); }
     if (!seniors || !seniors.length) { return res.json([]); }
 
-    // Batch-fetch all counts in single queries instead of per-user
-    const ids = seniors.map(s => s.id);
-
-    // Helper: count grouped by senior_id
-    async function countBySenior(table, extraFilters = {}) {
-      try {
-        const { data, error } = await supabase.from(table).select("senior_id", { count: "exact" });
-        if (error) return {};
-        // Manual count — supabase JS doesn't support group-by, so we count in JS
-        const rows = data || [];
-        const counts = {};
-        for (const r of rows) { counts[r.senior_id] = (counts[r.senior_id] || 0) + 1; }
-        return counts;
-      } catch { return {}; }
-    }
-
-    // Simple approach: just return users with 0 counts to avoid table-not-found errors
+    // Return users with basic info — no count queries that could fail or time out
     const enriched = seniors.map(s => ({
       ...norm(s),
       totalChats: 0,
@@ -1396,21 +1380,6 @@ app.get("/api/admin/users", adminAuth, async (req, res) => {
       totalAppts: 0,
       totalDoctorQ: 0,
     }));
-
-    // Try to enrich with counts, but don't fail if tables don't exist
-    try {
-      const chatCounts = {};
-      const { data: chatRows } = await supabase.from("conversations").select("senior_id").eq("role", "user");
-      for (const r of (chatRows || [])) chatCounts[r.senior_id] = (chatCounts[r.senior_id] || 0) + 1;
-      enriched.forEach(u => { u.totalChats = chatCounts[u._id] || 0; });
-    } catch {}
-
-    try {
-      const alertCounts = {};
-      const { data: alertRows } = await supabase.from("alerts").select("senior_id").eq("resolved", false);
-      for (const r of (alertRows || [])) alertCounts[r.senior_id] = (alertCounts[r.senior_id] || 0) + 1;
-      enriched.forEach(u => { u.openAlerts = alertCounts[u._id] || 0; });
-    } catch {}
 
     console.log(`[Admin] Returning ${enriched.length} users`);
     res.json(enriched);
