@@ -1169,15 +1169,9 @@
   // ── Init ──────────────────────────────────────────────────────────────────────
   async function init() {
 
-    // Request microphone permission once upfront — prevents re-prompting on each Talk tap
-    try {
-      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-      // Stop tracks immediately — we just needed the permission grant
-      stream.getTracks().forEach(t => t.stop());
-      console.log("[mic] Permission granted upfront");
-    } catch (e) {
-      console.log("[mic] Permission not granted:", e.message);
-    }
+    // Mic permission is requested naturally when the user taps Talk.
+    // Requesting upfront via getUserMedia causes iOS Safari to re-prompt
+    // every page load since it doesn't persist mic grants across loads.
 
     const hour = new Date().getHours();
     const part = hour < 12 ? "morning" : hour < 17 ? "afternoon" : "evening";
