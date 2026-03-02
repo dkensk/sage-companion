@@ -298,6 +298,14 @@
         </div>
 
         <button class="btn-primary" onclick="launchSage()">Start Talking to Sage →</button>
+
+        <!-- Install prompt after signup -->
+        <div id="setupInstallBanner" style="display:none; background:#EFF6FF; border:2px solid #93C5FD; border-radius:14px; padding:16px; margin-top:16px; text-align:center;">
+          <p style="font-size:16px; font-weight:700; color:#1E3A8A; margin-bottom:4px;">📲 Add Sage to Your Home Screen</p>
+          <p id="setupInstallMsg" style="font-size:13px; color:#64748B; margin-bottom:12px;">Access Sage instantly — just like a regular app!</p>
+          <button id="setupInstallBtn" onclick="installApp()" style="background:linear-gradient(135deg,#1E3A8A,#2D4EAA); color:white; border:none; border-radius:10px; padding:12px 24px; font-size:15px; font-weight:700; cursor:pointer; box-shadow:0 3px 12px rgba(30,58,138,0.3);">Add to Home Screen</button>
+        </div>
+
         <p style="font-size:14px;color:var(--muted);margin-top:16px;line-height:1.5;">
           Your family can log in at <strong>this app's address/family</strong> and enter your code to get started.
         </p>
@@ -545,6 +553,46 @@
   // ── If already set up, skip to elder ──────────────────────────────────────
   if (localStorage.getItem("sageSeniorId")) {
     window.location.href = "/elder";
+  }
+
+  // ── INSTALL PROMPT ──────────────────────────────────────────────────────────
+  let deferredPrompt = null;
+
+  function showSetupInstallBanner() {
+    if (window.matchMedia('(display-mode: standalone)').matches) return;
+    if (navigator.standalone === true) return;
+    const banner = document.getElementById('setupInstallBanner');
+    if (banner) banner.style.display = 'block';
+  }
+
+  window.addEventListener('beforeinstallprompt', (e) => {
+    e.preventDefault();
+    deferredPrompt = e;
+    showSetupInstallBanner();
+  });
+
+  function isIOS() { return /iPad|iPhone|iPod/.test(navigator.userAgent) && !window.MSStream; }
+  function isSafari() { return /Safari/.test(navigator.userAgent) && !/Chrome|CriOS|FxiOS/.test(navigator.userAgent); }
+
+  if (isIOS() && isSafari() && !navigator.standalone) {
+    setTimeout(() => {
+      const msg = document.getElementById('setupInstallMsg');
+      if (msg) msg.textContent = 'Tap the Share button ⬆ then "Add to Home Screen"';
+      const btn = document.getElementById('setupInstallBtn');
+      if (btn) btn.textContent = 'Got it!';
+      showSetupInstallBanner();
+    }, 2000);
+  }
+
+  async function installApp() {
+    if (deferredPrompt) {
+      deferredPrompt.prompt();
+      const result = await deferredPrompt.userChoice;
+      deferredPrompt = null;
+      document.getElementById('setupInstallBanner').style.display = 'none';
+    } else if (isIOS()) {
+      document.getElementById('setupInstallBanner').style.display = 'none';
+    }
   }
 </script>
 </body>

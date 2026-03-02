@@ -544,6 +544,75 @@
       opacity: 1;
       transform: translateX(-50%) translateY(0);
     }
+
+    /* ── INSTALL BANNER ─────────────────────────────────── */
+    #installBanner {
+      display: none;
+      background: linear-gradient(135deg, #EFF6FF, #DBEAFE);
+      border: 2px solid #93C5FD;
+      border-radius: 18px;
+      padding: 18px 20px;
+      margin-bottom: 16px;
+      animation: fadeUp 0.5s var(--ease) forwards;
+      position: relative;
+    }
+
+    #installBanner .install-content {
+      display: flex;
+      align-items: center;
+      gap: 14px;
+    }
+
+    #installBanner .install-icon {
+      font-size: 36px;
+      flex-shrink: 0;
+    }
+
+    #installBanner .install-text h3 {
+      font-size: 17px;
+      font-weight: 800;
+      color: var(--navy);
+      margin-bottom: 4px;
+    }
+
+    #installBanner .install-text p {
+      font-size: 14px;
+      color: var(--muted);
+      line-height: 1.4;
+    }
+
+    #installBanner .install-actions {
+      display: flex;
+      gap: 10px;
+      margin-top: 14px;
+    }
+
+    #installBanner .install-btn {
+      flex: 1;
+      background: linear-gradient(135deg, var(--navy), #2D4EAA);
+      color: white;
+      border: none;
+      border-radius: 12px;
+      padding: 13px 16px;
+      font-size: 15px;
+      font-weight: 700;
+      cursor: pointer;
+      box-shadow: 0 3px 12px rgba(30,58,138,0.3);
+      transition: transform 0.15s var(--ease);
+    }
+
+    #installBanner .install-btn:active { transform: scale(0.97); }
+
+    #installBanner .dismiss-btn {
+      background: transparent;
+      color: var(--muted);
+      border: 1.5px solid var(--border);
+      border-radius: 12px;
+      padding: 13px 16px;
+      font-size: 15px;
+      font-weight: 600;
+      cursor: pointer;
+    }
   </style>
   <script>
     if ('serviceWorker' in navigator) {
@@ -611,6 +680,21 @@
 </header>
 
 <div class="main">
+
+  <!-- Install Banner -->
+  <div id="installBanner">
+    <div class="install-content">
+      <span class="install-icon">📲</span>
+      <div class="install-text">
+        <h3>Add Sage to Your Home Screen</h3>
+        <p id="installMsg">Access Sage instantly — just like a regular app!</p>
+      </div>
+    </div>
+    <div class="install-actions">
+      <button class="install-btn" id="installBtn" onclick="installApp()">Add to Home Screen</button>
+      <button class="dismiss-btn" onclick="dismissInstall()">Later</button>
+    </div>
+  </div>
 
   <!-- Talk to Sage -->
   <div class="card">
@@ -1964,6 +2048,76 @@
 
   // Init reminders state on page load
   initReminders();
+
+  // ── INSTALL PROMPT (Add to Home Screen) ──────────────
+  let deferredPrompt = null;
+
+  function showInstallBanner() {
+    // Don't show if already installed (standalone mode) or dismissed recently
+    if (window.matchMedia('(display-mode: standalone)').matches) return;
+    if (navigator.standalone === true) return; // iOS standalone
+    if (localStorage.getItem('installDismissed')) {
+      const dismissed = parseInt(localStorage.getItem('installDismissed'));
+      if (Date.now() - dismissed < 7 * 24 * 60 * 60 * 1000) return; // 7 days
+    }
+    const banner = document.getElementById('installBanner');
+    if (banner) banner.style.display = 'block';
+  }
+
+  // Android/Chrome: capture the beforeinstallprompt event
+  window.addEventListener('beforeinstallprompt', (e) => {
+    e.preventDefault();
+    deferredPrompt = e;
+    showInstallBanner();
+  });
+
+  // iOS Safari: show manual instructions
+  function isIOS() {
+    return /iPad|iPhone|iPod/.test(navigator.userAgent) && !window.MSStream;
+  }
+
+  function isSafari() {
+    return /Safari/.test(navigator.userAgent) && !/Chrome|CriOS|FxiOS/.test(navigator.userAgent);
+  }
+
+  if (isIOS() && isSafari() && !navigator.standalone) {
+    setTimeout(() => {
+      const msg = document.getElementById('installMsg');
+      if (msg) msg.textContent = 'Tap the Share button ⬆ then "Add to Home Screen"';
+      const btn = document.getElementById('installBtn');
+      if (btn) btn.textContent = 'Got it!';
+      showInstallBanner();
+    }, 2000);
+  }
+
+  async function installApp() {
+    if (deferredPrompt) {
+      // Android/Chrome: trigger native install prompt
+      deferredPrompt.prompt();
+      const result = await deferredPrompt.userChoice;
+      if (result.outcome === 'accepted') {
+        showToast('🎉 Sage added to your home screen!');
+      }
+      deferredPrompt = null;
+      document.getElementById('installBanner').style.display = 'none';
+    } else if (isIOS()) {
+      // iOS: just dismiss since they need to do it manually
+      showToast('Tap ⬆ Share → Add to Home Screen');
+      document.getElementById('installBanner').style.display = 'none';
+    }
+  }
+
+  function dismissInstall() {
+    document.getElementById('installBanner').style.display = 'none';
+    localStorage.setItem('installDismissed', Date.now().toString());
+  }
+
+  // Also show banner if app was already installable (page loaded after event)
+  window.addEventListener('appinstalled', () => {
+    document.getElementById('installBanner').style.display = 'none';
+    deferredPrompt = null;
+    showToast('🎉 Sage added to your home screen!');
+  });
 </script>
 </body>
 </html>
