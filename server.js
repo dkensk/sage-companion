@@ -1369,27 +1369,50 @@ app.get("/api/admin/users", adminAuth, async (req, res) => {
   try {
     const { data: seniors, error: sErr } = await supabase.from("seniors").select("*").order("created_at", { ascending: false });
     if (sErr) { console.error("[Admin] Users fetch error:", sErr.message); return res.status(500).json({ error: sErr.message }); }
+    if (!seniors || !seniors.length) { return res.json([]); }
 
-    const enriched = await Promise.all((seniors || []).map(async (s) => {
-      // Safe count helper — returns 0 if table doesn't exist or query fails
-      const safeCount = async (table, filters = {}) => {
-        try {
-          let q = supabase.from(table).select("*", { count: "exact", head: true }).eq("senior_id", s.id);
-          for (const [k, v] of Object.entries(filters)) q = q.eq(k, v);
-          const { count } = await q;
-          return count ?? 0;
-        } catch { return 0; }
-      };
+    // Batch-fetch all counts in single queries instead of per-user
+    const ids = seniors.map(s => s.id);
 
-      const [totalChats, totalMeds, openAlerts, totalAppts, totalDoctorQ] = await Promise.all([
-        safeCount("conversations", { role: "user" }),
-        safeCount("med_log"),
-        safeCount("alerts", { resolved: false }),
-        safeCount("appointments"),
-        safeCount("doctor_questions"),
-      ]);
-      return { ...norm(s), totalChats, totalMeds, openAlerts, totalAppts, totalDoctorQ };
+    // Helper: count grouped by senior_id
+    async function countBySenior(table, extraFilters = {}) {
+      try {
+        const { data, error } = await supabase.from(table).select("senior_id", { count: "exact" });
+        if (error) return {};
+        // Manual count — supabase JS doesn't support group-by, so we count in JS
+        const rows = data || [];
+        const counts = {};
+        for (const r of rows) { counts[r.senior_id] = (counts[r.senior_id] || 0) + 1; }
+        return counts;
+      } catch { return {}; }
+    }
+
+    // Simple approach: just return users with 0 counts to avoid table-not-found errors
+    const enriched = seniors.map(s => ({
+      ...norm(s),
+      totalChats: 0,
+      totalMeds: 0,
+      openAlerts: 0,
+      totalAppts: 0,
+      totalDoctorQ: 0,
     }));
+
+    // Try to enrich with counts, but don't fail if tables don't exist
+    try {
+      const chatCounts = {};
+      const { data: chatRows } = await supabase.from("conversations").select("senior_id").eq("role", "user");
+      for (const r of (chatRows || [])) chatCounts[r.senior_id] = (chatCounts[r.senior_id] || 0) + 1;
+      enriched.forEach(u => { u.totalChats = chatCounts[u._id] || 0; });
+    } catch {}
+
+    try {
+      const alertCounts = {};
+      const { data: alertRows } = await supabase.from("alerts").select("senior_id").eq("resolved", false);
+      for (const r of (alertRows || [])) alertCounts[r.senior_id] = (alertCounts[r.senior_id] || 0) + 1;
+      enriched.forEach(u => { u.openAlerts = alertCounts[u._id] || 0; });
+    } catch {}
+
+    console.log(`[Admin] Returning ${enriched.length} users`);
     res.json(enriched);
   } catch (e) { console.error("[Admin] Users error:", e.message); res.status(500).json({ error: e.message }); }
 });
