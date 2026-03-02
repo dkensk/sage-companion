@@ -735,8 +735,8 @@
           document.getElementById('familyCode').textContent = data.familyCode || 'XXXXX';
 
           // Format member since date
-          if (data.memberSince) {
-            const date = new Date(data.memberSince);
+          if (data.createdAt) {
+            const date = new Date(data.createdAt);
             const formatted = date.toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' });
             document.getElementById('accountMemberSince').textContent = formatted;
           }
