@@ -45,6 +45,24 @@ const FROM_EMAIL = process.env.FROM_EMAIL || "Sage Companion <hello@mysagecompan
 // ── Demo senior ID ────────────────────────────────────────────────────────────
 const DEMO_SENIOR_ID = "00000000-0000-0000-0000-000000000001";
 
+// ── Production safety checks ─────────────────────────────────────────────────
+const IS_PROD = process.env.NODE_ENV === "production" || process.env.RAILWAY_ENVIRONMENT === "production";
+if (IS_PROD) {
+  const missing = [];
+  if (!process.env.JWT_SECRET || process.env.JWT_SECRET === "sage-family-secret-dev") missing.push("JWT_SECRET");
+  if (!process.env.SENIOR_TOKEN_SECRET || process.env.SENIOR_TOKEN_SECRET === "sage-senior-secret-dev") missing.push("SENIOR_TOKEN_SECRET");
+  if (!process.env.ADMIN_PASSWORD || process.env.ADMIN_PASSWORD === "admin123") missing.push("ADMIN_PASSWORD");
+  if (!process.env.SUPABASE_URL) missing.push("SUPABASE_URL");
+  if (!process.env.SUPABASE_SERVICE_ROLE_KEY) missing.push("SUPABASE_SERVICE_ROLE_KEY");
+  if (!process.env.ANTHROPIC_API_KEY) missing.push("ANTHROPIC_API_KEY");
+  if (missing.length > 0) {
+    console.error("🚨 FATAL: Missing required production environment variables:", missing.join(", "));
+    console.error("   Set these in Railway → Variables before deploying.");
+    process.exit(1);
+  }
+  console.log("✅ Production secret check passed");
+}
+
 // ── Web Push (VAPID) setup ────────────────────────────────────────────────────
 const VAPID_PUBLIC  = process.env.VAPID_PUBLIC_KEY  || "";
 const VAPID_PRIVATE = process.env.VAPID_PRIVATE_KEY || "";
@@ -55,6 +73,18 @@ if (VAPID_PUBLIC && VAPID_PRIVATE) {
 }
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
+
+// Fields that should NEVER be sent to the client
+const SENSITIVE_FIELDS = ["password_hash", "passwordHash", "google_tokens", "googleTokens",
+  "supabase_service_role_key", "stripe_customer_id", "stripeCustomerId"];
+
+// Strip sensitive fields from a senior record before sending to client
+function safeSenior(obj) {
+  if (!obj) return null;
+  const out = { ...obj };
+  for (const f of SENSITIVE_FIELDS) delete out[f];
+  return out;
+}
 
 // Convert snake_case Supabase rows → camelCase + add _id alias for frontend
 function toCamel(obj) {
@@ -366,6 +396,9 @@ app.post("/api/stripe/webhook", express.raw({ type: "application/json" }), async
 
 app.use(express.json({ limit: "1mb" }));
 
+// Trust proxy (Railway, Heroku, etc.) — needed for correct req.ip in rate limiting
+app.set("trust proxy", 1);
+
 // ── Request logger (debug) ──────────────────────────────────────────────────
 app.use((req, res, next) => {
   if (req.path.startsWith("/api/")) {
@@ -440,14 +473,26 @@ app.use((req, res, next) => {
   res.setHeader("X-Frame-Options", "SAMEORIGIN");
   res.setHeader("X-XSS-Protection", "1; mode=block");
   res.setHeader("Referrer-Policy", "strict-origin-when-cross-origin");
-  // CORS
+  res.setHeader("Strict-Transport-Security", "max-age=31536000; includeSubDomains");
+  res.setHeader("Content-Security-Policy", "default-src 'self'; script-src 'self' 'unsafe-inline' https://cdnjs.cloudflare.com https://js.stripe.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data: blob:; connect-src 'self' https://api.stripe.com https://nominatim.openstreetmap.org; frame-src https://js.stripe.com;");
+  res.setHeader("Permissions-Policy", "camera=(), microphone=(self), geolocation=(self)");
+  // CORS — lock to production domain (set FRONTEND_URL in env)
   const origin = req.headers.origin;
   const allowed = process.env.FRONTEND_URL || "";
-  if (origin && (origin === allowed || allowed === "*" || !allowed)) {
-    res.setHeader("Access-Control-Allow-Origin", origin);
-    res.setHeader("Access-Control-Allow-Credentials", "true");
+  if (IS_PROD) {
+    // In production, only allow the explicitly configured origin
+    if (origin && allowed && origin === allowed) {
+      res.setHeader("Access-Control-Allow-Origin", origin);
+      res.setHeader("Access-Control-Allow-Credentials", "true");
+    }
+  } else {
+    // In dev, allow any origin for convenience
+    if (origin) {
+      res.setHeader("Access-Control-Allow-Origin", origin);
+      res.setHeader("Access-Control-Allow-Credentials", "true");
+    }
   }
-  res.setHeader("Access-Control-Allow-Methods", "GET,POST,PATCH,DELETE,OPTIONS");
+  res.setHeader("Access-Control-Allow-Methods", "GET,POST,PUT,PATCH,DELETE,OPTIONS");
   res.setHeader("Access-Control-Allow-Headers", "Content-Type,x-senior-token,x-family-token,x-admin-token");
   if (req.method === "OPTIONS") return res.sendStatus(204);
   next();
@@ -474,7 +519,7 @@ app.get("/api/senior/:id", seniorAuth, validateUUID("id"), async (req, res) => {
       .eq("id", req.params.id).single();
     if (error || !data) return res.status(404).json({ error: "Senior not found" });
     res.json(norm(data));
-  } catch (e) { res.status(500).json({ error: e.message }); }
+  } catch (e) { console.error(`[Error] ${req.method} ${req.path}:`, e.message); res.status(500).json({ error: "Something went wrong. Please try again." }); }
 });
 
 // ── Phone Numbers ─────────────────────────────────────────────────────────────
@@ -486,7 +531,7 @@ app.get("/api/phones/:seniorId", anyAuth, validateUUID("seniorId"), async (req, 
       .eq("id", req.params.seniorId).single();
     if (!data) return res.status(404).json({ error: "Senior not found" });
     res.json({ seniorPhone: data.senior_phone || "", familyPhone: data.family_phone || "" });
-  } catch (e) { res.status(500).json({ error: e.message }); }
+  } catch (e) { console.error(`[Error] ${req.method} ${req.path}:`, e.message); res.status(500).json({ error: "Something went wrong. Please try again." }); }
 });
 
 // PUT update phone numbers (accessible by both senior and family)
@@ -499,7 +544,7 @@ app.put("/api/phones/:seniorId", anyAuth, validateUUID("seniorId"), async (req, 
     if (Object.keys(updates).length === 0) return res.status(400).json({ error: "No phone fields provided" });
     await supabase.from("seniors").update(updates).eq("id", req.params.seniorId);
     res.json({ success: true, ...updates });
-  } catch (e) { res.status(500).json({ error: e.message }); }
+  } catch (e) { console.error(`[Error] ${req.method} ${req.path}:`, e.message); res.status(500).json({ error: "Something went wrong. Please try again." }); }
 });
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -518,7 +563,7 @@ app.get("/api/medications/:seniorId", seniorAuth, validateUUID("seniorId"), asyn
 
     const takenIds = new Set((logs || []).map(l => l.medication_id));
     res.json(normArr(meds).map(m => ({ ...m, takenToday: takenIds.has(m.id) })));
-  } catch (e) { res.status(500).json({ error: e.message }); }
+  } catch (e) { console.error(`[Error] ${req.method} ${req.path}:`, e.message); res.status(500).json({ error: "Something went wrong. Please try again." }); }
 });
 
 app.post("/api/medications/:id/taken", seniorAuth, validateUUID("id"), async (req, res) => {
@@ -537,15 +582,14 @@ app.post("/api/medications/:id/taken", seniorAuth, validateUUID("id"), async (re
     });
     await trackUsage(med.senior_id, "medications_taken");
     res.json({ success: true, message: `${med.name} marked as taken` });
-  } catch (e) { res.status(500).json({ error: e.message }); }
+  } catch (e) { console.error(`[Error] ${req.method} ${req.path}:`, e.message); res.status(500).json({ error: "Something went wrong. Please try again." }); }
 });
 
-// GET /api/medications/scan/status — diagnostic check for scan pipeline
-app.get("/api/medications/scan/status", (req, res) => {
+// GET /api/medications/scan/status — diagnostic check for scan pipeline (admin only)
+app.get("/api/medications/scan/status", adminAuth, (req, res) => {
   const apiKey = (process.env.ANTHROPIC_API_KEY || "").trim();
   res.json({
     configured: !!apiKey && apiKey.length > 10,
-    keyPrefix: apiKey ? apiKey.substring(0, 10) + "…" : null,
     scanModel: process.env.SCAN_MODEL || "claude-sonnet-4-5-20250929",
     maxFileSize: "15MB",
   });
@@ -587,7 +631,7 @@ Fields:
     res.json(parsed);
   } catch (e) {
     console.error("[MedScan] Error:", e.message);
-    res.status(500).json({ error: e.message });
+    res.status(500).json({ error: "Something went wrong. Please try again." });
   }
 });
 
@@ -608,14 +652,14 @@ app.post("/api/medications", anyAuth, async (req, res) => {
       timestamp: new Date().toISOString(),
     });
     res.json({ success: true, medication: norm(med) });
-  } catch (e) { res.status(500).json({ error: e.message }); }
+  } catch (e) { console.error(`[Error] ${req.method} ${req.path}:`, e.message); res.status(500).json({ error: "Something went wrong. Please try again." }); }
 });
 
 app.delete("/api/medications/:id", seniorAuth, validateUUID("id"), async (req, res) => {
   try {
     await supabase.from("medications").update({ active: false }).eq("id", req.params.id);
     res.json({ success: true });
-  } catch (e) { res.status(500).json({ error: e.message }); }
+  } catch (e) { console.error(`[Error] ${req.method} ${req.path}:`, e.message); res.status(500).json({ error: "Something went wrong. Please try again." }); }
 });
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -637,7 +681,7 @@ app.post("/api/emergency", seniorAuth, async (req, res) => {
     });
     await trackUsage(seniorId, "emergency_alerts");
     res.json({ success: true, alert: norm(alert) });
-  } catch (e) { res.status(500).json({ error: e.message }); }
+  } catch (e) { console.error(`[Error] ${req.method} ${req.path}:`, e.message); res.status(500).json({ error: "Something went wrong. Please try again." }); }
 });
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -802,7 +846,7 @@ ${weatherInfo ? `Current weather: ${weatherInfo}` : ""}`;
     res.json({ reply: aiReply, sessionId: sid, suggestedQuestion, appointment: savedAppointment });
   } catch (e) {
     console.error("Chat error:", e.message);
-    res.status(500).json({ error: e.message });
+    res.status(500).json({ error: "Something went wrong. Please try again." });
   }
 });
 
@@ -811,23 +855,22 @@ ${weatherInfo ? `Current weather: ${weatherInfo}` : ""}`;
 // ─────────────────────────────────────────────────────────────────────────────
 
 // Quick status check — hit /api/tts/status to confirm TTS is configured
-app.get("/api/tts/status", (req, res) => {
+app.get("/api/tts/status", adminAuth, (req, res) => {
   const openaiKey = (process.env.OPENAI_API_KEY || "").trim();
   const isPlaceholder = !openaiKey || openaiKey.startsWith("YOUR_") || openaiKey.length < 20;
   res.json({
     configured: !isPlaceholder,
     provider: "openai",
-    keyPrefix: openaiKey && !isPlaceholder ? openaiKey.slice(0, 12) + "…" : null,
     voice: process.env.TTS_VOICE || "nova",
-    issue: isPlaceholder ? "OPENAI_API_KEY is missing or still a placeholder — set it in Railway Variables" : null,
+    issue: isPlaceholder ? "OPENAI_API_KEY is missing or still a placeholder" : null,
   });
 });
 
-// Live test endpoint — makes a real 1-word TTS call to verify the full pipeline
-app.get("/api/tts/test", async (req, res) => {
+// Live test endpoint — makes a real 1-word TTS call to verify the full pipeline (admin only)
+app.get("/api/tts/test", adminAuth, async (req, res) => {
   const apiKey = (process.env.OPENAI_API_KEY || "").trim();
   if (!apiKey || apiKey.startsWith("YOUR_") || apiKey.length < 20) {
-    return res.json({ ok: false, error: "OPENAI_API_KEY not set or is a placeholder", keyLength: apiKey.length, keyPrefix: apiKey.slice(0, 10) });
+    return res.json({ ok: false, error: "OPENAI_API_KEY not configured" });
   }
   const https = require("https");
   try {
@@ -854,7 +897,7 @@ app.get("/api/tts/test", async (req, res) => {
     });
     res.json(result);
   } catch (e) {
-    res.json({ ok: false, error: e.message });
+    res.json({ ok: false, error: "TTS test failed" });
   }
 });
 
@@ -926,7 +969,7 @@ app.post("/api/tts", seniorAuth, rateLimit(60000, 30), async (req, res) => {
     audioStream.pipe(res);
   } catch (e) {
     console.error("TTS failed:", e.message);
-    res.status(502).json({ error: e.message });
+    res.status(502).json({ error: "Voice synthesis failed. Please try again." });
   }
 });
 
@@ -939,7 +982,7 @@ app.get("/api/doctor-questions/:seniorId", anyAuth, validateUUID("seniorId"), as
     const { data } = await supabase.from("doctor_questions").select("*")
       .eq("senior_id", req.params.seniorId).order("created_at", { ascending: false });
     res.json(normArr(data));
-  } catch (e) { res.status(500).json({ error: e.message }); }
+  } catch (e) { console.error(`[Error] ${req.method} ${req.path}:`, e.message); res.status(500).json({ error: "Something went wrong. Please try again." }); }
 });
 
 app.post("/api/doctor-questions", seniorAuth, async (req, res) => {
@@ -955,7 +998,7 @@ app.post("/api/doctor-questions", seniorAuth, async (req, res) => {
     });
     await trackUsage(seniorId, "doctor_questions_added");
     res.json({ success: true, question: norm(q) });
-  } catch (e) { res.status(500).json({ error: e.message }); }
+  } catch (e) { console.error(`[Error] ${req.method} ${req.path}:`, e.message); res.status(500).json({ error: "Something went wrong. Please try again." }); }
 });
 
 app.patch("/api/doctor-questions/:id/asked", seniorAuth, validateUUID("id"), async (req, res) => {
@@ -963,14 +1006,14 @@ app.patch("/api/doctor-questions/:id/asked", seniorAuth, validateUUID("id"), asy
     await supabase.from("doctor_questions")
       .update({ asked: true, asked_at: new Date().toISOString() }).eq("id", req.params.id);
     res.json({ success: true });
-  } catch (e) { res.status(500).json({ error: e.message }); }
+  } catch (e) { console.error(`[Error] ${req.method} ${req.path}:`, e.message); res.status(500).json({ error: "Something went wrong. Please try again." }); }
 });
 
 app.delete("/api/doctor-questions/:id", seniorAuth, validateUUID("id"), async (req, res) => {
   try {
     await supabase.from("doctor_questions").delete().eq("id", req.params.id);
     res.json({ success: true });
-  } catch (e) { res.status(500).json({ error: e.message }); }
+  } catch (e) { console.error(`[Error] ${req.method} ${req.path}:`, e.message); res.status(500).json({ error: "Something went wrong. Please try again." }); }
 });
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -982,7 +1025,7 @@ app.get("/api/doctor-visits/:seniorId", anyAuth, validateUUID("seniorId"), async
     const { data } = await supabase.from("doctor_visits").select("*")
       .eq("senior_id", req.params.seniorId).order("created_at", { ascending: false });
     res.json(normArr(data));
-  } catch (e) { res.status(500).json({ error: e.message }); }
+  } catch (e) { console.error(`[Error] ${req.method} ${req.path}:`, e.message); res.status(500).json({ error: "Something went wrong. Please try again." }); }
 });
 
 app.post("/api/doctor-visits", seniorAuth, async (req, res) => {
@@ -1005,7 +1048,7 @@ app.post("/api/doctor-visits", seniorAuth, async (req, res) => {
       timestamp: new Date().toISOString(),
     });
     res.json({ success: true, visit: norm(visit) });
-  } catch (e) { res.status(500).json({ error: e.message }); }
+  } catch (e) { console.error(`[Error] ${req.method} ${req.path}:`, e.message); res.status(500).json({ error: "Something went wrong. Please try again." }); }
 });
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -1015,13 +1058,13 @@ app.post("/api/doctor-visits", seniorAuth, async (req, res) => {
 // Deprecated — login by name removed for security. Use email+password or family code.
 // app.get("/api/senior/by-name/:name", ...);
 
-app.get("/api/senior/by-code/:code", async (req, res) => {
+app.get("/api/senior/by-code/:code", rateLimit("login"), async (req, res) => {
   try {
-    const { data } = await supabase.from("seniors").select("*")
+    const { data } = await supabase.from("seniors").select("id, name, family_code, age")
       .eq("family_code", req.params.code.toUpperCase()).single();
     if (!data) return res.status(404).json({ error: "Invalid family code" });
     res.json(norm(data));
-  } catch (e) { res.status(500).json({ error: e.message }); }
+  } catch (e) { res.status(500).json({ error: "Lookup failed" }); }
 });
 
 app.get("/api/dashboard/:seniorId", familyAuth, validateUUID("seniorId"), async (req, res) => {
@@ -1049,7 +1092,7 @@ app.get("/api/dashboard/:seniorId", familyAuth, validateUUID("seniorId"), async 
     const adherence  = (meds || []).length > 0 ? Math.round((takenToday / meds.length) * 100) : 0;
 
     res.json({
-      senior: norm(senior),
+      senior: safeSenior(norm(senior)),
       stats: {
         medicationsTaken: takenToday,
         medicationsTotal: (meds || []).length,
@@ -1061,7 +1104,7 @@ app.get("/api/dashboard/:seniorId", familyAuth, validateUUID("seniorId"), async 
       recentActivity: normArr(activity),
       medications: normArr(meds).map(m => ({ ...m, takenToday: (logs || []).some(l => l.medication_id === m.id) })),
     });
-  } catch (e) { res.status(500).json({ error: e.message }); }
+  } catch (e) { console.error(`[Error] ${req.method} ${req.path}:`, e.message); res.status(500).json({ error: "Something went wrong. Please try again." }); }
 });
 
 app.post("/api/alerts/:id/resolve", familyAuth, validateUUID("id"), async (req, res) => {
@@ -1069,7 +1112,7 @@ app.post("/api/alerts/:id/resolve", familyAuth, validateUUID("id"), async (req, 
     await supabase.from("alerts")
       .update({ resolved: true, resolved_at: new Date().toISOString() }).eq("id", req.params.id);
     res.json({ success: true });
-  } catch (e) { res.status(500).json({ error: e.message }); }
+  } catch (e) { console.error(`[Error] ${req.method} ${req.path}:`, e.message); res.status(500).json({ error: "Something went wrong. Please try again." }); }
 });
 
 app.get("/api/conversations/:seniorId", anyAuth, validateUUID("seniorId"), async (req, res) => {
@@ -1086,7 +1129,7 @@ app.get("/api/conversations/:seniorId", anyAuth, validateUUID("seniorId"), async
       .sort((a, b) => new Date(b.startedAt) - new Date(a.startedAt))
       .slice(0, 20);
     res.json(sessionList);
-  } catch (e) { res.status(500).json({ error: e.message }); }
+  } catch (e) { console.error(`[Error] ${req.method} ${req.path}:`, e.message); res.status(500).json({ error: "Something went wrong. Please try again." }); }
 });
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -1098,7 +1141,7 @@ app.get("/api/appointments/:seniorId", anyAuth, validateUUID("seniorId"), async 
     const { data } = await supabase.from("appointments").select("*")
       .eq("senior_id", req.params.seniorId).order("date", { ascending: true });
     res.json(normArr(data));
-  } catch (e) { res.status(500).json({ error: e.message }); }
+  } catch (e) { console.error(`[Error] ${req.method} ${req.path}:`, e.message); res.status(500).json({ error: "Something went wrong. Please try again." }); }
 });
 
 app.post("/api/appointments", seniorAuth, async (req, res) => {
@@ -1116,14 +1159,14 @@ app.post("/api/appointments", seniorAuth, async (req, res) => {
     });
     await trackUsage(seniorId, "appointments_added");
     res.json({ success: true, appointment: norm(appt) });
-  } catch (e) { res.status(500).json({ error: e.message }); }
+  } catch (e) { console.error(`[Error] ${req.method} ${req.path}:`, e.message); res.status(500).json({ error: "Something went wrong. Please try again." }); }
 });
 
 app.delete("/api/appointments/:id", seniorAuth, validateUUID("id"), async (req, res) => {
   try {
     await supabase.from("appointments").delete().eq("id", req.params.id);
     res.json({ success: true });
-  } catch (e) { res.status(500).json({ error: e.message }); }
+  } catch (e) { console.error(`[Error] ${req.method} ${req.path}:`, e.message); res.status(500).json({ error: "Something went wrong. Please try again." }); }
 });
 
 app.post("/api/appointments/parse", seniorAuth, async (req, res) => {
@@ -1138,7 +1181,7 @@ app.post("/api/appointments/parse", seniorAuth, async (req, res) => {
     const match = response.content[0].text.match(/\{[\s\S]*\}/);
     if (!match) return res.status(400).json({ error: "Could not parse appointment" });
     res.json(JSON.parse(match[0]));
-  } catch (e) { res.status(500).json({ error: e.message }); }
+  } catch (e) { console.error(`[Error] ${req.method} ${req.path}:`, e.message); res.status(500).json({ error: "Something went wrong. Please try again." }); }
 });
 
 app.post("/api/appointments/ocr", rateLimit("upload"), upload.single("image"), seniorAuth, async (req, res) => {
@@ -1156,12 +1199,20 @@ app.post("/api/appointments/ocr", rateLimit("upload"), upload.single("image"), s
     });
     const match = response.content[0].text.match(/\[[\s\S]*\]/);
     res.json({ events: match ? JSON.parse(match[0]) : [] });
-  } catch (e) { res.status(500).json({ error: e.message }); }
+  } catch (e) { console.error(`[Error] ${req.method} ${req.path}:`, e.message); res.status(500).json({ error: "Something went wrong. Please try again." }); }
 });
 
-app.get("/api/calendar/:seniorId/feed.ics", async (req, res) => {
+app.get("/api/calendar/:seniorId/feed.ics", validateUUID("seniorId"), async (req, res) => {
   try {
     const { seniorId } = req.params;
+    // Verify access: accept either a valid token header or a ?token= query param
+    const queryToken = req.query.token;
+    const headerToken = req.headers["x-senior-token"] || req.headers["x-family-token"];
+    const isValidSenior = verifySeniorToken(headerToken || queryToken);
+    const isValidFamily = verifyFamilyToken(headerToken || queryToken);
+    if (!isValidSenior && !isValidFamily) {
+      return res.status(401).json({ error: "Authentication required — pass token as query param or header" });
+    }
     const { data: senior } = await supabase.from("seniors").select("name").eq("id", seniorId).single();
     const { data: appts }  = await supabase.from("appointments").select("*").eq("senior_id", seniorId);
     const fmt = (d) => d.toISOString().replace(/[-:.]/g, "").slice(0, 15) + "Z";
@@ -1180,7 +1231,7 @@ app.get("/api/calendar/:seniorId/feed.ics", async (req, res) => {
     res.setHeader("Content-Type", "text/calendar; charset=utf-8");
     res.setHeader("Content-Disposition", `attachment; filename="sage-companion.ics"`);
     res.send(cal);
-  } catch (e) { res.status(500).json({ error: e.message }); }
+  } catch (e) { res.status(500).json({ error: "Calendar feed error" }); }
 });
 
 // ── Google Calendar OAuth ─────────────────────────────────────────────────────
@@ -1216,7 +1267,7 @@ app.get("/api/google/status/:seniorId", anyAuth, validateUUID("seniorId"), async
   try {
     const { data } = await supabase.from("seniors").select("google_tokens").eq("id", req.params.seniorId).single();
     res.json({ connected: !!(data?.google_tokens), configured: !!process.env.GOOGLE_CLIENT_ID });
-  } catch (e) { res.status(500).json({ error: e.message }); }
+  } catch (e) { console.error(`[Error] ${req.method} ${req.path}:`, e.message); res.status(500).json({ error: "Something went wrong. Please try again." }); }
 });
 
 app.post("/api/google/sync/:seniorId", anyAuth, validateUUID("seniorId"), async (req, res) => {
@@ -1280,7 +1331,7 @@ app.post("/api/google/sync/:seniorId", anyAuth, validateUUID("seniorId"), async 
     res.json({ success: true, pulled, pushed, appointments: normArr(all) });
   } catch (e) {
     console.error("Google sync error:", e.message);
-    res.status(500).json({ error: e.message });
+    res.status(500).json({ error: "Something went wrong. Please try again." });
   }
 });
 
@@ -1293,7 +1344,7 @@ function generateFamilyCode() {
   return "SAGE" + Array.from({ length: 2 }, () => chars[Math.floor(Math.random() * chars.length)]).join("");
 }
 
-app.post("/api/seniors", async (req, res) => {
+app.post("/api/seniors", rateLimit("login"), async (req, res) => {
   try {
     const { name, age, email, password } = req.body;
     if (!name) return res.status(400).json({ error: "Name is required" });
@@ -1346,8 +1397,8 @@ app.post("/api/seniors", async (req, res) => {
       console.error("[Email] Welcome email failed:", e.message);
     });
 
-    res.json({ success: true, senior: norm(senior), token });
-  } catch (e) { res.status(500).json({ error: e.message }); }
+    res.json({ success: true, senior: safeSenior(norm(senior)), token });
+  } catch (e) { console.error(`[Error] ${req.method} ${req.path}:`, e.message); res.status(500).json({ error: "Something went wrong. Please try again." }); }
 });
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -1389,7 +1440,7 @@ app.get("/api/admin/stats", adminAuth, async (req, res) => {
     const { count: totalAppointments } = await supabase.from("appointments").select("*", { count: "exact", head: true });
 
     res.json({ totalUsers, activeToday, chatsThisWeek, totalEmergencies, newThisWeek, medsThisWeek, totalAppointments });
-  } catch (e) { res.status(500).json({ error: e.message }); }
+  } catch (e) { console.error(`[Error] ${req.method} ${req.path}:`, e.message); res.status(500).json({ error: "Something went wrong. Please try again." }); }
 });
 
 app.get("/api/admin/users", adminAuth, async (req, res) => {
@@ -1410,7 +1461,7 @@ app.get("/api/admin/users", adminAuth, async (req, res) => {
 
     console.log(`[Admin] Returning ${enriched.length} users`);
     res.json(enriched);
-  } catch (e) { console.error("[Admin] Users error:", e.message); res.status(500).json({ error: e.message }); }
+  } catch (e) { console.error("[Admin] Users error:", e.message); res.status(500).json({ error: "Something went wrong. Please try again." }); }
 });
 
 app.get("/api/admin/users/:id", adminAuth, async (req, res) => {
@@ -1444,7 +1495,7 @@ app.get("/api/admin/users/:id", adminAuth, async (req, res) => {
     const totalDoctorVisits = (await supabase.from("doctor_visits").select("*", { count: "exact", head: true }).eq("senior_id", id)).count ?? 0;
 
     res.json({
-      ...norm(senior),
+      ...safeSenior(norm(senior)),
       medications:     normArr(meds),
       doctorQuestions: normArr(questions),
       doctorVisits:    normArr(visits),
@@ -1458,7 +1509,7 @@ app.get("/api/admin/users/:id", adminAuth, async (req, res) => {
       totalDrQuestions,
       totalDoctorVisits,
     });
-  } catch (e) { res.status(500).json({ error: e.message }); }
+  } catch (e) { console.error(`[Error] ${req.method} ${req.path}:`, e.message); res.status(500).json({ error: "Something went wrong. Please try again." }); }
 });
 
 app.get("/api/admin/alerts", adminAuth, async (req, res) => {
@@ -1474,7 +1525,7 @@ app.get("/api/admin/alerts", adminAuth, async (req, res) => {
       userName: a.seniors?.name || "Unknown",
     }));
     res.json(enriched);
-  } catch (e) { res.status(500).json({ error: e.message }); }
+  } catch (e) { console.error(`[Error] ${req.method} ${req.path}:`, e.message); res.status(500).json({ error: "Something went wrong. Please try again." }); }
 });
 
 // Suspend / unsuspend a user
@@ -1496,7 +1547,7 @@ app.post("/api/admin/users/:id/suspend", adminAuth, async (req, res) => {
 
     console.log(`[Admin] User ${id} ${suspended ? "suspended" : "reactivated"}`);
     res.json({ success: true, suspended: !!suspended });
-  } catch (e) { res.status(500).json({ error: e.message }); }
+  } catch (e) { console.error(`[Error] ${req.method} ${req.path}:`, e.message); res.status(500).json({ error: "Something went wrong. Please try again." }); }
 });
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -1533,8 +1584,8 @@ app.post("/api/senior/login", rateLimit("login"), async (req, res) => {
 
     const token = makeSeniorToken(senior.id);
     console.log(`✅ Senior login: ${senior.name} (${senior.id})`);
-    res.json({ token, senior: norm(senior), expiresInDays: SENIOR_TOKEN_DAYS });
-  } catch (e) { res.status(500).json({ error: e.message }); }
+    res.json({ token, senior: safeSenior(norm(senior)), expiresInDays: SENIOR_TOKEN_DAYS });
+  } catch (e) { console.error(`[Error] ${req.method} ${req.path}:`, e.message); res.status(500).json({ error: "Something went wrong. Please try again." }); }
 });
 
 // Family login — exchange family code for a 30-day family token
@@ -1553,8 +1604,8 @@ app.post("/api/family/login", rateLimit("login"), async (req, res) => {
 
     const token = makeFamilyToken(senior.id);
     console.log(`✅ Family login for: ${senior.name}`);
-    res.json({ token, senior: norm(senior), expiresInDays: FAMILY_TOKEN_DAYS });
-  } catch (e) { res.status(500).json({ error: e.message }); }
+    res.json({ token, senior: safeSenior(norm(senior)), expiresInDays: FAMILY_TOKEN_DAYS });
+  } catch (e) { console.error(`[Error] ${req.method} ${req.path}:`, e.message); res.status(500).json({ error: "Something went wrong. Please try again." }); }
 });
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -1595,7 +1646,7 @@ app.post("/api/push/subscribe", seniorAuth, async (req, res) => {
     }
 
     res.json({ ok: true });
-  } catch (e) { res.status(500).json({ error: e.message }); }
+  } catch (e) { console.error(`[Error] ${req.method} ${req.path}:`, e.message); res.status(500).json({ error: "Something went wrong. Please try again." }); }
 });
 
 // Remove a push subscription
@@ -1605,7 +1656,7 @@ app.post("/api/push/unsubscribe", seniorAuth, async (req, res) => {
     if (!seniorId) return res.status(400).json({ error: "seniorId required" });
     await supabase.from("push_subscriptions").delete().eq("senior_id", seniorId);
     res.json({ ok: true });
-  } catch (e) { res.status(500).json({ error: e.message }); }
+  } catch (e) { console.error(`[Error] ${req.method} ${req.path}:`, e.message); res.status(500).json({ error: "Something went wrong. Please try again." }); }
 });
 
 // Send a test push notification
@@ -1643,7 +1694,7 @@ app.post("/api/push/test", seniorAuth, async (req, res) => {
       }
     }
     res.json({ ok: true, sent });
-  } catch (e) { res.status(500).json({ error: e.message }); }
+  } catch (e) { console.error(`[Error] ${req.method} ${req.path}:`, e.message); res.status(500).json({ error: "Something went wrong. Please try again." }); }
 });
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -1701,7 +1752,7 @@ app.post("/api/billing/checkout", seniorAuth, async (req, res) => {
     res.json({ url: session.url });
   } catch (e) {
     console.error("[Stripe] Checkout error:", e.message);
-    res.status(500).json({ error: e.message });
+    res.status(500).json({ error: "Something went wrong. Please try again." });
   }
 });
 
@@ -1716,7 +1767,7 @@ app.get("/api/billing/status", seniorAuth, async (req, res) => {
       trialEndsAt: senior.trial_ends_at || null,
       hasStripe: !!senior.stripe_customer_id,
     });
-  } catch (e) { res.status(500).json({ error: e.message }); }
+  } catch (e) { console.error(`[Error] ${req.method} ${req.path}:`, e.message); res.status(500).json({ error: "Something went wrong. Please try again." }); }
 });
 
 // Stripe billing portal (manage subscription, update card, cancel)
@@ -1731,7 +1782,7 @@ app.post("/api/billing/portal", seniorAuth, async (req, res) => {
       return_url: `${req.protocol}://${req.get("host")}/settings`,
     });
     res.json({ url: portalSession.url });
-  } catch (e) { res.status(500).json({ error: e.message }); }
+  } catch (e) { console.error(`[Error] ${req.method} ${req.path}:`, e.message); res.status(500).json({ error: "Something went wrong. Please try again." }); }
 });
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -1806,7 +1857,7 @@ app.post("/api/auth/forgot-code", rateLimit("login"), async (req, res) => {
       console.log(`[Email] Family code sent to ${email}`);
     }
     res.json({ success: true, message: "If an account exists with that email, we'll send your family code." });
-  } catch (e) { res.status(500).json({ error: e.message }); }
+  } catch (e) { console.error(`[Error] ${req.method} ${req.path}:`, e.message); res.status(500).json({ error: "Something went wrong. Please try again." }); }
 });
 
 // Password reset — sends reset token via email
@@ -1852,7 +1903,7 @@ app.post("/api/auth/forgot-password", rateLimit("login"), async (req, res) => {
       console.log(`[Email] Password reset sent to ${email}`);
     }
     res.json({ success: true });
-  } catch (e) { res.status(500).json({ error: e.message }); }
+  } catch (e) { console.error(`[Error] ${req.method} ${req.path}:`, e.message); res.status(500).json({ error: "Something went wrong. Please try again." }); }
 });
 
 // Reset password with token
@@ -1875,7 +1926,7 @@ app.post("/api/auth/reset-password", rateLimit("login"), async (req, res) => {
     }).eq("id", senior.id);
 
     res.json({ success: true });
-  } catch (e) { res.status(500).json({ error: e.message }); }
+  } catch (e) { console.error(`[Error] ${req.method} ${req.path}:`, e.message); res.status(500).json({ error: "Something went wrong. Please try again." }); }
 });
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -1888,7 +1939,7 @@ app.get("/api/account", seniorAuth, async (req, res) => {
     const { data: senior } = await supabase.from("seniors").select("name, email, age, family_code, subscription_status, subscription_plan, created_at").eq("id", req.seniorId).single();
     if (!senior) return res.status(404).json({ error: "Account not found" });
     res.json(norm(senior));
-  } catch (e) { res.status(500).json({ error: e.message }); }
+  } catch (e) { console.error(`[Error] ${req.method} ${req.path}:`, e.message); res.status(500).json({ error: "Something went wrong. Please try again." }); }
 });
 
 // Change password
@@ -1912,7 +1963,7 @@ app.post("/api/account/change-password", seniorAuth, rateLimit("login"), async (
     await supabase.from("seniors").update({ password_hash: salt + ":" + hash }).eq("id", req.seniorId);
 
     res.json({ success: true });
-  } catch (e) { res.status(500).json({ error: e.message }); }
+  } catch (e) { console.error(`[Error] ${req.method} ${req.path}:`, e.message); res.status(500).json({ error: "Something went wrong. Please try again." }); }
 });
 
 // Update email
@@ -1935,7 +1986,7 @@ app.post("/api/account/change-email", seniorAuth, rateLimit("login"), async (req
 
     await supabase.from("seniors").update({ email: newEmail.trim().toLowerCase() }).eq("id", req.seniorId);
     res.json({ success: true });
-  } catch (e) { res.status(500).json({ error: e.message }); }
+  } catch (e) { console.error(`[Error] ${req.method} ${req.path}:`, e.message); res.status(500).json({ error: "Something went wrong. Please try again." }); }
 });
 
 // Delete account
@@ -1967,7 +2018,7 @@ app.post("/api/account/delete", seniorAuth, rateLimit("login"), async (req, res)
     console.log(`[Account] Deleted account: ${senior.name} (${req.seniorId})`);
 
     res.json({ success: true });
-  } catch (e) { res.status(500).json({ error: e.message }); }
+  } catch (e) { console.error(`[Error] ${req.method} ${req.path}:`, e.message); res.status(500).json({ error: "Something went wrong. Please try again." }); }
 });
 
 // ─────────────────────────────────────────────────────────────────────────────
