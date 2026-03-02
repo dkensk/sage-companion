@@ -581,48 +581,115 @@
       cursor: pointer;
     }
 
-    /* ── HEADER BUTTONS ───────────────────────────────────── */
+    /* ── HEADER ROW ─────────────────────────────────────── */
+    .header-right {
+      display: flex;
+      flex-direction: column;
+      align-items: flex-end;
+      gap: 6px;
+      flex-shrink: 0;
+    }
+
     .header-actions {
       display: flex;
       gap: 6px;
-      margin-top: 6px;
       align-items: center;
     }
-    .header-actions .hdr-btn {
+
+    .help-btn {
+      background: var(--red);
+      color: white;
+      border: none;
+      border-radius: 12px;
+      padding: 12px 20px;
+      font-size: 18px;
+      font-weight: 800;
+      cursor: pointer;
+      white-space: nowrap;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      box-shadow: 0 3px 12px rgba(220,38,38,0.35);
+      transition: transform 0.15s var(--ease), box-shadow 0.15s;
+      -webkit-tap-highlight-color: transparent;
+      letter-spacing: 0.02em;
+    }
+    .help-btn:active { transform: scale(0.96); box-shadow: 0 1px 6px rgba(220,38,38,0.3); }
+
+    .hdr-btn {
       background: rgba(255,255,255,0.15);
       border: 1px solid rgba(255,255,255,0.25);
       color: white;
-      padding: 5px 10px;
+      padding: 7px 12px;
       border-radius: 8px;
-      font-size: 12px;
+      font-size: 13px;
       font-weight: 600;
       cursor: pointer;
       white-space: nowrap;
       text-decoration: none;
       display: inline-block;
       line-height: 1.4;
+      transition: background 0.15s;
+      -webkit-tap-highlight-color: transparent;
     }
-    .header-actions .hdr-btn.danger {
-      background: rgba(220,38,38,0.85);
-      border: 1px solid rgba(255,255,255,0.3);
+    .hdr-btn:hover { background: rgba(255,255,255,0.25); }
+
+    /* ── ADD TO HOME BUTTON ────────────────────────────────── */
+    .add-home-btn {
+      background: var(--white);
+      border: 2px solid var(--border);
+      border-radius: 18px;
+      padding: 20px 10px;
+      font-size: 16px;
       font-weight: 700;
+      color: var(--text);
+      cursor: pointer;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      text-align: center;
+      gap: 8px;
+      min-height: 88px;
+      width: 100%;
+      box-shadow: var(--shadow);
+      transition: transform 0.15s var(--ease), box-shadow 0.15s var(--ease), border-color 0.15s;
+      -webkit-tap-highlight-color: transparent;
+      opacity: 0;
+      animation: fadeUp 0.5s var(--ease) 0.25s forwards;
     }
+    .add-home-btn:active { transform: scale(0.96); }
+    .add-home-btn:hover { border-color: var(--navy); box-shadow: var(--shadow-lg); }
+    .add-home-btn .icon { font-size: 30px; }
 
     /* ── MOBILE RESPONSIVE ────────────────────────────────── */
-    @media (max-width: 400px) {
+    @media (min-width: 769px) {
+      /* Desktop: bigger header, centered content */
+      header { padding: 20px 32px 24px; }
+      .help-btn { padding: 14px 28px; font-size: 20px; border-radius: 14px; }
+      .hdr-btn { padding: 8px 16px; font-size: 14px; }
+    }
+
+    @media (max-width: 768px) and (min-width: 481px) {
+      /* Tablet */
+      .help-btn { padding: 12px 22px; font-size: 18px; }
+    }
+
+    @media (max-width: 480px) {
       header { padding: 14px 12px 16px; }
       .logo { font-size: 20px; }
       .greeting { font-size: 14px; }
       .header-time { font-size: 11px; }
-      .header-actions { gap: 4px; }
-      .header-actions .hdr-btn { font-size: 11px; padding: 4px 7px; }
+      .help-btn { padding: 10px 16px; font-size: 16px; border-radius: 10px; }
+      .hdr-btn { font-size: 12px; padding: 5px 9px; }
       .main { padding: 14px 10px; }
       .card { padding: 16px 14px; border-radius: 16px; }
       .section-title { font-size: 15px; }
     }
 
     @media (max-width: 340px) {
-      .header-actions .hdr-btn { font-size: 10px; padding: 3px 5px; border-radius: 6px; }
+      .help-btn { padding: 8px 12px; font-size: 14px; gap: 4px; }
+      .hdr-btn { font-size: 10px; padding: 4px 6px; border-radius: 6px; }
     }
   </style>
   <script>
@@ -681,11 +748,11 @@
     <div class="logo"><span class="logo-shield">🌿</span> Sage</div>
     <div class="greeting" id="headerGreeting">Good morning!</div>
   </div>
-  <div style="display:flex; flex-direction:column; align-items:flex-end; flex-shrink:0;">
-    <div class="header-time" id="headerTime"></div>
+  <div class="header-right">
+    <button onclick="showEmergencyModal()" class="help-btn">🆘 Get Help</button>
     <div class="header-actions">
-      <button onclick="showEmergencyModal()" class="hdr-btn danger">🆘 Help</button>
-      <a href="/settings" class="hdr-btn">⚙️ Settings</a>
+      <div class="header-time" id="headerTime"></div>
+      <a href="/settings" class="hdr-btn">Settings</a>
       <button onclick="seniorLogout()" class="hdr-btn">Sign out</button>
     </div>
   </div>
@@ -749,6 +816,12 @@
       <span>My Questions</span>
     </button>
   </div>
+
+  <!-- Add to Home Screen (shown when not installed) -->
+  <button class="add-home-btn" id="addHomeBtn" style="display:none; margin-bottom:16px;" onclick="installApp()">
+    <span class="icon">📲</span>
+    <span id="addHomeBtnLabel">Add to Home Screen</span>
+  </button>
 
   <!-- Medications -->
   <div class="card" id="medsSection">
@@ -2110,26 +2183,10 @@
   // ── INSTALL PROMPT (Add to Home Screen) ──────────────
   let deferredPrompt = null;
 
-  function showInstallBanner() {
-    // Don't show if already installed (standalone mode) or dismissed recently
-    if (window.matchMedia('(display-mode: standalone)').matches) return;
-    if (navigator.standalone === true) return; // iOS standalone
-    if (localStorage.getItem('installDismissed')) {
-      const dismissed = parseInt(localStorage.getItem('installDismissed'));
-      if (Date.now() - dismissed < 7 * 24 * 60 * 60 * 1000) return; // 7 days
-    }
-    const banner = document.getElementById('installBanner');
-    if (banner) banner.style.display = 'block';
+  function isInstalled() {
+    return window.matchMedia('(display-mode: standalone)').matches || navigator.standalone === true;
   }
 
-  // Android/Chrome: capture the beforeinstallprompt event
-  window.addEventListener('beforeinstallprompt', (e) => {
-    e.preventDefault();
-    deferredPrompt = e;
-    showInstallBanner();
-  });
-
-  // iOS Safari: show manual instructions
   function isIOS() {
     return /iPad|iPhone|iPod/.test(navigator.userAgent) && !window.MSStream;
   }
@@ -2138,30 +2195,69 @@
     return /Safari/.test(navigator.userAgent) && !/Chrome|CriOS|FxiOS/.test(navigator.userAgent);
   }
 
+  function showInstallBanner() {
+    if (isInstalled()) return;
+    if (localStorage.getItem('installDismissed')) {
+      var dismissed = parseInt(localStorage.getItem('installDismissed'));
+      if (Date.now() - dismissed < 7 * 24 * 60 * 60 * 1000) return;
+    }
+    var banner = document.getElementById('installBanner');
+    if (banner) banner.style.display = 'block';
+  }
+
+  function showAddHomeBtn() {
+    if (isInstalled()) return;
+    var btn = document.getElementById('addHomeBtn');
+    if (btn) btn.style.display = 'flex';
+    // Update label for iOS
+    if (isIOS() && isSafari()) {
+      var label = document.getElementById('addHomeBtnLabel');
+      if (label) label.textContent = 'How to Add to Home Screen';
+    }
+  }
+
+  // Always show the add-to-home button if not installed
+  if (!isInstalled()) {
+    // Small delay to let page load
+    setTimeout(showAddHomeBtn, 500);
+  }
+
+  // Android/Chrome: capture the beforeinstallprompt event
+  window.addEventListener('beforeinstallprompt', function(e) {
+    e.preventDefault();
+    deferredPrompt = e;
+    showInstallBanner();
+    showAddHomeBtn();
+  });
+
+  // iOS Safari: show manual instructions
   if (isIOS() && isSafari() && !navigator.standalone) {
-    setTimeout(() => {
-      const msg = document.getElementById('installMsg');
+    setTimeout(function() {
+      var msg = document.getElementById('installMsg');
       if (msg) msg.textContent = 'Tap the Share button ⬆ then "Add to Home Screen"';
-      const btn = document.getElementById('installBtn');
+      var btn = document.getElementById('installBtn');
       if (btn) btn.textContent = 'Got it!';
       showInstallBanner();
+      showAddHomeBtn();
     }, 2000);
   }
 
   async function installApp() {
     if (deferredPrompt) {
-      // Android/Chrome: trigger native install prompt
       deferredPrompt.prompt();
-      const result = await deferredPrompt.userChoice;
+      var result = await deferredPrompt.userChoice;
       if (result.outcome === 'accepted') {
-        showToast('🎉 Sage added to your home screen!');
+        showToast('Sage added to your home screen!');
       }
       deferredPrompt = null;
       document.getElementById('installBanner').style.display = 'none';
+      document.getElementById('addHomeBtn').style.display = 'none';
     } else if (isIOS()) {
-      // iOS: just dismiss since they need to do it manually
-      showToast('Tap ⬆ Share → Add to Home Screen');
+      showToast('Tap the Share button ⬆ at the bottom, then tap "Add to Home Screen"');
       document.getElementById('installBanner').style.display = 'none';
+    } else {
+      // Desktop or other browser — show instructions
+      showToast('Look for the install icon in your browser address bar, or use your browser menu to install this app.');
     }
   }
 
@@ -2170,11 +2266,12 @@
     localStorage.setItem('installDismissed', Date.now().toString());
   }
 
-  // Also show banner if app was already installable (page loaded after event)
-  window.addEventListener('appinstalled', () => {
+  window.addEventListener('appinstalled', function() {
     document.getElementById('installBanner').style.display = 'none';
+    var addBtn = document.getElementById('addHomeBtn');
+    if (addBtn) addBtn.style.display = 'none';
     deferredPrompt = null;
-    showToast('🎉 Sage added to your home screen!');
+    showToast('Sage added to your home screen!');
   });
 </script>
 </body>
