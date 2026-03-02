@@ -649,15 +649,30 @@
 
   function getFamilyToken() { return localStorage.getItem("familyToken"); }
 
+  // Debug: log auth state on load
+  console.log("[Family] Page load — seniorId:", seniorId, "hasToken:", !!getFamilyToken());
+
   // Wrapper for authenticated API calls
-  async function familyApiCall(url, opts = {}) {
-    const token = getFamilyToken();
+  // logout param: only force logout on critical calls (dashboard), not tab loads
+  async function familyApiCall(url, opts, forceLogoutOn401) {
+    opts = opts || {};
+    if (forceLogoutOn401 === undefined) forceLogoutOn401 = false;
+    var token = getFamilyToken();
     if (token) {
       opts.headers = opts.headers || {};
       opts.headers["x-family-token"] = token;
     }
-    const res = await fetch(url, opts);
-    if (res.status === 401) {
+    console.log("[Family] API call:", url, "hasToken:", !!token);
+    var res;
+    try {
+      res = await fetch(url, opts);
+    } catch (netErr) {
+      console.error("[Family] Network error on", url, netErr);
+      throw netErr;
+    }
+    console.log("[Family] Response:", url, "status:", res.status);
+    if (res.status === 401 && forceLogoutOn401) {
+      console.warn("[Family] 401 on critical endpoint, logging out:", url);
       localStorage.removeItem("familyToken");
       localStorage.removeItem("familySeniorId");
       localStorage.removeItem("familySeniorName");
@@ -729,7 +744,7 @@
   async function loadDashboard() {
     if (!seniorId) return;
     try {
-      const res = await familyApiCall(`/api/dashboard/${seniorId}`);
+      const res = await familyApiCall(`/api/dashboard/${seniorId}`, {}, true);
       const d = await res.json();
 
       document.getElementById("seniorNameDisplay").textContent = d.senior.name;
@@ -757,7 +772,8 @@
       renderMeds(d.medications);
       renderActivity(d.recentActivity);
       renderAlerts(d.alerts);
-      await loadConversations();
+      // Load conversations separately so failure doesn't kill dashboard
+      loadConversations().catch(function(err) { console.error("Convo load error:", err); });
 
     } catch (e) {
       console.error("Dashboard load error:", e);
@@ -820,15 +836,21 @@
   }
 
   async function loadConversations() {
-    const res = await familyApiCall(`/api/conversations/${seniorId}`);
-    const sessions = await res.json();
     const el = document.getElementById("convoList");
-    if (!sessions || sessions.length === 0) {
-      el.innerHTML = `<p class="empty">No conversations yet. ${seniorName} hasn't talked to Sage today.</p>`;
-      return;
+    try {
+      const res = await familyApiCall(`/api/conversations/${seniorId}`);
+      if (!res.ok) throw new Error("API returned " + res.status);
+      const sessions = await res.json();
+      if (!sessions || sessions.length === 0) {
+        el.innerHTML = '<p class="empty">No conversations yet. ' + escHtml(seniorName) + ' hasn\'t talked to Sage today.</p>';
+        return;
+      }
+      const allMessages = sessions.flatMap(function(s) { return s.messages || []; }).slice(-20);
+      renderConvos(allMessages);
+    } catch (e) {
+      console.error("loadConversations error:", e);
+      el.innerHTML = '<p style="color:var(--muted);">Couldn\'t load conversations.</p>';
     }
-    const allMessages = sessions.flatMap(s => s.messages).slice(-20);
-    renderConvos(allMessages);
   }
 
   async function resolveAlert(id) {
@@ -878,16 +900,21 @@
 
   function showTab(name, btn) {
     ["meds","activity","alerts","convo","doctorq","visits","calendar"].forEach(t => {
-      document.getElementById(`tab-${t}`).style.display = "none";
+      document.getElementById("tab-" + t).style.display = "none";
     });
-    document.querySelectorAll(".tab").forEach(b => b.classList.remove("active"));
-    document.getElementById(`tab-${name}`).style.display = "block";
+    document.querySelectorAll(".tab").forEach(function(b) { b.classList.remove("active"); });
+    document.getElementById("tab-" + name).style.display = "block";
     btn.classList.add("active");
     activeTab = name;
-    if (name === "convo")    loadConversations();
-    if (name === "doctorq")  loadDoctorQuestions();
-    if (name === "visits")   loadVisits();
-    if (name === "calendar") loadCalendar();
+    console.log("[Family] showTab:", name);
+    try {
+      if (name === "convo")    loadConversations().catch(function(e) { console.error("[Family] convo tab error:", e); });
+      if (name === "doctorq")  loadDoctorQuestions().catch(function(e) { console.error("[Family] doctorq tab error:", e); });
+      if (name === "visits")   loadVisits().catch(function(e) { console.error("[Family] visits tab error:", e); });
+      if (name === "calendar") loadCalendar().catch(function(e) { console.error("[Family] calendar tab error:", e); });
+    } catch (e) {
+      console.error("[Family] showTab sync error:", e);
+    }
   }
 
   // ── Calendar ────────────────────────────────────────────────────────────────
@@ -895,6 +922,7 @@
     const el = document.getElementById("calendarList");
     try {
       const res = await familyApiCall(`/api/appointments/${seniorId}`);
+      if (!res.ok) throw new Error("API returned " + res.status);
       const appts = await res.json();
 
       if (!appts || appts.length === 0) {
@@ -958,6 +986,7 @@
     const el = document.getElementById("doctorqList");
     try {
       const res = await familyApiCall(`/api/doctor-questions/${seniorId}`);
+      if (!res.ok) throw new Error("API returned " + res.status);
       const questions = await res.json();
 
       if (!questions || questions.length === 0) {
@@ -1002,6 +1031,7 @@
     const el = document.getElementById("visitsList");
     try {
       const res = await familyApiCall(`/api/doctor-visits/${seniorId}`);
+      if (!res.ok) throw new Error("API returned " + res.status);
       const visits = await res.json();
 
       if (!visits || visits.length === 0) {

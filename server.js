@@ -567,7 +567,7 @@ Fields:
 });
 
 // POST /api/medications — add medication (family or scan)
-app.post("/api/medications", seniorAuth, async (req, res) => {
+app.post("/api/medications", anyAuth, async (req, res) => {
   try {
     const { seniorId, name, dose, time, withFood } = req.body;
     if (!seniorId || !name) return res.status(400).json({ error: "seniorId and name required" });
@@ -909,7 +909,7 @@ app.post("/api/tts", seniorAuth, rateLimit(60000, 30), async (req, res) => {
 // DOCTOR QUESTIONS
 // ─────────────────────────────────────────────────────────────────────────────
 
-app.get("/api/doctor-questions/:seniorId", seniorAuth, validateUUID("seniorId"), async (req, res) => {
+app.get("/api/doctor-questions/:seniorId", anyAuth, validateUUID("seniorId"), async (req, res) => {
   try {
     const { data } = await supabase.from("doctor_questions").select("*")
       .eq("senior_id", req.params.seniorId).order("created_at", { ascending: false });
@@ -952,7 +952,7 @@ app.delete("/api/doctor-questions/:id", seniorAuth, validateUUID("id"), async (r
 // DOCTOR VISITS
 // ─────────────────────────────────────────────────────────────────────────────
 
-app.get("/api/doctor-visits/:seniorId", seniorAuth, validateUUID("seniorId"), async (req, res) => {
+app.get("/api/doctor-visits/:seniorId", anyAuth, validateUUID("seniorId"), async (req, res) => {
   try {
     const { data } = await supabase.from("doctor_visits").select("*")
       .eq("senior_id", req.params.seniorId).order("created_at", { ascending: false });
