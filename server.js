@@ -46,7 +46,7 @@ const FROM_EMAIL = process.env.FROM_EMAIL || "Sage Companion <hello@mysagecompan
 const DEMO_SENIOR_ID = "00000000-0000-0000-0000-000000000001";
 
 // ── Production safety checks ─────────────────────────────────────────────────
-const IS_PROD = process.env.NODE_ENV === "production" || process.env.RAILWAY_ENVIRONMENT === "production";
+const IS_PROD = process.env.NODE_ENV === "production" || process.env.RENDER === "true";
 if (IS_PROD) {
   const missing = [];
   if (!process.env.JWT_SECRET || process.env.JWT_SECRET === "sage-family-secret-dev") missing.push("JWT_SECRET");

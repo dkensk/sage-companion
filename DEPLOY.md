@@ -17,65 +17,47 @@ This guide covers everything you need to go from local development to a live pro
 
 ---
 
-## Step 2: Deploy to Railway (Recommended — Free)
-
-Railway is the fastest way to deploy — it connects to your GitHub repo and auto-deploys on every push.
-
-### 2a. First push your code to GitHub
-```bash
-cd "Guardian AI/guardian-mvp"
-git push
-```
-
-### 2b. Create Railway project
-1. Go to [railway.app](https://railway.app) and sign up (free)
-2. Click **New Project → Deploy from GitHub repo**
-3. Select `dkensk/sage-companion`
-4. Railway will detect the Node.js app and deploy automatically
-
-### 2c. Set environment variables in Railway
-In your Railway project → **Variables** tab, add each of these:
-
-| Variable | Value |
-|----------|-------|
-| `ANTHROPIC_API_KEY` | Your Anthropic key (from .env) |
-| `OPENAI_API_KEY` | Your OpenAI key (for TTS voice) |
-| `SUPABASE_URL` | From Step 1 |
-| `SUPABASE_SERVICE_ROLE_KEY` | From Step 1 |
-| `ADMIN_PASSWORD` | Choose a strong password |
-| `JWT_SECRET` | Any long random string (e.g. `sage-prod-secret-2024-xk9p`) |
-| `VAPID_PUBLIC_KEY` | From your .env |
-| `VAPID_PRIVATE_KEY` | From your .env |
-| `VAPID_EMAIL` | `mailto:your@email.com` |
-| `GOOGLE_CLIENT_ID` | Optional — for Google Calendar sync |
-| `GOOGLE_CLIENT_SECRET` | Optional |
-
-### 2d. Get your URL
-After deploy, Railway gives you a URL like `https://sage-companion-production.up.railway.app`
-
-Update `GOOGLE_REDIRECT_URI` in Railway variables to:
-`https://your-railway-url.up.railway.app/api/google/callback`
-
----
-
-## Step 3: Deploy to Render (Alternative — Also Free)
+## Step 2: Deploy to Render
 
 1. Go to [render.com](https://render.com) and sign up
 2. Click **New → Web Service**
 3. Connect your GitHub repo `dkensk/sage-companion`
 4. Render auto-detects the settings from `render.yaml`
-5. Add the same environment variables as listed in Step 2c
+5. Add the environment variables listed below
 6. Click **Create Web Service**
 
-Your app will be live at `https://sage-companion.onrender.com`
+### Environment Variables
 
-> **Note:** Render free tier spins down after 15 mins of inactivity (cold start ~30s). Railway free tier stays warm longer.
+Set these in your Render dashboard → **Environment** tab:
+
+| Variable | Value |
+|----------|-------|
+| `NODE_ENV` | `production` |
+| `FRONTEND_URL` | `https://mysagecompanion.com` (your domain) |
+| `ANTHROPIC_API_KEY` | Your Anthropic key |
+| `OPENAI_API_KEY` | Your OpenAI key (for TTS voice) |
+| `SUPABASE_URL` | From Step 1 |
+| `SUPABASE_SERVICE_ROLE_KEY` | From Step 1 |
+| `ADMIN_PASSWORD` | A strong password (not `admin123`) |
+| `JWT_SECRET` | A long random string (not the dev default) |
+| `SENIOR_TOKEN_SECRET` | A long random string (not the dev default) |
+| `VAPID_PUBLIC_KEY` | From your .env |
+| `VAPID_PRIVATE_KEY` | From your .env |
+| `VAPID_EMAIL` | `mailto:your@email.com` |
+| `GOOGLE_CLIENT_ID` | Optional — for Google Calendar sync |
+| `GOOGLE_CLIENT_SECRET` | Optional |
+| `GOOGLE_REDIRECT_URI` | `https://mysagecompanion.com/api/google/callback` |
+| `STRIPE_SECRET_KEY` | Your Stripe live key |
+| `STRIPE_WEBHOOK_SECRET` | From Stripe webhook setup |
+| `STRIPE_PRICE_ID` | Your Stripe live price ID |
+
+Your app will be live at your Render URL or custom domain.
 
 ---
 
-## Step 4: Set Up Push Notifications (for medication reminders)
+## Step 3: Set Up Push Notifications (for medication reminders)
 
-The VAPID keys are already generated and in your `.env` file. Just make sure these 3 are set in your deployment platform:
+The VAPID keys are already generated and in your `.env` file. Just make sure these 3 are set in Render:
 
 - `VAPID_PUBLIC_KEY`
 - `VAPID_PRIVATE_KEY`
@@ -85,7 +67,7 @@ Seniors will see an "Enable Reminders" button in the app — when they tap it, t
 
 ---
 
-## Step 5: Test your live deployment
+## Step 4: Test your live deployment
 
 1. Visit `https://your-app-url/` — you should see the Sage home screen
 2. Visit `https://your-app-url/admin` — log in with your `ADMIN_PASSWORD`
@@ -94,19 +76,17 @@ Seniors will see an "Enable Reminders" button in the app — when they tap it, t
 
 ---
 
-## Custom Domain (optional)
+## Custom Domain
 
-Both Railway and Render support custom domains for free:
-- Railway: Project Settings → Domains → Add custom domain
-- Render: Service Settings → Custom Domains
-
-Point your domain's CNAME to the provided value and SSL is automatic.
+Render supports custom domains for free:
+- Service Settings → Custom Domains
+- Point your domain's CNAME to the provided value and SSL is automatic
 
 ---
 
 ## Updating the app
 
-Every time you push to GitHub (`git push`), Railway/Render auto-deploys within ~2 minutes. No manual steps needed.
+Every time you push to GitHub (`git push`), Render auto-deploys within ~2 minutes.
 
 ```bash
 git add .
