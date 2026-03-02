@@ -1285,7 +1285,9 @@ app.post("/api/seniors", async (req, res) => {
     console.log(`✅ New user: ${name} | Family code: ${familyCode}`);
 
     // Send welcome email with family code (non-blocking)
-    sendWelcomeEmail(email.trim().toLowerCase(), name.trim(), familyCode).catch(() => {});
+    sendWelcomeEmail(email.trim().toLowerCase(), name.trim(), familyCode).catch(e => {
+      console.error("[Email] Welcome email failed:", e.message);
+    });
 
     res.json({ success: true, senior: norm(senior), token });
   } catch (e) { res.status(500).json({ error: e.message }); }
@@ -1918,6 +1920,8 @@ async function start() {
     console.log(`   👨‍👩‍👧 Family view:  http://localhost:${PORT}/family`);
     console.log(`   🔐 Admin CRM:     http://localhost:${PORT}/admin`);
     console.log(`\n   Demo family code: FAMILY123`);
+    console.log(`   📧 Resend:        ${resend ? "configured ✅" : "NOT configured ❌"}`);
+    console.log(`   💳 Stripe:        ${stripe ? "configured ✅" : "NOT configured ❌"}`);
     console.log("\n   Press Ctrl+C to stop\n");
 
     // Start medication reminder cron — checks every minute

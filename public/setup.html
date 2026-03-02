@@ -297,7 +297,28 @@
           <button class="copy-btn" onclick="copyCode()">Copy Code</button>
         </div>
 
-        <button class="btn-primary" onclick="launchSage()">Start Talking to Sage →</button>
+        <!-- Plan selection -->
+        <div id="planSection" style="margin-top:20px;">
+          <p style="font-size:16px; font-weight:700; color:var(--navy); margin-bottom:14px; text-align:center;">Choose Your Plan</p>
+          <p style="font-size:14px; color:var(--muted); margin-bottom:16px; text-align:center; line-height:1.5;">Start with a <strong>7-day free trial</strong>. Cancel anytime.</p>
+
+          <div style="display:flex; gap:10px; margin-bottom:14px;">
+            <button onclick="selectPlan('monthly')" id="planMonthly" style="flex:1; background:white; border:2px solid var(--border); border-radius:14px; padding:16px 12px; cursor:pointer; text-align:center; transition:border-color 0.2s;">
+              <div style="font-size:22px; font-weight:800; color:var(--navy);">$9.99</div>
+              <div style="font-size:13px; color:var(--muted); font-weight:600;">per month</div>
+            </button>
+            <button onclick="selectPlan('yearly')" id="planYearly" style="flex:1; background:white; border:2px solid var(--border); border-radius:14px; padding:16px 12px; cursor:pointer; text-align:center; position:relative; transition:border-color 0.2s;">
+              <div style="position:absolute; top:-10px; left:50%; transform:translateX(-50%); background:var(--green); color:white; font-size:11px; font-weight:700; padding:3px 10px; border-radius:20px; white-space:nowrap;">SAVE 25%</div>
+              <div style="font-size:22px; font-weight:800; color:var(--navy);">$89.99</div>
+              <div style="font-size:13px; color:var(--muted); font-weight:600;">per year</div>
+            </button>
+          </div>
+
+          <button class="btn-primary" id="startTrialBtn" onclick="startTrial()">Start Free Trial →</button>
+          <p id="planError" style="color:#DC2626; font-size:14px; margin-top:8px; display:none; text-align:center;"></p>
+        </div>
+
+        <button onclick="launchSage()" style="background:none; border:none; color:var(--muted); font-size:14px; font-weight:600; cursor:pointer; margin-top:12px; text-decoration:underline;">Skip for now</button>
 
         <!-- Install prompt after signup -->
         <div id="setupInstallBanner" style="display:none; background:#EFF6FF; border:2px solid #93C5FD; border-radius:14px; padding:16px; margin-top:16px; text-align:center;">
@@ -307,7 +328,7 @@
         </div>
 
         <p style="font-size:14px;color:var(--muted);margin-top:16px;line-height:1.5;">
-          Your family can log in at <strong>this app's address/family</strong> and enter your code to get started.
+          Your family can log in at <strong>mysagecompanion.com/family</strong> and enter your code to get started.
         </p>
       </div>
     </div>
@@ -547,6 +568,51 @@
     } catch {
       document.getElementById("returningError").textContent = "Invalid family code. Please check and try again.";
       document.getElementById("returningError").style.display = "block";
+    }
+  }
+
+  // ── Plan selection & Stripe checkout ──────────────────────────────────────
+  let selectedPlan = null;
+
+  function selectPlan(plan) {
+    selectedPlan = plan;
+    const monthly = document.getElementById("planMonthly");
+    const yearly = document.getElementById("planYearly");
+    monthly.style.borderColor = plan === "monthly" ? "#1E3A8A" : "#E2E8F0";
+    monthly.style.background = plan === "monthly" ? "#EFF6FF" : "white";
+    yearly.style.borderColor = plan === "yearly" ? "#1E3A8A" : "#E2E8F0";
+    yearly.style.background = plan === "yearly" ? "#EFF6FF" : "white";
+    document.getElementById("planError").style.display = "none";
+  }
+
+  async function startTrial() {
+    if (!selectedPlan) {
+      const err = document.getElementById("planError");
+      err.textContent = "Please select a plan first.";
+      err.style.display = "block";
+      return;
+    }
+    const btn = document.getElementById("startTrialBtn");
+    btn.textContent = "Redirecting to checkout…";
+    btn.disabled = true;
+    try {
+      const token = localStorage.getItem("sageSeniorToken");
+      const res = await fetch("/api/billing/checkout", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "x-senior-token": token },
+        body: JSON.stringify({ plan: selectedPlan }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Checkout failed");
+      if (data.url) {
+        window.location.href = data.url;
+      }
+    } catch (e) {
+      const err = document.getElementById("planError");
+      err.textContent = e.message;
+      err.style.display = "block";
+      btn.textContent = "Start Free Trial →";
+      btn.disabled = false;
     }
   }
 
