@@ -1365,6 +1365,14 @@ app.get("/api/admin/stats", adminAuth, async (req, res) => {
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
+// Temporary debug endpoint — remove after testing
+app.get("/api/debug/users-check", async (req, res) => {
+  try {
+    const { data, error, count } = await supabase.from("seniors").select("id, name, email, family_code", { count: "exact" });
+    res.json({ count, error: error?.message || null, sample: (data || []).slice(0, 2).map(s => ({ id: s.id, name: s.name })) });
+  } catch (e) { res.json({ error: e.message }); }
+});
+
 app.get("/api/admin/users", adminAuth, async (req, res) => {
   try {
     const { data: seniors, error: sErr } = await supabase.from("seniors").select("*").order("created_at", { ascending: false });
