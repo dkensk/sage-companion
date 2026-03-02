@@ -349,6 +349,14 @@ app.post("/api/stripe/webhook", express.raw({ type: "application/json" }), async
 
 app.use(express.json({ limit: "1mb" }));
 
+// ── Request logger (debug) ──────────────────────────────────────────────────
+app.use((req, res, next) => {
+  if (req.path.startsWith("/api/")) {
+    console.log(`[API] ${req.method} ${req.path}`);
+  }
+  next();
+});
+
 // ── Rate Limiting (in-memory, no dependencies) ──────────────────────────────
 const rateLimitMap = new Map();
 const RATE_WINDOW = 60 * 1000; // 1 minute window
