@@ -1437,31 +1437,37 @@
   let currentSource  = null; // currently playing AudioBufferSourceNode
 
   function unlockAudio() {
-    if (audioUnlocked) return;
-    audioUnlocked = true;
+    // Re-run every time on Safari to ensure context stays alive
+    const isSafari = /^((?!chrome|android).)*safari/i.test(navigator.userAgent);
 
-    // 1. Create and resume a persistent AudioContext during the user gesture.
-    //    Once resumed, it stays unlocked for the entire page session.
-    try {
-      ttsAudioCtx = new (window.AudioContext || window.webkitAudioContext)();
-      // Play a silent buffer to fully activate the context
-      const buf = ttsAudioCtx.createBuffer(1, 1, 22050);
-      const src = ttsAudioCtx.createBufferSource();
-      src.buffer = buf;
-      src.connect(ttsAudioCtx.destination);
-      src.start(0);
-      ttsAudioCtx.resume();
-      console.log("[audio] AudioContext created, state:", ttsAudioCtx.state);
-    } catch(e) { console.warn("[audio] AudioContext unlock failed:", e); }
+    if (!audioUnlocked || isSafari) {
+      audioUnlocked = true;
 
-    // 2. Also unlock HTMLAudioElement as a backup
-    try {
-      const silence = new Audio("data:audio/wav;base64,UklGRigAAABXQVZFZm10IBIAAAABAAEARKwAAIhYAQACABAAAABkYXRhAgAAAAEA");
-      silence.play().catch(() => {});
-    } catch(e) {}
+      // 1. Create or resume AudioContext during user gesture
+      try {
+        if (!ttsAudioCtx) {
+          ttsAudioCtx = new (window.AudioContext || window.webkitAudioContext)();
+        }
+        // Play a silent buffer to fully activate the context
+        const buf = ttsAudioCtx.createBuffer(1, 1, 22050);
+        const src = ttsAudioCtx.createBufferSource();
+        src.buffer = buf;
+        src.connect(ttsAudioCtx.destination);
+        src.start(0);
+        ttsAudioCtx.resume().then(() => {
+          console.log("[audio] AudioContext resumed, state:", ttsAudioCtx.state);
+        });
+      } catch(e) { console.warn("[audio] AudioContext unlock failed:", e); }
 
-    // 3. Warm up speechSynthesis — CRITICAL for iOS Safari.
-    //    speechSynthesis has its own separate gesture gate.
+      // 2. Also unlock HTMLAudioElement as a backup
+      try {
+        const silence = new Audio("data:audio/wav;base64,UklGRigAAABXQVZFZm10IBIAAAABAAEARKwAAIhYAQACABAAAABkYXRhAgAAAAEA");
+        silence.play().catch(() => {});
+      } catch(e) {}
+    }
+
+    // 3. ALWAYS warm up speechSynthesis on every gesture — Safari requires this
+    //    Safari's speechSynthesis gate resets between gestures
     try {
       if (window.speechSynthesis) {
         window.speechSynthesis.cancel();
@@ -1527,23 +1533,30 @@
           // Try Web Audio API first (works best on mobile)
           if (ttsAudioCtx) {
             try {
-              if (ttsAudioCtx.state === "suspended") await ttsAudioCtx.resume();
-              const audioBuf = await ttsAudioCtx.decodeAudioData(arrayBuf.slice(0)); // slice to copy
-              console.log("[tts] WebAudio decoded, duration:", audioBuf.duration.toFixed(1), "s");
-              const source = ttsAudioCtx.createBufferSource();
-              source.buffer = audioBuf;
-              source.connect(ttsAudioCtx.destination);
-              source.onended = () => { currentSource = null; currentAudio = null; setSpeakingIndicator(false); };
-              source.start(0);
-              currentSource = source;
-              currentAudio = "webapi";
-              return;
+              if (ttsAudioCtx.state === "suspended") {
+                await ttsAudioCtx.resume();
+                console.log("[tts] AudioContext resumed from suspended, state:", ttsAudioCtx.state);
+              }
+              if (ttsAudioCtx.state === "running") {
+                const audioBuf = await ttsAudioCtx.decodeAudioData(arrayBuf.slice(0)); // slice to copy
+                console.log("[tts] WebAudio decoded, duration:", audioBuf.duration.toFixed(1), "s");
+                const source = ttsAudioCtx.createBufferSource();
+                source.buffer = audioBuf;
+                source.connect(ttsAudioCtx.destination);
+                source.onended = () => { currentSource = null; currentAudio = null; setSpeakingIndicator(false); };
+                source.start(0);
+                currentSource = source;
+                currentAudio = "webapi";
+                return;
+              } else {
+                console.warn("[tts] AudioContext state:", ttsAudioCtx.state, "— skipping WebAudio");
+              }
             } catch (decodeErr) {
               console.warn("[tts] WebAudio decode failed:", decodeErr.message, "— trying HTMLAudio…");
             }
           }
 
-          // Fallback: HTMLAudioElement with blob URL (works on desktop)
+          // Fallback: HTMLAudioElement with blob URL
           try {
             const ctype = res.headers.get("content-type") || "audio/mpeg";
             const blob = new Blob([arrayBuf], { type: ctype });
@@ -1556,7 +1569,7 @@
             console.log("[tts] Playing via HTMLAudioElement");
             return;
           } catch (audioErr) {
-            console.warn("[tts] HTMLAudio failed:", audioErr.message);
+            console.warn("[tts] HTMLAudio failed:", audioErr.message, "— falling back to browser voice");
           }
         } else {
           console.warn("[tts] Server returned 200 but empty body");
@@ -1601,15 +1614,18 @@
   }
 
   function speakBrowser(text) {
-    if (!window.speechSynthesis) return;
+    if (!window.speechSynthesis) { setSpeakingIndicator(false); return; }
 
     function doSpeak(voices) {
+      // Safari fix: cancel any pending utterances first
+      window.speechSynthesis.cancel();
+
       const utter = new SpeechSynthesisUtterance(text);
       utter.rate = 0.82;  // slightly slower — easier for seniors to follow
       utter.pitch = 1.0;
       utter.volume = 1.0;
       utter.onend = () => setSpeakingIndicator(false);
-      utter.onerror = () => setSpeakingIndicator(false);
+      utter.onerror = (e) => { console.warn("[tts] Browser speech error:", e.error); setSpeakingIndicator(false); };
 
       const en = voices.filter(v => v.lang.startsWith("en"));
       // Priority: Premium → Enhanced → well-known named → non-Google en-US → any English
@@ -1622,8 +1638,26 @@
         en.find(v => v.lang === "en-US") ||
         en[0];
 
-      if (pick) utter.voice = pick;
-      window.speechSynthesis.speak(utter);
+      if (pick) {
+        utter.voice = pick;
+        console.log("[tts] Browser voice selected:", pick.name);
+      }
+
+      // Safari workaround: short delay after cancel before speaking
+      setTimeout(() => {
+        window.speechSynthesis.speak(utter);
+        // Safari bug: speechSynthesis sometimes stops mid-sentence on long text
+        // This keepalive timer resumes it if paused
+        const keepAlive = setInterval(() => {
+          if (!window.speechSynthesis.speaking) {
+            clearInterval(keepAlive);
+          } else if (window.speechSynthesis.paused) {
+            window.speechSynthesis.resume();
+          }
+        }, 3000);
+        utter.onend = () => { clearInterval(keepAlive); setSpeakingIndicator(false); };
+        utter.onerror = () => { clearInterval(keepAlive); setSpeakingIndicator(false); };
+      }, 100);
     }
 
     const voices = window.speechSynthesis.getVoices();
