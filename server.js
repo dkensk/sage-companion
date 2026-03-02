@@ -1234,19 +1234,65 @@ app.get("/api/calendar/:seniorId/feed.ics", validateUUID("seniorId"), async (req
     }
     const { data: senior } = await supabase.from("seniors").select("name").eq("id", seniorId).single();
     const { data: appts }  = await supabase.from("appointments").select("*").eq("senior_id", seniorId);
-    const fmt = (d) => d.toISOString().replace(/[-:.]/g, "").slice(0, 15) + "Z";
+
+    // Parse time string like "2:00 PM", "14:00", "3:30 pm" into { hours, minutes }
+    function parseTime(timeStr) {
+      if (!timeStr) return { hours: 0, minutes: 0 };
+      const t = timeStr.trim();
+      // Try 12-hour format: "2:00 PM", "11:30 am"
+      const m12 = t.match(/^(\d{1,2}):(\d{2})\s*(AM|PM|am|pm)$/i);
+      if (m12) {
+        let h = parseInt(m12[1], 10);
+        const min = parseInt(m12[2], 10);
+        const isPM = m12[3].toUpperCase() === "PM";
+        if (isPM && h !== 12) h += 12;
+        if (!isPM && h === 12) h = 0;
+        return { hours: h, minutes: min };
+      }
+      // Try 24-hour format: "14:00", "9:30"
+      const m24 = t.match(/^(\d{1,2}):(\d{2})$/);
+      if (m24) return { hours: parseInt(m24[1], 10), minutes: parseInt(m24[2], 10) };
+      return { hours: 0, minutes: 0 };
+    }
+
+    // Format as iCal date-time: YYYYMMDDTHHMMSS (local, no Z — treated as floating time)
+    function fmtLocal(dateStr, timeObj) {
+      const d = dateStr.replace(/-/g, "");
+      const h = String(timeObj.hours).padStart(2, "0");
+      const m = String(timeObj.minutes).padStart(2, "0");
+      return `${d}T${h}${m}00`;
+    }
+
     const lines = (appts || []).map(a => {
-      const start = new Date(a.date + (a.time ? " " + a.time : " 00:00"));
-      const end   = new Date(start.getTime() + 60 * 60 * 1000);
-      return ["BEGIN:VEVENT", `UID:${a.id}@sage-companion`, `DTSTAMP:${fmt(new Date())}`,
-        `DTSTART:${fmt(start)}`, `DTEND:${fmt(end)}`, `SUMMARY:${a.title}`,
-        a.location ? `LOCATION:${a.location}` : "", a.notes ? `DESCRIPTION:${a.notes}` : "",
-        "END:VEVENT"].filter(Boolean).join("\r\n");
+      const time = parseTime(a.time);
+      const startStr = fmtLocal(a.date, time);
+      const endH = time.hours + 1;
+      const endStr = fmtLocal(a.date, { hours: endH, minutes: time.minutes });
+      return [
+        "BEGIN:VEVENT",
+        `UID:${a.id}@sage-companion`,
+        `DTSTAMP:${new Date().toISOString().replace(/[-:.]/g, "").slice(0, 15)}Z`,
+        `DTSTART:${startStr}`,
+        `DTEND:${endStr}`,
+        `SUMMARY:${(a.title || "").replace(/[\r\n]/g, " ")}`,
+        a.location ? `LOCATION:${a.location.replace(/[\r\n]/g, " ")}` : null,
+        a.notes ? `DESCRIPTION:${a.notes.replace(/[\r\n]/g, "\\n")}` : null,
+        "END:VEVENT"
+      ].filter(Boolean).join("\r\n");
     });
-    const cal = ["BEGIN:VCALENDAR", "VERSION:2.0", "PRODID:-//Sage Companion LLC//EN",
-      "CALSCALE:GREGORIAN", "METHOD:PUBLISH",
+
+    const cal = [
+      "BEGIN:VCALENDAR",
+      "VERSION:2.0",
+      "PRODID:-//Sage Companion LLC//EN",
+      "CALSCALE:GREGORIAN",
+      "METHOD:PUBLISH",
       `X-WR-CALNAME:Sage Companion — ${senior?.name || "Calendar"}`,
-      "REFRESH-INTERVAL;VALUE=DURATION:PT1H", ...lines, "END:VCALENDAR"].join("\r\n");
+      "X-WR-TIMEZONE:America/Chicago",
+      "REFRESH-INTERVAL;VALUE=DURATION:PT1H",
+      ...lines,
+      "END:VCALENDAR"
+    ].join("\r\n");
     res.setHeader("Content-Type", "text/calendar; charset=utf-8");
     res.setHeader("Content-Disposition", `attachment; filename="sage-companion.ics"`);
     res.send(cal);
