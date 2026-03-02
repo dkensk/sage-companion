@@ -485,6 +485,34 @@
 </head>
 <body>
 
+<!-- ── Consent / Welcome Screen (first use only) ── -->
+<div id="consentScreen" style="display:none; position:fixed; inset:0; background:var(--bg); z-index:250; align-items:center; justify-content:center; padding:24px; overflow-y:auto;">
+  <div style="background:white; border-radius:24px; padding:40px 28px; max-width:460px; width:100%; text-align:center; box-shadow:0 8px 32px rgba(0,0,0,0.12); margin:auto;">
+    <div style="font-size:56px; margin-bottom:16px;">🛡️</div>
+    <h2 style="font-size:24px; font-weight:900; color:var(--navy); margin-bottom:12px;">Welcome to Sage Family</h2>
+    <p style="font-size:16px; color:var(--text); line-height:1.6; margin-bottom:20px; text-align:left;">
+      Before you begin, here's what you should know about the data you'll have access to:
+    </p>
+    <div style="background:#F8FAFC; border-radius:16px; padding:20px; text-align:left; margin-bottom:20px; border:1px solid #E2E8F0;">
+      <p style="font-size:15px; color:var(--text); line-height:1.6; margin-bottom:14px;">
+        <strong>You'll see health information</strong> including medications, doctor questions, appointment history, and AI conversation transcripts for your loved one.
+      </p>
+      <p style="font-size:15px; color:var(--text); line-height:1.6; margin-bottom:14px;">
+        <strong>This information is private.</strong> Please handle it with care and only share it with authorized healthcare providers or family members.
+      </p>
+      <p style="font-size:15px; color:var(--text); line-height:1.6; margin-bottom:0;">
+        <strong>Sage is not a medical device.</strong> It does not replace professional medical care. Always consult a doctor for health decisions.
+      </p>
+    </div>
+    <p style="font-size:13px; color:#64748B; margin-bottom:20px; line-height:1.5;">
+      By continuing, you agree to our <a href="/terms" target="_blank" style="color:var(--navy); font-weight:600;">Terms of Service</a> and <a href="/privacy" target="_blank" style="color:var(--navy); font-weight:600;">Privacy Policy</a>.
+    </p>
+    <button onclick="acceptFamilyConsent()" style="width:100%; background:var(--navy); color:white; border:none; border-radius:14px; padding:16px; font-size:17px; font-weight:700; cursor:pointer; box-shadow:0 4px 16px rgba(30,58,138,0.3);">
+      I Understand — Continue
+    </button>
+  </div>
+</div>
+
 <!-- ── LOGIN ──────────────────────────────────────────────── -->
 <div id="loginScreen">
   <div class="login-card">
@@ -714,9 +742,31 @@
     showDashboard();
   }
 
+  // ── Consent screen (first use) ───────────────────────────────────────────
+  function familyNeedsConsent() {
+    return !localStorage.getItem("sageFamilyConsentAcknowledged");
+  }
+
+  function showFamilyConsent() {
+    document.getElementById("loginScreen").style.display = "none";
+    document.getElementById("consentScreen").style.display = "flex";
+  }
+
+  function acceptFamilyConsent() {
+    localStorage.setItem("sageFamilyConsentAcknowledged", Date.now().toString());
+    document.getElementById("consentScreen").style.display = "none";
+    proceedToDashboard();
+  }
+
   async function showDashboard() {
     if (!seniorId) return;
+    if (familyNeedsConsent()) { showFamilyConsent(); return; }
+    proceedToDashboard();
+  }
+
+  async function proceedToDashboard() {
     document.getElementById("loginScreen").style.display = "none";
+    document.getElementById("consentScreen").style.display = "none";
     document.getElementById("app").style.display = "block";
     seniorName = localStorage.getItem("familySeniorName") || seniorName;
     document.getElementById("sidebarSub").textContent = "Monitoring " + seniorName;
@@ -1070,6 +1120,7 @@
 
   function logout() {
     localStorage.removeItem("familySeniorId"); localStorage.removeItem("familySeniorName"); localStorage.removeItem("familyToken");
+    localStorage.removeItem("sageFamilyConsentAcknowledged");
     location.reload();
   }
 
