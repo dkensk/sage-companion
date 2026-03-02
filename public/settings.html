@@ -601,6 +601,21 @@
       </div>
     </div>
 
+    <!-- Phone Numbers -->
+    <div class="card">
+      <div class="card-title">Phone Numbers</div>
+      <div id="phoneMessage" class="message"></div>
+      <div class="form-group">
+        <label class="form-label">My Phone Number</label>
+        <input type="tel" class="form-input" id="settingSeniorPhone" placeholder="(555) 123-4567">
+      </div>
+      <div class="form-group">
+        <label class="form-label">Family's Phone Number</label>
+        <input type="tel" class="form-input" id="settingFamilyPhone" placeholder="(555) 987-6543">
+      </div>
+      <button class="form-button" onclick="savePhones()">Save Phone Numbers</button>
+    </div>
+
     <!-- Change Password -->
     <div class="card">
       <div class="card-title">Change Password</div>
@@ -1009,6 +1024,40 @@
     });
 
     // Check for billing query params
+    // ── Phone Numbers ──────────────────────────────────────────────────────────
+    const SENIOR_ID = localStorage.getItem("sageSeniorId");
+
+    async function loadPhones() {
+      if (!SENIOR_ID) return;
+      try {
+        const res = await apiCall('/api/phones/' + SENIOR_ID);
+        if (!res.ok) return;
+        const data = await res.json();
+        document.getElementById('settingSeniorPhone').value = data.seniorPhone || '';
+        document.getElementById('settingFamilyPhone').value = data.familyPhone || '';
+      } catch (e) { console.log('[Settings] phone load error:', e); }
+    }
+
+    async function savePhones() {
+      if (!SENIOR_ID) { showToast('Not logged in', 'error'); return; }
+      const sp = document.getElementById('settingSeniorPhone').value.trim();
+      const fp = document.getElementById('settingFamilyPhone').value.trim();
+      try {
+        const res = await apiCall('/api/phones/' + SENIOR_ID, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ seniorPhone: sp, familyPhone: fp })
+        });
+        if (!res.ok) throw new Error('Save failed');
+        showMessage('phoneMessage', 'Phone numbers saved!', 'success');
+        showToast('Phone numbers saved!', 'success');
+        setTimeout(() => clearMessage('phoneMessage'), 3000);
+      } catch (e) {
+        showMessage('phoneMessage', 'Error saving phone numbers', 'error');
+        showToast('Error saving phone numbers', 'error');
+      }
+    }
+
     window.addEventListener('DOMContentLoaded', () => {
       const params = new URLSearchParams(window.location.search);
 
@@ -1020,8 +1069,9 @@
         window.history.replaceState({}, document.title, window.location.pathname);
       }
 
-      // Load account info
+      // Load account info and phones
       loadAccountInfo();
+      loadPhones();
     });
   </script>
 </body>
