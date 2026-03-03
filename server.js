@@ -815,75 +815,12 @@ ${weatherInfo ? `Current weather: ${weatherInfo}` : ""}`;
 
     const rawReply = response.content[0].text;
 
-    // Extract structured tags before cleaning reply
+    // ── Clean reply and extract tags immediately ──────────────────────────────
     const askDoctorMatch = rawReply.match(/\[ASK_DOCTOR:\s*(.+?)\]/s);
     const suggestedQuestion = askDoctorMatch ? askDoctorMatch[1].trim() : null;
-
     const appointmentMatch = rawReply.match(/\[APPOINTMENT:\s*(\{[\s\S]*?\})\]/);
-    let savedAppointment = null;
-    if (appointmentMatch) {
-      try {
-        const apptData = JSON.parse(appointmentMatch[1]);
-        if (apptData.title && apptData.date) {
-          const { data: appt } = await supabase.from("appointments").insert({
-            senior_id: effectiveSeniorId,
-            title: apptData.title,
-            date: apptData.date,
-            time: apptData.time || null,
-            location: apptData.location || "",
-            notes: apptData.notes || "",
-            source: "voice",
-            google_event_id: null,
-          }).select().single();
-          if (appt) {
-            savedAppointment = { id: appt.id, title: apptData.title, date: apptData.date, time: apptData.time || null, location: apptData.location || null };
-            await supabase.from("activity").insert({
-              senior_id: effectiveSeniorId, type: "appointment_added",
-              description: `Voice appointment: ${apptData.title} on ${apptData.date}`,
-              timestamp: new Date().toISOString(),
-            });
-            await trackUsage(effectiveSeniorId, "appointments_added");
-          }
-        }
-      } catch (parseErr) {
-        console.error("Appointment parse error:", parseErr.message);
-      }
-    }
-
-    // ── Parse [REMINDER: ...] tag ──────────────────────────────────────────────
     const reminderMatch = rawReply.match(/\[REMINDER:\s*(\{[\s\S]*?\})\]/);
-    let savedReminder = null;
-    if (reminderMatch) {
-      try {
-        const remData = JSON.parse(reminderMatch[1]);
-        if (remData.text) {
-          const { data: rem } = await supabase.from("reminders").insert({
-            senior_id: effectiveSeniorId, text: remData.text,
-            due_date: remData.date || null, due_time: remData.time || null,
-            source: "voice", completed: false,
-          }).select().single();
-          if (rem) {
-            savedReminder = { id: rem.id, text: remData.text, date: remData.date || null, time: remData.time || null };
-            // If date present, also add to calendar
-            if (remData.date) {
-              await supabase.from("appointments").insert({
-                senior_id: effectiveSeniorId, title: remData.text, date: remData.date,
-                time: remData.time || null, notes: "From reminders", source: "reminder",
-              });
-            }
-            await supabase.from("activity").insert({
-              senior_id: effectiveSeniorId, type: "reminder_added",
-              description: `Voice reminder: "${remData.text.slice(0, 60)}"`,
-              timestamp: new Date().toISOString(),
-            });
-          }
-        }
-      } catch (parseErr) {
-        console.error("Reminder parse error:", parseErr.message);
-      }
-    }
 
-    // Clean all tags from the spoken reply
     const aiReply = rawReply
       .replace(/\[ASK_DOCTOR:\s*.+?\]/s, "")
       .replace(/\[APPOINTMENT:\s*\{[\s\S]*?\}\]/, "")
@@ -891,12 +828,9 @@ ${weatherInfo ? `Current weather: ${weatherInfo}` : ""}`;
       .trim();
 
     const sid = sessionId || uuidv4();
-
-    // ── Fire TTS + DB saves in parallel (saves ~1-2s) ────────────────────────
-    // Clean text for speech
     const spokenText = aiReply.replace(/[*#_~`>\[\](){}|]/g, "").replace(/\s+/g, " ").trim().slice(0, 4096);
 
-    // Inline TTS fetch (only if client requested it and OpenAI is configured)
+    // ── Start TTS immediately (don't wait for anything else) ─────────────────
     const ttsApiKey = (process.env.OPENAI_API_KEY || "").trim();
     const ttsEnabled = includeTTS && ttsApiKey && !ttsApiKey.startsWith("YOUR_") && ttsApiKey.length >= 20;
     const ttsPromise = ttsEnabled ? new Promise((resolve) => {
@@ -923,6 +857,55 @@ ${weatherInfo ? `Current weather: ${weatherInfo}` : ""}`;
       ttsReq.end();
     }) : Promise.resolve(null);
 
+    // ── Parse appointment/reminder tags and save — all non-blocking ──────────
+    let savedAppointment = null;
+    let savedReminder = null;
+
+    const tagSaves = [];
+
+    if (appointmentMatch) {
+      tagSaves.push((async () => {
+        try {
+          const apptData = JSON.parse(appointmentMatch[1]);
+          if (apptData.title && apptData.date) {
+            const { data: appt } = await supabase.from("appointments").insert({
+              senior_id: effectiveSeniorId, title: apptData.title, date: apptData.date,
+              time: apptData.time || null, location: apptData.location || "", notes: apptData.notes || "",
+              source: "voice", google_event_id: null,
+            }).select().single();
+            if (appt) {
+              savedAppointment = { id: appt.id, title: apptData.title, date: apptData.date, time: apptData.time || null, location: apptData.location || null };
+              supabase.from("activity").insert({ senior_id: effectiveSeniorId, type: "appointment_added", description: `Voice appointment: ${apptData.title} on ${apptData.date}`, timestamp: new Date().toISOString() }).then(() => {});
+              trackUsage(effectiveSeniorId, "appointments_added").catch(() => {});
+            }
+          }
+        } catch (e) { console.error("Appointment parse error:", e.message); }
+      })());
+    }
+
+    if (reminderMatch) {
+      tagSaves.push((async () => {
+        try {
+          const remData = JSON.parse(reminderMatch[1]);
+          if (remData.text) {
+            const { data: rem } = await supabase.from("reminders").insert({
+              senior_id: effectiveSeniorId, text: remData.text,
+              due_date: remData.date || null, due_time: remData.time || null,
+              source: "voice", completed: false,
+            }).select().single();
+            if (rem) {
+              savedReminder = { id: rem.id, text: remData.text, date: remData.date || null, time: remData.time || null };
+              if (remData.date) {
+                supabase.from("appointments").insert({ senior_id: effectiveSeniorId, title: remData.text, date: remData.date, time: remData.time || null, notes: "From reminders", source: "reminder" }).then(() => {});
+              }
+              supabase.from("activity").insert({ senior_id: effectiveSeniorId, type: "reminder_added", description: `Voice reminder: "${remData.text.slice(0, 60)}"`, timestamp: new Date().toISOString() }).then(() => {});
+            }
+          }
+        } catch (e) { console.error("Reminder parse error:", e.message); }
+      })());
+    }
+
+    // ── All in parallel: TTS + tag saves + conversation logging ──────────────
     const dbPromise = Promise.all([
       supabase.from("conversations").insert([
         { senior_id: effectiveSeniorId, session_id: sid, role: "user",      content: message,  timestamp: new Date().toISOString() },
@@ -934,6 +917,7 @@ ${weatherInfo ? `Current weather: ${weatherInfo}` : ""}`;
         timestamp: new Date().toISOString(),
       }),
       trackUsage(effectiveSeniorId, "chat_messages"),
+      ...tagSaves,
     ]);
 
     const [ttsAudioBase64] = await Promise.all([ttsPromise, dbPromise]);
