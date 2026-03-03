@@ -1503,7 +1503,10 @@
 
     recognition.onerror = (e) => {
       if (e.error === "not-allowed" || e.error === "permission-denied") {
-        showToast("Microphone blocked — please allow mic access in your browser settings.");
+        // Try requesting mic permission directly — this triggers the Allow popup
+        // on iOS standalone PWAs where SpeechRecognition alone may not prompt.
+        requestMicAndRetry();
+        return;
       } else if (e.error === "no-speech") {
         // Just a pause — don't show error
         return;
@@ -1541,18 +1544,48 @@
     }
   }
 
-  function startListening() {
+  // Request mic permission via getUserMedia, then retry recognition.
+  // This is the fallback when SpeechRecognition fires "not-allowed" —
+  // getUserMedia shows the actual Allow/Deny popup on iOS standalone PWAs.
+  async function requestMicAndRetry() {
+    stopListening();
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      // Permission granted — stop the stream immediately (we just needed the grant)
+      stream.getTracks().forEach(t => t.stop());
+      showToast("Microphone enabled! Tap Talk to try again.");
+    } catch (err) {
+      // User denied or device has no mic
+      if (err.name === "NotAllowedError" || err.name === "PermissionDeniedError") {
+        showToast("Sage needs your microphone to listen. You can type below instead, or check Settings > Safari > Microphone.");
+      } else {
+        showToast("No microphone found — please type below to chat.");
+      }
+    }
+  }
+
+  async function startListening() {
     // Lazy-init: create SpeechRecognition on first tap instead of page load.
     // This avoids iOS Safari prompting for mic permission on every page open.
     if (!recognition) {
       setupVoice();
       if (!recognition) { showToast("Voice not supported — please type below."); return; }
+    }
 
-      // First-time coaching: let user know the browser will ask for mic access.
-      // In standalone PWA mode, iOS remembers the grant, so skip the coaching.
-      if (!isStandalone && !localStorage.getItem("sageMicCoached")) {
-        localStorage.setItem("sageMicCoached", "1");
-        showToast("Tap \"Allow\" when prompted — this lets Sage hear you.");
+    // On first tap (or if permission was reset), request mic via getUserMedia
+    // BEFORE starting SpeechRecognition. This triggers the friendly Allow popup
+    // instead of a silent "not-allowed" error. The grant carries over to SR.
+    if (!localStorage.getItem("sageMicGranted")) {
+      try {
+        const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+        stream.getTracks().forEach(t => t.stop()); // release immediately
+        localStorage.setItem("sageMicGranted", "1");
+      } catch (err) {
+        if (err.name === "NotAllowedError" || err.name === "PermissionDeniedError") {
+          showToast("Sage needs your microphone to listen. You can type below instead.");
+          return;
+        }
+        // Other errors (no mic hardware) — let SR try anyway
       }
     }
 
@@ -2085,8 +2118,9 @@
     };
 
     qRecognition.onerror = (e) => {
-      if (e.error === "not-allowed") {
-        showToast("Microphone blocked — please allow mic access in browser settings.");
+      if (e.error === "not-allowed" || e.error === "permission-denied") {
+        requestMicAndRetry();
+        return;
       } else if (e.error === "no-speech" || e.error === "aborted") {
         return;
       }
@@ -2321,6 +2355,8 @@
     localStorage.removeItem("sageDemo");
     localStorage.removeItem("sageLocation");
     localStorage.removeItem("sageConsentAcknowledged");
+    localStorage.removeItem("sageMicGranted");
+    localStorage.removeItem("sageMicCoached");
     window.location.href = "/";
   }
 
