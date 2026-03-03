@@ -1182,8 +1182,8 @@
     await loadDoctorQuestions();
     loadElderPhones();
     loadReminders();
-    setupVoice();
-    setupQuestionVoice();
+    // Voice is lazy-initialized on first tap — see toggleVoice().
+    // This avoids the iOS mic permission prompt on every page load.
 
     if (!sessionStorage.getItem("sageGreeted")) {
       setTimeout(() => {
@@ -1492,6 +1492,10 @@
     };
   }
 
+  // Detect if running as installed PWA (home-screen app)
+  const isStandalone = window.matchMedia("(display-mode: standalone)").matches
+                    || window.navigator.standalone === true;
+
   function toggleVoice() {
     unlockAudio(); // must run synchronously during the user gesture
     if (isListening) {
@@ -1507,7 +1511,19 @@
   }
 
   function startListening() {
-    if (!recognition) { showToast("Voice not supported — please type below."); return; }
+    // Lazy-init: create SpeechRecognition on first tap instead of page load.
+    // This avoids iOS Safari prompting for mic permission on every page open.
+    if (!recognition) {
+      setupVoice();
+      if (!recognition) { showToast("Voice not supported — please type below."); return; }
+
+      // First-time coaching: let user know the browser will ask for mic access.
+      // In standalone PWA mode, iOS remembers the grant, so skip the coaching.
+      if (!isStandalone && !localStorage.getItem("sageMicCoached")) {
+        localStorage.setItem("sageMicCoached", "1");
+        showToast("Tap \"Allow\" to let Sage hear you. You only need to do this once if you add Sage to your home screen.");
+      }
+    }
 
     // Stop Sage speaking before opening the mic
     stopCurrentAudio();
@@ -2067,7 +2083,11 @@
   }
 
   function startQuestionVoice() {
-    if (!qRecognition) { showToast("Voice not supported — please type your question."); return; }
+    // Lazy-init question voice on first use (same pattern as main voice)
+    if (!qRecognition) {
+      setupQuestionVoice();
+      if (!qRecognition) { showToast("Voice not supported — please type your question."); return; }
+    }
 
     // Stop Sage speaking
     stopCurrentAudio();
