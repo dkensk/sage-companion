@@ -4,19 +4,23 @@
       <stop offset="0%"   stop-color="#1E3A8A"/>
       <stop offset="100%" stop-color="#0F766E"/>
     </linearGradient>
+    <linearGradient id="leafGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%"   stop-color="#22C55E"/>
+      <stop offset="100%" stop-color="#16A34A"/>
+    </linearGradient>
   </defs>
-  <!-- Rounded square background -->
   <rect width="512" height="512" rx="110" fill="url(#bg)"/>
-  <!-- Sage leaf icon -->
-  <g transform="translate(256,180)" fill="none" stroke="white" stroke-width="12" stroke-linecap="round" stroke-linejoin="round">
-    <!-- Main leaf shape -->
-    <path d="M0,0 C-60,-30 -80,-100 -10,-140 C30,-120 50,-60 0,0Z" fill="rgba(255,255,255,0.2)" stroke="white"/>
-    <path d="M0,0 C60,-30 80,-100 10,-140 C-30,-120 -50,-60 0,0Z" fill="rgba(255,255,255,0.2)" stroke="white"/>
-    <!-- Stem -->
-    <line x1="0" y1="0" x2="0" y2="40"/>
-    <!-- Center vein -->
-    <line x1="0" y1="-10" x2="0" y2="-110"/>
+  <!-- Centered sage leaf — larger for icon-only use -->
+  <g transform="translate(256,256)">
+    <path d="M0,-160 C68,-148 118,-86 118,-12 C118,62 68,136 0,160 C-68,136 -118,62 -118,-12 C-118,-86 -68,-148 0,-160Z" fill="url(#leafGrad)" opacity="0.9"/>
+    <line x1="0" y1="-148" x2="0" y2="148" stroke="white" stroke-width="5" opacity="0.7"/>
+    <line x1="0" y1="-100" x2="-56" y2="-62" stroke="white" stroke-width="3" opacity="0.5" stroke-linecap="round"/>
+    <line x1="0" y1="-100" x2="56" y2="-62" stroke="white" stroke-width="3" opacity="0.5" stroke-linecap="round"/>
+    <line x1="0" y1="-48" x2="-74" y2="-6" stroke="white" stroke-width="3" opacity="0.5" stroke-linecap="round"/>
+    <line x1="0" y1="-48" x2="74" y2="-6" stroke="white" stroke-width="3" opacity="0.5" stroke-linecap="round"/>
+    <line x1="0" y1="8" x2="-68" y2="55" stroke="white" stroke-width="3" opacity="0.5" stroke-linecap="round"/>
+    <line x1="0" y1="8" x2="68" y2="55" stroke="white" stroke-width="3" opacity="0.5" stroke-linecap="round"/>
+    <line x1="0" y1="62" x2="-50" y2="105" stroke="white" stroke-width="3" opacity="0.5" stroke-linecap="round"/>
+    <line x1="0" y1="62" x2="50" y2="105" stroke="white" stroke-width="3" opacity="0.5" stroke-linecap="round"/>
   </g>
-  <!-- "Sage" text -->
-  <text x="256" y="330" font-size="100" font-weight="700" text-anchor="middle" fill="white" font-family="-apple-system, 'Segoe UI', Helvetica, Arial, sans-serif" letter-spacing="4">Sage</text>
 </svg>
