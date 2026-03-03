@@ -731,8 +731,8 @@
 
   <!-- Install Banner -->
   <div id="installBanner">
-    <!-- Android / Chrome: simple one-tap install -->
-    <div id="installAndroid" style="display:none;">
+    <!-- Chrome/Edge with beforeinstallprompt: simple one-tap install -->
+    <div id="installOneClick" style="display:none;">
       <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;">
         <div style="display:flex;align-items:center;gap:10px;flex:1;min-width:0;">
           <span style="font-size:22px;flex-shrink:0;">📲</span>
@@ -743,6 +743,26 @@
         </div>
         <div style="display:flex;gap:8px;flex-shrink:0;">
           <button class="install-btn" onclick="installApp()" style="padding:10px 16px;font-size:14px;">Install</button>
+          <button class="dismiss-btn" onclick="dismissInstall()" style="padding:10px 12px;font-size:13px;">Later</button>
+        </div>
+      </div>
+    </div>
+    <!-- Desktop browser without native install: visual guide -->
+    <div id="installDesktop" style="display:none;">
+      <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;">
+        <div style="display:flex;align-items:center;gap:10px;flex:1;min-width:0;">
+          <span style="font-size:22px;flex-shrink:0;">💻</span>
+          <div style="min-width:0;">
+            <div style="font-size:15px;font-weight:700;color:var(--navy);">Install Sage as a Desktop App</div>
+            <div style="font-size:13px;color:var(--text);line-height:1.4;" id="desktopInstallMsg">
+              In Chrome: click the <strong>install icon</strong>
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--navy)" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:middle;margin:0 2px;"><path d="M12 5v14"/><path d="M19 12l-7 7-7-7"/><line x1="5" y1="21" x2="19" y2="21"/></svg>
+              in the address bar, then click <strong>"Install"</strong>
+            </div>
+          </div>
+        </div>
+        <div style="display:flex;gap:8px;flex-shrink:0;">
+          <button class="install-btn" onclick="dismissInstall()" style="padding:10px 16px;font-size:14px;">Got It</button>
           <button class="dismiss-btn" onclick="dismissInstall()" style="padding:10px 12px;font-size:13px;">Later</button>
         </div>
       </div>
@@ -2484,6 +2504,10 @@
     return /Safari/.test(navigator.userAgent) && !/Chrome|CriOS|FxiOS/.test(navigator.userAgent);
   }
 
+  function isDesktop() {
+    return !/Android|iPhone|iPad|iPod|webOS|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+  }
+
   function showInstallBanner(type) {
     if (isInstalled()) return;
     if (localStorage.getItem('installDismissed')) {
@@ -2492,19 +2516,30 @@
     }
     var banner = document.getElementById('installBanner');
     if (!banner) return;
-    // Show the correct sub-panel
-    var androidPanel = document.getElementById('installAndroid');
-    var iosPanel = document.getElementById('installIOS');
-    if (type === 'ios' && iosPanel) iosPanel.style.display = 'block';
-    else if (androidPanel) androidPanel.style.display = 'block';
+
+    if (type === 'oneclick')     document.getElementById('installOneClick').style.display = 'block';
+    else if (type === 'ios')     document.getElementById('installIOS').style.display = 'block';
+    else if (type === 'desktop') {
+      // Tailor the desktop message to the browser
+      var msg = document.getElementById('desktopInstallMsg');
+      if (/Edg/.test(navigator.userAgent)) {
+        msg.innerHTML = 'In Edge: click the <strong>App Available</strong> icon <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--navy)" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:middle;margin:0 2px;"><rect x="3" y="3" width="18" height="18" rx="3"/><line x1="12" y1="8" x2="12" y2="16"/><line x1="8" y1="12" x2="16" y2="12"/></svg> in the address bar, then click <strong>"Install"</strong>';
+      } else if (/Firefox/.test(navigator.userAgent)) {
+        msg.innerHTML = 'Firefox doesn\'t support app install yet. For the best experience, open Sage in <strong>Chrome</strong> or <strong>Edge</strong> and install from there.';
+      } else if (/Safari/.test(navigator.userAgent) && !/Chrome/.test(navigator.userAgent)) {
+        msg.innerHTML = 'In Safari on Mac: go to <strong>File</strong> menu, then click <strong>"Add to Dock"</strong>';
+      }
+      // Chrome default message is already set in HTML
+      document.getElementById('installDesktop').style.display = 'block';
+    }
     banner.style.display = 'block';
   }
 
-  // Android/Chrome: capture the beforeinstallprompt event
+  // Chrome/Edge: capture the beforeinstallprompt event (one-click install)
   window.addEventListener('beforeinstallprompt', function(e) {
     e.preventDefault();
     deferredPrompt = e;
-    showInstallBanner('android');
+    showInstallBanner('oneclick');
   });
 
   // iOS Safari: show step-by-step visual guide
@@ -2512,9 +2547,19 @@
     setTimeout(function() { showInstallBanner('ios'); }, 2000);
   }
 
-  // For non-iOS browsers without beforeinstallprompt, show after delay
-  if (!isInstalled() && !isIOS()) {
-    setTimeout(function() { showInstallBanner('android'); }, 3000);
+  // Desktop without beforeinstallprompt: show browser-specific instructions after delay
+  // (If beforeinstallprompt fires first, this won't show because banner is already visible)
+  if (!isInstalled() && !isIOS() && isDesktop()) {
+    setTimeout(function() {
+      if (!deferredPrompt) showInstallBanner('desktop');
+    }, 3500);
+  }
+
+  // Mobile Android without beforeinstallprompt (rare): show one-click panel
+  if (!isInstalled() && !isIOS() && !isDesktop()) {
+    setTimeout(function() {
+      if (!deferredPrompt) showInstallBanner('oneclick');
+    }, 3000);
   }
 
   async function installApp() {
@@ -2522,12 +2567,10 @@
       deferredPrompt.prompt();
       var result = await deferredPrompt.userChoice;
       if (result.outcome === 'accepted') {
-        showToast('Sage installed on your home screen!');
+        showToast('Sage installed!');
       }
       deferredPrompt = null;
       document.getElementById('installBanner').style.display = 'none';
-    } else {
-      showToast('Look for the install icon in your browser address bar, or use your browser menu.');
     }
   }
 
