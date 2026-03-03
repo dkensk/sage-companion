@@ -1177,11 +1177,13 @@
     navigator.geolocation.getCurrentPosition(async (pos) => {
       try {
         const { latitude: lat, longitude: lon } = pos.coords;
+        localStorage.setItem("sageCoords", JSON.stringify({ lat, lon }));
         const r = await fetch(`https://nominatim.openstreetmap.org/reverse?lat=${lat}&lon=${lon}&format=json`);
         const d = await r.json();
         const city  = d.address?.city || d.address?.town || d.address?.village || "";
         const state = d.address?.state || "";
-        userLocation = city ? `${city}, ${state}`.trim().replace(/,$/, "") : null;
+        const zip   = d.address?.postcode || "";
+        userLocation = city ? `${city}, ${state}${zip ? " " + zip : ""}`.trim().replace(/,$/, "") : null;
         if (userLocation) localStorage.setItem("sageLocation", userLocation);
       } catch { /* non-critical */ }
     }, () => { /* permission denied — that's fine */ });

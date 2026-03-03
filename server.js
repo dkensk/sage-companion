@@ -732,13 +732,13 @@ app.post("/api/chat", seniorAuth, suspendCheck, rateLimit(60000, 20), async (req
 
     // Fetch weather if location provided and message seems weather-related
     let weatherInfo = null;
-    const weatherKeywords = /weather|temperature|outside|warm|cold|rain|sunny|snow|hot|degrees|forecast/i;
+    const weatherKeywords = /weather|temperature|outside|warm|cold|rain|sunny|snow|hot|humid|chill|wind|rain|sunny|snow|degrees|forecast|jacket|coat|umbrella|dress.*(for|today|tomorrow)/i;
     if (location && weatherKeywords.test(message)) {
       try {
         weatherInfo = await new Promise((resolve) => {
           const https = require("https");
           const city  = encodeURIComponent(location);
-          https.get(`https://wttr.in/${city}?format=3`, (r) => {
+          https.get(`https://wttr.in/${city}?format=%C+%t+%h+%w`, (r) => {
             let data = "";
             r.on("data", d => data += d);
             r.on("end", () => resolve(data.trim()));
@@ -798,6 +798,10 @@ When ${seniorName} asks you to remind them of something, add something to their 
 
 Today's medication status:
 ${medSummary || "No medications scheduled today"}
+
+LOCAL & LOCATION-AWARE HELP:
+${location ? `${seniorName} lives in ${location}. When they ask about local places (pharmacies, doctors, restaurants, stores, hospitals, churches, libraries, etc.), give helpful answers using your knowledge of that area. Mention well-known chains or landmarks nearby when you can. If they ask about hours, give typical hours but remind them to call ahead to confirm.` : `Location is not available. If they ask about local places, suggest they tell you their city so you can help better.`}
+When they ask about weather, give a simple friendly summary — for example "It's a nice warm day out there, around 75 degrees" rather than raw numbers.
 
 Current time: ${clientTime || new Date().toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit" })}
 Today: ${timezone ? new Date().toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric", timeZone: timezone }) : new Date().toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric" })}
