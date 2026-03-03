@@ -997,7 +997,23 @@
 
 <script>
   // ── Auth ──────────────────────────────────────────────────────────────────────
-  function getSeniorToken() { return localStorage.getItem("sageSeniorToken"); }
+  // Cookie helpers — cookies persist across Safari ↔ Dock app contexts
+  function setCookie(name, value, days) {
+    const d = new Date(); d.setTime(d.getTime() + days * 86400000);
+    document.cookie = `${name}=${encodeURIComponent(value)};expires=${d.toUTCString()};path=/;SameSite=Strict;Secure`;
+  }
+  function getCookie(name) {
+    const v = document.cookie.match('(^|;)\\s*' + name + '\\s*=\\s*([^;]+)');
+    return v ? decodeURIComponent(v.pop()) : null;
+  }
+  function deleteCookie(name) {
+    document.cookie = `${name}=;expires=Thu, 01 Jan 1970 00:00:00 GMT;path=/;SameSite=Strict;Secure`;
+  }
+
+  function getSeniorToken() {
+    // Try localStorage first, then fall back to cookie (for Safari Dock / standalone PWAs)
+    return localStorage.getItem("sageSeniorToken") || getCookie("sageSeniorToken");
+  }
 
   async function seniorLogin() {
     const email = document.getElementById("seniorLoginEmail").value.trim();
@@ -1027,6 +1043,9 @@
       localStorage.setItem("sageSeniorId", senior._id);
       localStorage.setItem("sageSeniorName", senior.name);
       localStorage.setItem("sageFamilyCode", senior.familyCode);
+      setCookie("sageSeniorToken", token, 90);
+      setCookie("sageSeniorId", senior._id, 90);
+      setCookie("sageSeniorName", senior.name, 90);
       location.reload();
     } catch (e) {
       errEl.textContent = "Connection error — please try again.";
@@ -1055,6 +1074,9 @@
       localStorage.setItem("sageSeniorId", senior._id);
       localStorage.setItem("sageSeniorName", senior.name);
       localStorage.setItem("sageFamilyCode", code);
+      setCookie("sageSeniorToken", token, 90);
+      setCookie("sageSeniorId", senior._id, 90);
+      setCookie("sageSeniorName", senior.name, 90);
       location.reload();
     } catch (e) {
       errEl.textContent = "Connection error — please try again.";
@@ -1123,6 +1145,7 @@
           if (res.ok) {
             const data = await res.json();
             localStorage.setItem("sageSeniorToken", data.token);
+            setCookie("sageSeniorToken", data.token, 90);
             document.getElementById("loginScreen").style.display = "none";
             return true;
           }
@@ -1149,6 +1172,7 @@
     const res = await fetch(url, opts);
     if (res.status === 401) {
       localStorage.removeItem("sageSeniorToken");
+      deleteCookie("sageSeniorToken");
       document.getElementById("loginScreen").style.display = "flex";
       throw new Error("Session expired — please log in again.");
     }
@@ -1156,6 +1180,13 @@
   }
 
   // ── State ─────────────────────────────────────────────────────────────────────
+  // Sync from cookies → localStorage on load (handles Safari Dock app context)
+  if (!localStorage.getItem("sageSeniorToken") && getCookie("sageSeniorToken")) {
+    localStorage.setItem("sageSeniorToken", getCookie("sageSeniorToken"));
+    if (getCookie("sageSeniorId")) localStorage.setItem("sageSeniorId", getCookie("sageSeniorId"));
+    if (getCookie("sageSeniorName")) localStorage.setItem("sageSeniorName", getCookie("sageSeniorName"));
+  }
+
   const SENIOR_ID = localStorage.getItem("sageSeniorId") || "00000000-0000-0000-0000-000000000001";
   let seniorName = localStorage.getItem("sageSeniorName") || "Margaret";
 
@@ -2399,6 +2430,9 @@
     localStorage.removeItem("sageConsentAcknowledged");
     localStorage.removeItem("sageMicGranted");
     localStorage.removeItem("sageMicCoached");
+    deleteCookie("sageSeniorToken");
+    deleteCookie("sageSeniorId");
+    deleteCookie("sageSeniorName");
     window.location.href = "/";
   }
 
