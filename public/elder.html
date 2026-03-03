@@ -786,9 +786,9 @@
       <span class="icon">❓</span>
       <span>My Questions</span>
     </button>
-    <button class="action-btn" id="callFamilyAction" onclick="callFamily()" style="background:#FEF2F2;border-color:#FECACA;">
-      <span class="icon">📞</span>
-      <span>Call Family</span>
+    <button class="action-btn" onclick="showSection('reminders')" style="background:#FFFBEB;border-color:#FDE68A;">
+      <span class="icon">📝</span>
+      <span>My Reminders</span>
     </button>
   </div>
 
@@ -900,6 +900,28 @@
     </div>
   </div>
 
+  <!-- Reminders / To-Do -->
+  <div class="card" id="remindersSection">
+    <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px;margin-bottom:4px;">
+      <div class="section-title" style="margin-bottom:0;">📝 My Reminders</div>
+    </div>
+    <div id="reminderList" style="margin-top:12px;">
+      <p style="color:var(--muted);font-size:18px;padding:4px 0;">Loading...</p>
+    </div>
+    <div style="display:flex;gap:10px;margin-top:16px;align-items:center;">
+      <input type="text" id="reminderInput" placeholder="Add a reminder..."
+        style="flex:1;border:2px solid var(--border);border-radius:12px;padding:14px 16px;font-size:18px;outline:none;background:var(--bg);color:var(--text);"
+        onfocus="this.style.borderColor='var(--navy)'" onblur="this.style.borderColor='var(--border)'"
+        onkeydown="if(event.key==='Enter') addReminder()" />
+      <button onclick="addReminder()"
+        style="background:var(--teal);color:white;border:none;border-radius:12px;padding:12px 20px;font-size:18px;font-weight:700;cursor:pointer;-webkit-tap-highlight-color:transparent;">
+        Add
+      </button>
+    </div>
+    <p style="color:var(--muted);font-size:14px;margin-top:10px;line-height:1.4;">
+      Tip: You can also say "Remind me to..." while talking to Sage!
+    </p>
+  </div>
 
 </div>
 
@@ -1159,6 +1181,7 @@
     await loadMedications();
     await loadDoctorQuestions();
     loadElderPhones();
+    loadReminders();
     setupVoice();
     setupQuestionVoice();
 
@@ -1266,6 +1289,22 @@
     el.scrollTop = el.scrollHeight;
   }
 
+  function addReminderCard(rem) {
+    const el = document.getElementById("chatArea");
+    const card = document.createElement("div");
+    card.style.cssText = "background:linear-gradient(135deg,#FFFBEB,#FEF3C7);border-radius:16px;padding:16px 18px;margin:8px 0 4px;border:1px solid #FDE68A;max-width:340px;";
+    const dateStr = rem.date ? new Date(rem.date + "T12:00:00").toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric" }) + (rem.time ? ` at ${rem.time}` : "") : "No date";
+    card.innerHTML = `
+      <div style="font-size:14px;font-weight:600;color:#92400E;text-transform:uppercase;letter-spacing:0.5px;margin-bottom:6px;">Added to Reminders</div>
+      <div style="font-size:18px;font-weight:600;color:#78350F;">${escHtml(rem.text)}</div>
+      <div style="color:#92400E;font-size:16px;margin-top:2px;">${dateStr}</div>
+    `;
+    el.appendChild(card);
+    el.scrollTop = el.scrollHeight;
+    // Refresh reminders list if visible
+    if (document.getElementById("remindersSection").style.display !== "none") loadReminders();
+  }
+
   async function sendMessage(text) {
     unlockAudio(); // ensure audio is unlocked whenever a message is sent
     const input = document.getElementById("typeInput");
@@ -1310,6 +1349,10 @@
         // If an appointment was saved, show confirmation card
         if (data.appointment) {
           addAppointmentCard(data.appointment);
+        }
+        // If a reminder was saved, show confirmation card
+        if (data.reminder) {
+          addReminderCard(data.reminder);
         }
         // If Sage suggested a doctor question, show the Add button
         if (data.suggestedQuestion) {
@@ -1846,19 +1889,7 @@
       const data = await res.json();
       elderSeniorPhoneStored = data.seniorPhone || "";
       elderFamilyPhoneStored = data.familyPhone || "";
-      updateCallFamilyBtn();
     } catch (e) { console.log("[Elder] phone load error:", e); }
-  }
-
-  function updateCallFamilyBtn() {
-    const btn = document.getElementById("callFamilyAction");
-    if (elderFamilyPhoneStored) {
-      btn.style.background = "#F0FDF4";
-      btn.style.borderColor = "#BBF7D0";
-    } else {
-      btn.style.background = "#FEF2F2";
-      btn.style.borderColor = "#FECACA";
-    }
   }
 
   function callFamily() {
@@ -1892,6 +1923,77 @@
     }
   }
 
+
+  // ── Reminders / To-Do ────────────────────────────────────────────────────────
+  async function loadReminders() {
+    try {
+      const res = await apiCall(`/api/reminders/${SENIOR_ID}`);
+      if (!res.ok) return;
+      const reminders = await res.json();
+      const el = document.getElementById("reminderList");
+      const active = reminders.filter(r => !r.completed);
+      const done   = reminders.filter(r => r.completed).slice(0, 5);
+
+      if (active.length === 0 && done.length === 0) {
+        el.innerHTML = `<p style="color:var(--muted);font-size:18px;padding:4px 0;">No reminders yet — say "Remind me to..." or type one below!</p>`;
+        return;
+      }
+
+      let html = active.map(r => {
+        const dateStr = r.due_date ? ` <span style="color:var(--muted);font-size:15px;">· ${new Date(r.due_date + "T12:00:00").toLocaleDateString("en-US", { month: "short", day: "numeric" })}${r.due_time ? " " + r.due_time : ""}</span>` : "";
+        return `
+          <div style="display:flex;align-items:flex-start;gap:12px;padding:12px 0;border-bottom:1px solid var(--border);">
+            <button onclick="completeReminder('${r.id}')" style="background:none;border:2px solid var(--border);border-radius:8px;width:32px;height:32px;cursor:pointer;flex-shrink:0;margin-top:2px;-webkit-tap-highlight-color:transparent;" title="Mark done"></button>
+            <div style="flex:1;font-size:19px;line-height:1.5;">${escHtml(r.text)}${dateStr}</div>
+            <button onclick="deleteReminder('${r.id}')" style="background:none;border:none;color:var(--muted);font-size:22px;cursor:pointer;padding:2px 6px;">✕</button>
+          </div>`;
+      }).join("");
+
+      if (done.length > 0) {
+        html += `<div style="margin-top:16px;padding-top:12px;border-top:2px solid var(--border);">
+          <div style="font-size:15px;font-weight:700;color:var(--muted);margin-bottom:8px;">Completed</div>`;
+        html += done.map(r => `
+          <div style="display:flex;align-items:center;gap:12px;padding:8px 0;opacity:0.5;">
+            <span style="font-size:20px;">✓</span>
+            <span style="font-size:17px;text-decoration:line-through;">${escHtml(r.text)}</span>
+          </div>`).join("");
+        html += `</div>`;
+      }
+
+      el.innerHTML = html;
+    } catch (e) { console.error("[Reminders] Load error:", e); }
+  }
+
+  async function addReminder() {
+    const input = document.getElementById("reminderInput");
+    const text = input.value.trim();
+    if (!text) return;
+    input.value = "";
+    try {
+      await apiCall("/api/reminders", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ seniorId: SENIOR_ID, text })
+      });
+      showToast("Reminder added!");
+      loadReminders();
+    } catch (e) { showToast("Error adding reminder"); }
+  }
+
+  async function completeReminder(id) {
+    try {
+      await apiCall(`/api/reminders/${id}/done`, { method: "PATCH" });
+      showToast("Done!");
+      loadReminders();
+    } catch (e) { showToast("Error completing reminder"); }
+  }
+
+  async function deleteReminder(id) {
+    try {
+      await apiCall(`/api/reminders/${id}`, { method: "DELETE" });
+      loadReminders();
+    } catch (e) { showToast("Error deleting reminder"); }
+  }
 
   // ── Doctor Question Voice Input ────────────────────────────────────────────────
   let qRecognition   = null;
@@ -2145,6 +2247,12 @@
   function showSection(name) {
     if (name === "meds") document.getElementById("medsSection").scrollIntoView({ behavior: "smooth" });
     if (name === "doctorQ") document.getElementById("doctorQSection").scrollIntoView({ behavior: "smooth" });
+    if (name === "reminders") {
+      const sec = document.getElementById("remindersSection");
+      sec.style.display = "block";
+      sec.scrollIntoView({ behavior: "smooth" });
+      loadReminders();
+    }
   }
 
   function showToast(msg, duration = 3000) {

@@ -214,3 +214,17 @@ CREATE TABLE IF NOT EXISTS senior_tokens (
 
 CREATE INDEX IF NOT EXISTS idx_senior_tokens_senior ON senior_tokens(senior_id);
 CREATE INDEX IF NOT EXISTS idx_senior_tokens_hash   ON senior_tokens(token_hash);
+
+-- ── Reminders / To-Do Items ─────────────────────────────────────────────────
+CREATE TABLE IF NOT EXISTS reminders (
+  id          UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  senior_id   UUID NOT NULL REFERENCES seniors(id) ON DELETE CASCADE,
+  text        TEXT NOT NULL,
+  due_date    DATE,
+  due_time    TEXT,
+  completed   BOOLEAN DEFAULT FALSE,
+  source      TEXT DEFAULT 'manual',
+  created_at  TIMESTAMPTZ DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS idx_reminders_senior ON reminders(senior_id, completed);

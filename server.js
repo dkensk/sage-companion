@@ -788,6 +788,14 @@ When ${seniorName} mentions an upcoming appointment, event, or anything that sho
 4. If they do NOT give enough info to determine a date (just "sometime" or "eventually"), ask them gently what day it is, do NOT output the tag.
 5. The tag is machine-parsed and NEVER read aloud — the user only hears your friendly confirmation.
 
+REMINDERS & TO-DO:
+When ${seniorName} asks you to remind them of something, add something to their list, or mentions a task they need to do (pick up dry cleaning, call the bank, buy milk, etc.):
+1. Confirm warmly, for example: "Got it, I've added 'pick up prescription' to your reminders!"
+2. At the very END of your response, add: [REMINDER: {"text": "...", "date": "YYYY-MM-DD" or null, "time": "2:00 PM" or null}]
+3. If they mention a date or day (like "tomorrow" or "next Friday"), include the date. If no date mentioned, set date to null.
+4. You can output BOTH an APPOINTMENT tag and a REMINDER tag in the same response if appropriate.
+5. The tag is machine-parsed and NEVER read aloud.
+
 Today's medication status:
 ${medSummary || "No medications scheduled today"}
 
@@ -842,10 +850,44 @@ ${weatherInfo ? `Current weather: ${weatherInfo}` : ""}`;
       }
     }
 
+    // ── Parse [REMINDER: ...] tag ──────────────────────────────────────────────
+    const reminderMatch = rawReply.match(/\[REMINDER:\s*(\{[\s\S]*?\})\]/);
+    let savedReminder = null;
+    if (reminderMatch) {
+      try {
+        const remData = JSON.parse(reminderMatch[1]);
+        if (remData.text) {
+          const { data: rem } = await supabase.from("reminders").insert({
+            senior_id: effectiveSeniorId, text: remData.text,
+            due_date: remData.date || null, due_time: remData.time || null,
+            source: "voice", completed: false,
+          }).select().single();
+          if (rem) {
+            savedReminder = { id: rem.id, text: remData.text, date: remData.date || null, time: remData.time || null };
+            // If date present, also add to calendar
+            if (remData.date) {
+              await supabase.from("appointments").insert({
+                senior_id: effectiveSeniorId, title: remData.text, date: remData.date,
+                time: remData.time || null, notes: "From reminders", source: "reminder",
+              });
+            }
+            await supabase.from("activity").insert({
+              senior_id: effectiveSeniorId, type: "reminder_added",
+              description: `Voice reminder: "${remData.text.slice(0, 60)}"`,
+              timestamp: new Date().toISOString(),
+            });
+          }
+        }
+      } catch (parseErr) {
+        console.error("Reminder parse error:", parseErr.message);
+      }
+    }
+
     // Clean all tags from the spoken reply
     const aiReply = rawReply
       .replace(/\[ASK_DOCTOR:\s*.+?\]/s, "")
       .replace(/\[APPOINTMENT:\s*\{[\s\S]*?\}\]/, "")
+      .replace(/\[REMINDER:\s*\{[\s\S]*?\}\]/, "")
       .trim();
 
     const sid = sessionId || uuidv4();
@@ -896,7 +938,7 @@ ${weatherInfo ? `Current weather: ${weatherInfo}` : ""}`;
 
     const [ttsAudioBase64] = await Promise.all([ttsPromise, dbPromise]);
 
-    const result = { reply: aiReply, sessionId: sid, suggestedQuestion, appointment: savedAppointment };
+    const result = { reply: aiReply, sessionId: sid, suggestedQuestion, appointment: savedAppointment, reminder: savedReminder };
     if (ttsAudioBase64) result.audioBase64 = ttsAudioBase64;
     res.json(result);
   } catch (e) {
@@ -1339,6 +1381,57 @@ app.get("/api/calendar/:seniorId/feed.ics", validateUUID("seniorId"), async (req
 // GET /api/calendar/:seniorId/feed-token — returns a permanent feed token for webcal subscriptions
 app.get("/api/calendar/:seniorId/feed-token", anyAuth, validateUUID("seniorId"), async (req, res) => {
   res.json({ token: makeCalendarFeedToken(req.params.seniorId) });
+});
+
+// ── Reminders / To-Do ─────────────────────────────────────────────────────────
+
+app.get("/api/reminders/:seniorId", anyAuth, validateUUID("seniorId"), async (req, res) => {
+  try {
+    const { data } = await supabase.from("reminders").select("*")
+      .eq("senior_id", req.params.seniorId).order("created_at", { ascending: false });
+    res.json(data || []);
+  } catch (e) { console.error(`[Error] ${req.method} ${req.path}:`, e.message); res.status(500).json({ error: "Something went wrong. Please try again." }); }
+});
+
+app.post("/api/reminders", seniorAuth, async (req, res) => {
+  try {
+    const seniorId = req.body.seniorId || req.seniorId;
+    const { text, dueDate, dueTime, source } = req.body;
+    if (!text) return res.status(400).json({ error: "text required" });
+    const { data: reminder } = await supabase.from("reminders").insert({
+      senior_id: seniorId, text, due_date: dueDate || null, due_time: dueTime || null,
+      source: source || "manual", completed: false,
+    }).select().single();
+    // If there's a date, also create a calendar appointment
+    let appointment = null;
+    if (dueDate) {
+      const { data: appt } = await supabase.from("appointments").insert({
+        senior_id: seniorId, title: text, date: dueDate, time: dueTime || null,
+        notes: "From reminders", source: "reminder", google_event_id: null,
+      }).select().single();
+      appointment = appt;
+    }
+    await supabase.from("activity").insert({
+      senior_id: seniorId, type: "reminder_added",
+      description: `Reminder: "${text.slice(0, 60)}"`,
+      timestamp: new Date().toISOString(),
+    });
+    res.json({ reminder, appointment });
+  } catch (e) { console.error(`[Error] ${req.method} ${req.path}:`, e.message); res.status(500).json({ error: "Something went wrong. Please try again." }); }
+});
+
+app.patch("/api/reminders/:id/done", seniorAuth, validateUUID("id"), async (req, res) => {
+  try {
+    await supabase.from("reminders").update({ completed: true }).eq("id", req.params.id);
+    res.json({ success: true });
+  } catch (e) { console.error(`[Error] ${req.method} ${req.path}:`, e.message); res.status(500).json({ error: "Something went wrong. Please try again." }); }
+});
+
+app.delete("/api/reminders/:id", seniorAuth, validateUUID("id"), async (req, res) => {
+  try {
+    await supabase.from("reminders").delete().eq("id", req.params.id);
+    res.json({ success: true });
+  } catch (e) { console.error(`[Error] ${req.method} ${req.path}:`, e.message); res.status(500).json({ error: "Something went wrong. Please try again." }); }
 });
 
 // ── Google Calendar OAuth ─────────────────────────────────────────────────────

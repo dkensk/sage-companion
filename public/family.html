@@ -547,6 +547,7 @@
     <button class="mob-tab" onclick="showTab('doctorq',null,this)" data-tab="doctorq">Dr. Qs</button>
     <button class="mob-tab" onclick="showTab('visits',null,this)" data-tab="visits">Transcripts</button>
     <button class="mob-tab" onclick="showTab('calendar',null,this)" data-tab="calendar">Calendar</button>
+    <button class="mob-tab" onclick="showTab('reminders',null,this)" data-tab="reminders">Reminders</button>
   </div>
 
   <div class="layout">
@@ -568,6 +569,7 @@
         <div class="nav-item" onclick="showTab('doctorq', this)"><span class="nav-icon">❓</span> Doctor Questions</div>
         <div class="nav-item" onclick="showTab('visits', this)"><span class="nav-icon">🩺</span> Transcripts</div>
         <div class="nav-item" onclick="showTab('calendar', this)"><span class="nav-icon">📅</span> Calendar</div>
+        <div class="nav-item" onclick="showTab('reminders', this)"><span class="nav-icon">📝</span> Reminders</div>
       </nav>
       <div class="sidebar-footer">
         <button class="logout-btn" onclick="logout()">🚪 Sign out</button>
@@ -688,6 +690,11 @@
       <div id="tab-calendar" class="page">
         <div class="page-header"><div><div class="page-title">Calendar</div><div class="page-sub">Upcoming appointments</div></div></div>
         <div class="table-card"><div class="table-toolbar"><div class="table-title">📅 Appointments</div></div><div class="table-body" id="calendarList"><div class="table-empty">Loading...</div></div></div>
+      </div>
+
+      <div id="tab-reminders" class="page">
+        <div class="page-header"><div><div class="page-title">Reminders</div><div class="page-sub">To-do items and reminders</div></div></div>
+        <div class="table-card"><div class="table-toolbar"><div class="table-title">📝 Reminders</div></div><div class="table-body" id="remindersList"><div class="table-empty">Loading...</div></div></div>
       </div>
 
     </div>
@@ -935,8 +942,45 @@
       if (name === "convo")    loadConversations().catch(function(e) { console.error("[Family] convo tab error:", e); });
       if (name === "doctorq")  loadDoctorQuestions().catch(function(e) { console.error("[Family] doctorq tab error:", e); });
       if (name === "visits")   loadVisits().catch(function(e) { console.error("[Family] visits tab error:", e); });
-      if (name === "calendar") loadCalendar().catch(function(e) { console.error("[Family] calendar tab error:", e); });
+      if (name === "calendar")  loadCalendar().catch(function(e) { console.error("[Family] calendar tab error:", e); });
+      if (name === "reminders") loadReminders().catch(function(e) { console.error("[Family] reminders tab error:", e); });
     } catch (e) { console.error("[Family] showTab error:", e); }
+  }
+
+  async function loadReminders() {
+    try {
+      var res = await familyApiCall("/api/reminders/" + seniorId);
+      if (!res.ok) throw new Error("Failed");
+      var reminders = await res.json();
+      var el = document.getElementById("remindersList");
+      var active = reminders.filter(function(r) { return !r.completed; });
+      var done   = reminders.filter(function(r) { return r.completed; }).slice(0, 10);
+
+      if (active.length === 0 && done.length === 0) {
+        el.innerHTML = '<div class="table-empty">No reminders yet</div>';
+        return;
+      }
+
+      var html = active.map(function(r) {
+        var dateStr = r.due_date ? new Date(r.due_date + "T12:00:00").toLocaleDateString("en-US", { month: "short", day: "numeric" }) : "";
+        var timeStr = r.due_time ? " " + r.due_time : "";
+        return '<div class="table-row">' +
+          '<div style="flex:1;"><strong>' + escHtml(r.text) + '</strong>' +
+          (dateStr ? '<div style="color:#64748B;font-size:13px;margin-top:2px;">' + dateStr + timeStr + '</div>' : '') +
+          '</div>' +
+          '<div style="font-size:12px;color:#64748B;">' + (r.source === "voice" ? "🎙️ Voice" : "✏️ Manual") + '</div>' +
+          '</div>';
+      }).join("");
+
+      if (done.length > 0) {
+        html += '<div style="padding:12px 16px;border-top:2px solid #E2E8F0;font-size:13px;font-weight:700;color:#64748B;">Completed</div>';
+        html += done.map(function(r) {
+          return '<div class="table-row" style="opacity:0.5;"><div style="flex:1;text-decoration:line-through;">' + escHtml(r.text) + '</div><div style="font-size:12px;color:#16A34A;">✓</div></div>';
+        }).join("");
+      }
+
+      el.innerHTML = html;
+    } catch (e) { console.error("[Family] loadReminders error:", e); }
   }
 
   async function loadCalendar() {
