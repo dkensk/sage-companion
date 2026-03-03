@@ -1239,13 +1239,33 @@
     // This avoids the iOS mic permission prompt on every page load.
 
     if (!sessionStorage.getItem("sageGreeted")) {
-      setTimeout(() => {
-        addBubble("assistant", `Good ${part}, ${seniorName}! I'm Sage, your AI companion. You can tap the button to talk, or type below. How are you feeling today?`);
-        // Only speak the greeting if audio is already unlocked (user tapped
-        // something before the 700ms delay). Otherwise the utterance gets
-        // silently queued by iOS and replays later when user taps Talk.
-        if (audioUnlocked) {
-          speak(`Good ${part}, ${seniorName}. I'm Sage. How are you feeling today?`);
+      setTimeout(async () => {
+        // Send a greeting message to the AI so it can mention today's appointments/reminders
+        try {
+          const greetRes = await apiCall("/api/chat", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              seniorId: SENIOR_ID,
+              message: `Good ${part}! I just opened the app.`,
+              clientTime: new Date().toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit" }),
+              timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
+              location: userLocation,
+              includeTTS: true,
+            })
+          });
+          const greetData = await greetRes.json();
+          if (greetData.reply) {
+            addBubble("assistant", greetData.reply);
+            if (greetData.audioBase64 && audioUnlocked) {
+              playBase64Audio(greetData.audioBase64);
+            } else if (audioUnlocked) {
+              speak(greetData.reply);
+            }
+          }
+        } catch {
+          // Fallback if API fails
+          addBubble("assistant", `Good ${part}, ${seniorName}! I'm Sage, your AI companion. How are you feeling today?`);
         }
         sessionStorage.setItem("sageGreeted", "1");
       }, 700);

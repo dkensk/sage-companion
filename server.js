@@ -714,11 +714,15 @@ app.post("/api/chat", seniorAuth, suspendCheck, rateLimit(60000, 20), async (req
 
     // ── Parallel DB queries (saves ~300-500ms vs sequential) ──────────────────
     const todayStart = new Date(); todayStart.setHours(0, 0, 0, 0);
-    const [seniorRes, medsRes, logsRes, historyRes] = await Promise.all([
+    const todayStr = todayStart.toISOString().slice(0, 10); // "YYYY-MM-DD"
+    const tomorrowStr = new Date(todayStart.getTime() + 86400000).toISOString().slice(0, 10);
+    const [seniorRes, medsRes, logsRes, historyRes, todayApptsRes, remindersRes] = await Promise.all([
       supabase.from("seniors").select("*").eq("id", effectiveSeniorId).single(),
       supabase.from("medications").select("*").eq("senior_id", effectiveSeniorId).eq("active", true),
       supabase.from("med_log").select("medication_id").eq("senior_id", effectiveSeniorId).gte("taken_at", todayStart.toISOString()),
       supabase.from("conversations").select("role, content").eq("senior_id", effectiveSeniorId).order("timestamp", { ascending: false }).limit(20),
+      supabase.from("appointments").select("title, date, time, location, notes").eq("senior_id", effectiveSeniorId).gte("date", todayStr).lte("date", tomorrowStr).order("date").order("time"),
+      supabase.from("reminders").select("text, due_date, due_time").eq("senior_id", effectiveSeniorId).eq("completed", false).order("created_at"),
     ]);
     const senior = seniorRes.data;
     const seniorName = senior?.name || "Friend";
@@ -729,6 +733,32 @@ app.post("/api/chat", seniorAuth, suspendCheck, rateLimit(60000, 20), async (req
       `- ${m.name} ${m.dose || ""} at ${m.time || ""}${m.with_food ? " (with food)" : ""}: ${takenIds.has(m.id) ? "taken" : "not yet taken"}`
     ).join("\n");
     const recentHistory = (historyRes.data || []).reverse();
+
+    // Build today's schedule context
+    const todayAppts = todayApptsRes.data || [];
+    const activeReminders = remindersRes.data || [];
+    let scheduleSummary = "";
+    if (todayAppts.length > 0) {
+      const apptLines = todayAppts.map(a => {
+        let line = `- ${a.title}`;
+        if (a.date === todayStr) line += " (today)";
+        else line += " (tomorrow)";
+        if (a.time) line += ` at ${a.time}`;
+        if (a.location) line += ` at ${a.location}`;
+        if (a.notes) line += ` — ${a.notes}`;
+        return line;
+      });
+      scheduleSummary += "Today's and tomorrow's appointments:\n" + apptLines.join("\n");
+    }
+    if (activeReminders.length > 0) {
+      const remLines = activeReminders.slice(0, 10).map(r => {
+        let line = `- ${r.text}`;
+        if (r.due_date) line += ` (due ${r.due_date}${r.due_time ? " at " + r.due_time : ""})`;
+        return line;
+      });
+      if (scheduleSummary) scheduleSummary += "\n";
+      scheduleSummary += "Active reminders/to-do:\n" + remLines.join("\n");
+    }
 
     // Fetch weather if location provided and message seems weather-related
     let weatherInfo = null;
@@ -798,6 +828,8 @@ When ${seniorName} asks you to remind them of something, add something to their 
 
 Today's medication status:
 ${medSummary || "No medications scheduled today"}
+
+${scheduleSummary ? `TODAY'S SCHEDULE & REMINDERS:\n${scheduleSummary}\n\nIMPORTANT: If this is the first message of the conversation (no prior messages above), proactively mention any appointments happening today. For example: "Just a reminder, you have a dentist appointment at 2 PM today." Keep it natural and warm — don't read the whole list robotically, just highlight the most important or time-sensitive items. If there are active reminders, briefly mention them too.` : "No appointments or reminders scheduled for today."}
 
 LOCAL & LOCATION-AWARE HELP:
 ${location ? `${seniorName} lives in ${location}. When they ask about local places (pharmacies, doctors, restaurants, stores, hospitals, churches, libraries, etc.), give helpful answers using your knowledge of that area. Mention well-known chains or landmarks nearby when you can. If they ask about hours, give typical hours but remind them to call ahead to confirm.` : `Location is not available. If they ask about local places, suggest they tell you their city so you can help better.`}
