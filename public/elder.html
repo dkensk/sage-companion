@@ -1481,20 +1481,32 @@
   }
 
   // ── Voice ─────────────────────────────────────────────────────────────────────
+  // Two modes:
+  //   1. SpeechRecognition (Safari, desktop Chrome/Edge) — real-time transcription
+  //   2. MediaRecorder + Whisper (Chrome/Firefox on iOS, any browser without SR)
+  //      Records audio, sends to /api/transcribe for server-side transcription.
+
   let finalTranscript = "";
   let silenceTimer    = null;
-  const SILENCE_MS    = 1800; // auto-send after 1.8s of silence
+  const SILENCE_MS    = 1800;
+
+  // Detect environment
+  const isStandalone = window.matchMedia("(display-mode: standalone)").matches
+                    || window.navigator.standalone === true;
+  const hasSR = !!(window.SpeechRecognition || window.webkitSpeechRecognition);
+
+  // MediaRecorder fallback state
+  let mediaRecorder  = null;
+  let audioChunks    = [];
+  let recordingStream = null;
 
   function setupVoice() {
     const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
-    if (!SR) {
-      document.getElementById("talkBtn").querySelector("#talkBtnLabel").textContent = "TYPE BELOW TO CHAT";
-      return;
-    }
+    if (!SR) return; // will use MediaRecorder fallback
 
     recognition = new SR();
-    recognition.continuous    = true;   // keep listening until user taps again
-    recognition.interimResults = true;  // show words appearing in real-time
+    recognition.continuous    = true;
+    recognition.interimResults = true;
     recognition.lang          = "en-US";
     recognition.maxAlternatives = 1;
 
@@ -1508,11 +1520,9 @@
           interim += e.results[i][0].transcript;
         }
       }
-      // Show live transcript so user knows it's hearing them
       const display = (finalTranscript + interim).trim();
       document.getElementById("listenStatus").textContent = display || "Listening…";
 
-      // Auto-send after a natural pause
       if (finalTranscript.trim()) {
         silenceTimer = setTimeout(() => {
           const msg = finalTranscript.trim();
@@ -1525,115 +1535,193 @@
 
     recognition.onerror = (e) => {
       if (e.error === "not-allowed" || e.error === "permission-denied") {
-        // Try requesting mic permission directly — this triggers the Allow popup
-        // on iOS standalone PWAs where SpeechRecognition alone may not prompt.
-        requestMicAndRetry();
+        requestMicPermission();
         return;
-      } else if (e.error === "no-speech") {
-        // Just a pause — don't show error
+      } else if (e.error === "no-speech" || e.error === "aborted") {
         return;
-      } else if (e.error === "aborted") {
-        return; // user stopped intentionally
       } else {
         showToast("Couldn't hear anything — please try again.");
       }
       stopListening();
     };
 
-    // If recognition stops on its own (e.g. browser timeout), restart it
     recognition.onend = () => {
       if (isListening) {
-        try { recognition.start(); } catch(e) { /* already starting */ }
+        try { recognition.start(); } catch(e) {}
       }
     };
   }
 
-  // Detect if running as installed PWA (home-screen app)
-  const isStandalone = window.matchMedia("(display-mode: standalone)").matches
-                    || window.navigator.standalone === true;
-
-  function toggleVoice() {
-    unlockAudio(); // must run synchronously during the user gesture
-    if (isListening) {
-      // Manual stop — send whatever was captured
-      clearTimeout(silenceTimer);
-      const msg = finalTranscript.trim();
-      finalTranscript = "";
-      stopListening();
-      if (msg) sendMessage(msg);
-    } else {
-      startListening();
-    }
-  }
-
-  // Request mic permission via getUserMedia, then retry recognition.
-  // This is the fallback when SpeechRecognition fires "not-allowed" —
-  // getUserMedia shows the actual Allow/Deny popup on iOS standalone PWAs.
-  async function requestMicAndRetry() {
+  // ── Mic permission helper (browser-aware messages) ───────────────────────────
+  async function requestMicPermission() {
     stopListening();
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-      // Permission granted — stop the stream immediately (we just needed the grant)
       stream.getTracks().forEach(t => t.stop());
       sessionStorage.setItem("sageMicSession", "1");
       showToast("Microphone enabled! Tap Talk to try again.");
     } catch (err) {
-      // User denied or device has no mic
       if (err.name === "NotAllowedError" || err.name === "PermissionDeniedError") {
-        showToast("Sage needs your microphone to listen. You can type below instead, or check Settings > Safari > Microphone.");
+        // Browser-aware guidance
+        const isChromeIOS = /CriOS/.test(navigator.userAgent);
+        const isSafariIOS = /Safari/.test(navigator.userAgent) && /iPhone|iPad/.test(navigator.userAgent) && !isChromeIOS;
+        if (isChromeIOS) {
+          showToast("Microphone blocked. Open iPhone Settings > Chrome > Microphone and turn it on.");
+        } else if (isSafariIOS) {
+          showToast("Microphone blocked. Open iPhone Settings > Safari > Microphone and turn it on.");
+        } else {
+          showToast("Sage needs your microphone. Check your browser settings to allow microphone access.");
+        }
       } else {
         showToast("No microphone found — please type below to chat.");
       }
     }
   }
 
-  async function startListening() {
-    // Lazy-init: create SpeechRecognition on first tap instead of page load.
-    // This avoids iOS Safari prompting for mic permission on every page open.
-    if (!recognition) {
-      setupVoice();
-      if (!recognition) { showToast("Voice not supported — please type below."); return; }
+  function toggleVoice() {
+    unlockAudio();
+    if (isListening) {
+      clearTimeout(silenceTimer);
+      if (hasSR && recognition) {
+        // SpeechRecognition mode — send transcript
+        const msg = finalTranscript.trim();
+        finalTranscript = "";
+        stopListening();
+        if (msg) sendMessage(msg);
+      } else {
+        // MediaRecorder mode — stop recording and transcribe
+        stopListening();
+      }
+    } else {
+      startListening();
     }
+  }
 
-    // Request mic permission via getUserMedia BEFORE starting SpeechRecognition.
-    // This triggers the friendly Allow popup instead of a silent "not-allowed" error.
-    // IMPORTANT: On iOS standalone PWAs, mic permission resets every launch even
-    // though localStorage persists — so we ALWAYS request in standalone mode.
+  async function startListening() {
+    // Always request mic permission on first tap per session (or always in standalone)
     const needsMicRequest = isStandalone || !sessionStorage.getItem("sageMicSession");
     if (needsMicRequest) {
       try {
         const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-        stream.getTracks().forEach(t => t.stop()); // release immediately
+        stream.getTracks().forEach(t => t.stop());
         sessionStorage.setItem("sageMicSession", "1");
       } catch (err) {
         if (err.name === "NotAllowedError" || err.name === "PermissionDeniedError") {
-          showToast("Sage needs your microphone to listen. You can type below instead.");
+          const isChromeIOS = /CriOS/.test(navigator.userAgent);
+          if (isChromeIOS) {
+            showToast("Microphone blocked. Open iPhone Settings > Chrome > Microphone and turn it on.");
+          } else {
+            showToast("Sage needs your microphone to listen. You can type below instead.");
+          }
           return;
         }
-        // Other errors (no mic hardware) — let SR try anyway
       }
     }
 
-    // Stop Sage speaking before opening the mic
     stopCurrentAudio();
 
-    isListening     = true;
-    finalTranscript = "";
-
-    try { recognition.start(); } catch(e) { /* already running */ }
+    if (hasSR) {
+      // ── SpeechRecognition path ──
+      if (!recognition) {
+        setupVoice();
+        if (!recognition) { showToast("Voice not supported — please type below."); return; }
+      }
+      isListening     = true;
+      finalTranscript = "";
+      try { recognition.start(); } catch(e) {}
+    } else {
+      // ── MediaRecorder + Whisper fallback ──
+      try {
+        recordingStream = await navigator.mediaDevices.getUserMedia({ audio: true });
+        sessionStorage.setItem("sageMicSession", "1");
+      } catch (err) {
+        if (err.name === "NotAllowedError" || err.name === "PermissionDeniedError") {
+          const isChromeIOS = /CriOS/.test(navigator.userAgent);
+          if (isChromeIOS) {
+            showToast("Microphone blocked. Open iPhone Settings > Chrome > Microphone and turn it on.");
+          } else {
+            showToast("Sage needs your microphone to listen. You can type below instead.");
+          }
+          return;
+        }
+        showToast("No microphone found — please type below to chat.");
+        return;
+      }
+      audioChunks = [];
+      // Use the best format supported by this browser
+      const mimeType = MediaRecorder.isTypeSupported("audio/webm;codecs=opus") ? "audio/webm;codecs=opus"
+                     : MediaRecorder.isTypeSupported("audio/mp4") ? "audio/mp4" : "";
+      mediaRecorder = new MediaRecorder(recordingStream, mimeType ? { mimeType } : {});
+      mediaRecorder.ondataavailable = (e) => { if (e.data.size > 0) audioChunks.push(e.data); };
+      mediaRecorder.onstop = () => {
+        recordingStream.getTracks().forEach(t => t.stop());
+        recordingStream = null;
+        if (audioChunks.length > 0) transcribeRecording();
+      };
+      mediaRecorder.start(250); // collect chunks every 250ms
+      isListening = true;
+    }
 
     document.getElementById("talkBtn").classList.add("listening");
     document.getElementById("micIcon").textContent     = "🔴";
     document.getElementById("talkBtnLabel").textContent = "TAP TO SEND";
     const status = document.getElementById("listenStatus");
-    status.textContent  = "Listening…";
+    status.textContent  = hasSR ? "Listening…" : "Recording… tap when done";
     status.style.display = "block";
+  }
+
+  async function transcribeRecording() {
+    const status = document.getElementById("listenStatus");
+    status.textContent  = "Processing…";
+    status.style.display = "block";
+    document.getElementById("talkBtn").classList.remove("listening");
+    document.getElementById("micIcon").textContent     = "🎙️";
+    document.getElementById("talkBtnLabel").textContent = "TAP TO TALK";
+
+    try {
+      const mimeType = audioChunks[0]?.type || "audio/webm";
+      const blob = new Blob(audioChunks, { type: mimeType });
+      audioChunks = [];
+
+      if (blob.size < 1000) { // less than 1KB — probably empty
+        status.style.display = "none";
+        showToast("Didn't hear anything — try again or type below.");
+        return;
+      }
+
+      const form = new FormData();
+      const ext = mimeType.includes("mp4") ? "m4a" : "webm";
+      form.append("audio", blob, `recording.${ext}`);
+
+      const res = await apiCall("/api/transcribe", { method: "POST", body: form });
+      const data = await res.json();
+      status.style.display = "none";
+
+      if (data.text && data.text.trim()) {
+        sendMessage(data.text.trim());
+      } else {
+        showToast("Couldn't make out any words — please try again or type below.");
+      }
+    } catch (e) {
+      status.style.display = "none";
+      showToast("Couldn't process recording — please type below instead.");
+    }
   }
 
   function stopListening() {
     isListening = false;
     clearTimeout(silenceTimer);
-    if (recognition) try { recognition.stop(); } catch(e) {}
+    if (hasSR && recognition) {
+      try { recognition.stop(); } catch(e) {}
+    }
+    if (mediaRecorder && mediaRecorder.state !== "inactive") {
+      mediaRecorder.stop(); // triggers onstop → transcribeRecording
+      return; // don't reset UI yet — transcribeRecording will handle it
+    }
+    if (recordingStream) {
+      recordingStream.getTracks().forEach(t => t.stop());
+      recordingStream = null;
+    }
 
     document.getElementById("talkBtn").classList.remove("listening");
     document.getElementById("micIcon").textContent     = "🎙️";
@@ -2105,7 +2193,10 @@
   let qListening     = false;
   let qFinal         = "";
   let qSilenceTimer  = null;
-  const Q_SILENCE_MS = 2000; // slightly longer pause before saving — gives time to finish thought
+  let qMediaRecorder = null;
+  let qAudioChunks   = [];
+  let qRecStream     = null;
+  const Q_SILENCE_MS = 2000;
 
   function setupQuestionVoice() {
     const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
@@ -2131,7 +2222,6 @@
       status.textContent = display || "Listening…";
       status.style.color = display ? "var(--text)" : "var(--muted)";
 
-      // Auto-save after pause
       if (qFinal.trim()) {
         qSilenceTimer = setTimeout(() => {
           const q = qFinal.trim();
@@ -2144,7 +2234,7 @@
 
     qRecognition.onerror = (e) => {
       if (e.error === "not-allowed" || e.error === "permission-denied") {
-        requestMicAndRetry();
+        requestMicPermission();
         return;
       } else if (e.error === "no-speech" || e.error === "aborted") {
         return;
@@ -2161,43 +2251,82 @@
 
   function toggleQuestionVoice() {
     if (qListening) {
-      // Manual tap to stop — save what was captured
       clearTimeout(qSilenceTimer);
-      const q = qFinal.trim();
-      qFinal = "";
-      stopQuestionVoice();
-      if (q) confirmAndSaveQuestion(q);
+      if (hasSR && qRecognition) {
+        const q = qFinal.trim();
+        qFinal = "";
+        stopQuestionVoice();
+        if (q) confirmAndSaveQuestion(q);
+      } else {
+        stopQuestionVoice(); // MediaRecorder onstop will transcribe
+      }
     } else {
       startQuestionVoice();
     }
   }
 
-  function startQuestionVoice() {
-    // Lazy-init question voice on first use (same pattern as main voice)
-    if (!qRecognition) {
-      setupQuestionVoice();
-      if (!qRecognition) { showToast("Voice not supported — please type your question."); return; }
-    }
-
-    // Stop Sage speaking
+  async function startQuestionVoice() {
     stopCurrentAudio();
-
-    // Stop main chat listening if active
     if (isListening) stopListening();
 
-    qListening = true;
-    qFinal = "";
-    try { qRecognition.start(); } catch(e) {}
+    if (hasSR) {
+      if (!qRecognition) {
+        setupQuestionVoice();
+        if (!qRecognition) { showToast("Voice not supported — please type your question."); return; }
+      }
+      qListening = true;
+      qFinal = "";
+      try { qRecognition.start(); } catch(e) {}
+    } else {
+      // MediaRecorder fallback
+      try {
+        qRecStream = await navigator.mediaDevices.getUserMedia({ audio: true });
+        sessionStorage.setItem("sageMicSession", "1");
+      } catch (err) {
+        requestMicPermission();
+        return;
+      }
+      qAudioChunks = [];
+      const mimeType = MediaRecorder.isTypeSupported("audio/webm;codecs=opus") ? "audio/webm;codecs=opus"
+                     : MediaRecorder.isTypeSupported("audio/mp4") ? "audio/mp4" : "";
+      qMediaRecorder = new MediaRecorder(qRecStream, mimeType ? { mimeType } : {});
+      qMediaRecorder.ondataavailable = (e) => { if (e.data.size > 0) qAudioChunks.push(e.data); };
+      qMediaRecorder.onstop = async () => {
+        qRecStream.getTracks().forEach(t => t.stop());
+        qRecStream = null;
+        if (qAudioChunks.length > 0) {
+          const status = document.getElementById("qListenStatus");
+          status.textContent = "Processing…";
+          try {
+            const mt = qAudioChunks[0]?.type || "audio/webm";
+            const blob = new Blob(qAudioChunks, { type: mt });
+            qAudioChunks = [];
+            const form = new FormData();
+            form.append("audio", blob, `q.${mt.includes("mp4") ? "m4a" : "webm"}`);
+            const res = await apiCall("/api/transcribe", { method: "POST", body: form });
+            const data = await res.json();
+            status.style.display = "none";
+            if (data.text && data.text.trim()) confirmAndSaveQuestion(data.text.trim());
+            else showToast("Couldn't make out any words — try again or type below.");
+          } catch (e) {
+            status.style.display = "none";
+            showToast("Couldn't process recording — please type your question.");
+          }
+        }
+      };
+      qMediaRecorder.start(250);
+      qListening = true;
+    }
 
     const btn = document.getElementById("addQVoiceBtn");
     btn.style.background = "linear-gradient(145deg, var(--teal), #0D9488)";
     btn.style.boxShadow  = "0 4px 20px rgba(15,118,110,0.4)";
     btn.style.animation  = "listenPulse 1.5s ease-in-out infinite";
     document.getElementById("addQIcon").textContent  = "🔴";
-    document.getElementById("addQLabel").textContent = "LISTENING — TAP TO SAVE";
+    document.getElementById("addQLabel").textContent = hasSR ? "LISTENING — TAP TO SAVE" : "RECORDING — TAP WHEN DONE";
 
     const status = document.getElementById("qListenStatus");
-    status.textContent  = "Listening…";
+    status.textContent  = hasSR ? "Listening…" : "Recording…";
     status.style.display = "block";
     status.style.color   = "var(--muted)";
   }
@@ -2205,7 +2334,14 @@
   function stopQuestionVoice() {
     qListening = false;
     clearTimeout(qSilenceTimer);
-    if (qRecognition) try { qRecognition.stop(); } catch(e) {}
+    if (hasSR && qRecognition) try { qRecognition.stop(); } catch(e) {}
+    if (qMediaRecorder && qMediaRecorder.state !== "inactive") {
+      qMediaRecorder.stop();
+    }
+    if (qRecStream) {
+      qRecStream.getTracks().forEach(t => t.stop());
+      qRecStream = null;
+    }
 
     const btn = document.getElementById("addQVoiceBtn");
     btn.style.background = "linear-gradient(145deg, var(--navy), #2D4EAA)";

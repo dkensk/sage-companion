@@ -1091,6 +1091,61 @@ app.post("/api/tts", seniorAuth, rateLimit(60000, 30), async (req, res) => {
 });
 
 // ─────────────────────────────────────────────────────────────────────────────
+// SPEECH-TO-TEXT (Whisper) — fallback for browsers without SpeechRecognition
+// ─────────────────────────────────────────────────────────────────────────────
+
+app.post("/api/transcribe", rateLimit("default"), upload.single("audio"), seniorAuth, async (req, res) => {
+  try {
+    const apiKey = (process.env.OPENAI_API_KEY || "").trim();
+    if (!apiKey || apiKey.startsWith("YOUR_") || apiKey.length < 20) {
+      return res.status(503).json({ error: "Transcription not configured" });
+    }
+    if (!req.file) return res.status(400).json({ error: "No audio file" });
+
+    // Build multipart form for OpenAI Whisper API
+    const boundary = "----WhisperBoundary" + Date.now();
+    const ext = req.file.mimetype === "audio/webm" ? "webm" : req.file.mimetype === "audio/mp4" ? "m4a" : "wav";
+    const parts = [];
+    parts.push(`--${boundary}\r\nContent-Disposition: form-data; name="file"; filename="audio.${ext}"\r\nContent-Type: ${req.file.mimetype}\r\n\r\n`);
+    parts.push(req.file.buffer);
+    parts.push(`\r\n--${boundary}\r\nContent-Disposition: form-data; name="model"\r\n\r\ngpt-4o-mini-transcribe`);
+    parts.push(`\r\n--${boundary}\r\nContent-Disposition: form-data; name="language"\r\n\r\nen`);
+    parts.push(`\r\n--${boundary}--\r\n`);
+
+    const body = Buffer.concat(parts.map(p => typeof p === "string" ? Buffer.from(p) : p));
+
+    const https = require("https");
+    const whisperRes = await new Promise((resolve, reject) => {
+      const wreq = https.request({
+        hostname: "api.openai.com",
+        path: "/v1/audio/transcriptions",
+        method: "POST",
+        headers: {
+          "Authorization": `Bearer ${apiKey}`,
+          "Content-Type": `multipart/form-data; boundary=${boundary}`,
+          "Content-Length": body.length,
+        },
+      }, (wres) => {
+        let data = "";
+        wres.on("data", d => data += d);
+        wres.on("end", () => {
+          if (wres.statusCode === 200) resolve(JSON.parse(data));
+          else reject(new Error(`Whisper ${wres.statusCode}: ${data.slice(0, 200)}`));
+        });
+      });
+      wreq.on("error", reject);
+      wreq.write(body);
+      wreq.end();
+    });
+
+    res.json({ text: whisperRes.text || "" });
+  } catch (e) {
+    console.error("Transcribe error:", e.message);
+    res.status(502).json({ error: "Transcription failed" });
+  }
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
 // DOCTOR QUESTIONS
 // ─────────────────────────────────────────────────────────────────────────────
 
