@@ -19,6 +19,7 @@ CREATE TABLE IF NOT EXISTS seniors (
   subscription_plan   TEXT     DEFAULT 'none',
   trial_ends_at       TIMESTAMPTZ,
   timezone            TEXT,
+  location            TEXT,
   reset_token         TEXT,
   reset_expires       TIMESTAMPTZ,
   created_at          TIMESTAMPTZ DEFAULT NOW(),
@@ -239,6 +240,7 @@ ALTER TABLE medications ADD COLUMN IF NOT EXISTS med_times TEXT;
 ALTER TABLE medications ADD COLUMN IF NOT EXISTS frequency INTEGER DEFAULT 1;
 ALTER TABLE med_log ADD COLUMN IF NOT EXISTS dose_time TEXT;
 ALTER TABLE seniors ADD COLUMN IF NOT EXISTS timezone TEXT;
+ALTER TABLE seniors ADD COLUMN IF NOT EXISTS location TEXT;
 
 -- ── Row Level Security ──────────────────────────────────────────────────────
 -- Enable RLS on all tables (service_role key bypasses RLS, so your server

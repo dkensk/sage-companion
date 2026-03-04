@@ -775,10 +775,16 @@ app.post("/api/chat", seniorAuth, suspendCheck, rateLimit(60000, 20), async (req
     const seniorName = senior?.name || "Friend";
     const conditions = (senior?.conditions || []).join(", ");
 
-    // Persist user timezone for calendar sync, reminders, etc. (non-blocking)
+    // Persist user timezone and location for future sessions (non-blocking)
     if (timezone && senior && timezone !== senior.timezone) {
       supabase.from("seniors").update({ timezone }).eq("id", effectiveSeniorId).then(() => {});
     }
+    if (location && senior && location !== senior.location) {
+      supabase.from("seniors").update({ location }).eq("id", effectiveSeniorId).then(() => {});
+    }
+
+    // Fall back to stored location if client didn't send one (e.g. geolocation not yet resolved)
+    const effectiveLocation = location || senior?.location || null;
 
     const meds = medsRes.data;
     const takenIds = new Set((logsRes.data || []).map(l => l.medication_id));
@@ -822,11 +828,11 @@ app.post("/api/chat", seniorAuth, suspendCheck, rateLimit(60000, 20), async (req
     // Fetch weather if location provided and message seems weather-related
     let weatherInfo = null;
     const weatherKeywords = /weather|temperature|outside|warm|cold|rain|sunny|snow|hot|humid|chill|wind|rain|sunny|snow|degrees|forecast|jacket|coat|umbrella|dress.*(for|today|tomorrow)/i;
-    if (location && weatherKeywords.test(message)) {
+    if (effectiveLocation && weatherKeywords.test(message)) {
       try {
         weatherInfo = await new Promise((resolve) => {
           const https = require("https");
-          const city  = encodeURIComponent(location);
+          const city  = encodeURIComponent(effectiveLocation);
           https.get(`https://wttr.in/${city}?format=%C+%t+%h+%w`, (r) => {
             let data = "";
             r.on("data", d => data += d);
@@ -861,6 +867,11 @@ IMPORTANT — What you MUST NOT do:
 - Never provide medical advice, diagnoses, or treatment recommendations
 - Never comment on whether a medication dose is correct or safe
 - Never provide legal or financial advice
+
+YOUR CAPABILITIES — Be honest about what you can and cannot do:
+You CAN: have friendly conversations, add appointments and reminders, track medications, provide general knowledge from your training, give weather info (when provided), and offer encouragement.
+You CANNOT: make phone calls, send texts or emails, browse the internet, look up real-time business info (hours, phone numbers, addresses), book appointments, access maps, or take any action outside this chat. NEVER offer to do these things.
+Instead of saying "I can help you find that" or "Would you like me to call them," say something like "You might want to call your doctor's office directly" or "Your family member could help you look that up." Be helpful by suggesting what the USER can do, not by promising things YOU cannot do.
 
 When ${seniorName} asks about symptoms, medications, medical concerns, or anything health-related:
 1. Acknowledge their concern warmly
@@ -898,12 +909,12 @@ ${recentHistory.length === 0 ? `This is the FIRST message — ${seniorName} just
 ${recentHistory.length >= 2 ? `You've ALREADY given the daily check-in in your first message. Do NOT repeat the daily rundown or medication reminders. PRIORITY: Just answer ${seniorName}'s question or respond naturally to what they said. Keep it focused on what they asked.` : ""}
 
 LOCAL & LOCATION-AWARE HELP:
-${location ? `${seniorName} lives in ${location}. When they ask about local places (pharmacies, doctors, restaurants, stores, hospitals, churches, libraries, etc.), give helpful answers using your knowledge of that area. Mention well-known chains or landmarks nearby when you can. If they ask about hours, give typical hours but remind them to call ahead to confirm.` : `Location is not available. If they ask about local places, suggest they tell you their city so you can help better.`}
+${effectiveLocation ? `${seniorName} lives in ${effectiveLocation}. When they ask about local places (pharmacies, doctors, restaurants, stores, hospitals, churches, libraries, etc.), give helpful answers using your general knowledge of that area. Mention well-known chains or landmarks nearby when you can. Important: You are using general knowledge, NOT real-time data. Always say something like "I believe there's a Walgreens near you, but you might want to call ahead to check hours" rather than stating hours or addresses as facts.` : `Location is not available. If they ask about local places, ask them what city they live in so you can help better next time.`}
 When they ask about weather, give a simple friendly summary — for example "It's a nice warm day out there, around 75 degrees" rather than raw numbers.
 
 Current time: ${clientTime || new Date().toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit" })}
 Today: ${timezone ? new Date().toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric", timeZone: timezone }) : new Date().toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric" })}
-${location ? `User's location: ${location}` : ""}
+${effectiveLocation ? `User's location: ${effectiveLocation}` : ""}
 ${weatherInfo ? `Current weather: ${weatherInfo}` : ""}`;
 
     // Haiku is 10-20x faster than Opus — ideal for conversational voice responses
