@@ -745,7 +745,7 @@ app.post("/api/chat", seniorAuth, suspendCheck, rateLimit(60000, 20), async (req
         else line += " (tomorrow)";
         if (a.time) line += ` at ${a.time}`;
         if (a.location) line += ` at ${a.location}`;
-        if (a.notes) line += ` — ${a.notes}`;
+        if (a.notes) { const n = a.notes.length > 80 ? a.notes.substring(0, 77) + "…" : a.notes; line += ` — ${n}`; }
         return line;
       });
       scheduleSummary += "Today's and tomorrow's appointments:\n" + apptLines.join("\n");
@@ -1509,6 +1509,20 @@ app.post("/api/google/sync/:seniorId", anyAuth, validateUUID("seniorId"), async 
       timeMin: now.toISOString(), timeMax: future.toISOString(), maxResults: 100,
     });
 
+    // Strip HTML tags and clean up Google Calendar descriptions to just core info
+    function cleanDescription(desc) {
+      if (!desc) return "";
+      // Remove HTML tags
+      let text = desc.replace(/<[^>]+>/g, " ").replace(/&nbsp;/g, " ").replace(/&amp;/g, "&").replace(/&lt;/g, "<").replace(/&gt;/g, ">");
+      // Remove common Google Meet / Zoom / conferencing noise
+      text = text.replace(/(Join with Google Meet|https?:\/\/meet\.google\.com\S*|https?:\/\/\S*zoom\.us\S*|Meeting ID:.*|Passcode:.*|Phone:.*\+\d[\d\s-]*)/gi, "");
+      // Collapse whitespace and trim
+      text = text.replace(/\s+/g, " ").trim();
+      // Truncate to 120 chars max
+      if (text.length > 120) text = text.substring(0, 117) + "…";
+      return text;
+    }
+
     let pulled = 0;
     for (const ev of (gRes.data.items || [])) {
       if (!ev.summary) continue;
@@ -1516,11 +1530,12 @@ app.post("/api/google/sync/:seniorId", anyAuth, validateUUID("seniorId"), async 
       const startDate = new Date(startRaw);
       const dateStr   = startDate.toISOString().split("T")[0];
       const timeStr   = ev.start.dateTime ? startDate.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" }) : null;
+      const cleanNotes = cleanDescription(ev.description);
       const { data: existing } = await supabase.from("appointments").select("id").eq("google_event_id", ev.id).eq("senior_id", seniorId).single();
       if (existing) {
-        await supabase.from("appointments").update({ title: ev.summary, date: dateStr, time: timeStr, location: ev.location || "", notes: ev.description || "" }).eq("id", existing.id);
+        await supabase.from("appointments").update({ title: ev.summary, date: dateStr, time: timeStr, location: ev.location || "", notes: cleanNotes }).eq("id", existing.id);
       } else {
-        await supabase.from("appointments").insert({ senior_id: seniorId, title: ev.summary, date: dateStr, time: timeStr, location: ev.location || "", notes: ev.description || "", source: "google", google_event_id: ev.id });
+        await supabase.from("appointments").insert({ senior_id: seniorId, title: ev.summary, date: dateStr, time: timeStr, location: ev.location || "", notes: cleanNotes, source: "google", google_event_id: ev.id });
         pulled++;
       }
     }
