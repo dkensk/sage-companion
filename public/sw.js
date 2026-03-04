@@ -1,7 +1,7 @@
 // ── Sage Companion Service Worker ────────────────────────────────────────────
 // Handles: offline caching + push notification display
 
-const CACHE_NAME = "sage-v58";
+const CACHE_NAME = "sage-v59";
 const CACHE_URLS = [
   "/",
   "/elder",
@@ -36,8 +36,8 @@ self.addEventListener("fetch", (event) => {
   const { request } = event;
   const url = new URL(request.url);
 
-  // Skip non-GET and API requests — always go to network
-  if (request.method !== "GET" || url.pathname.startsWith("/api/")) return;
+  // Skip non-GET, API requests, and admin pages — always go to network
+  if (request.method !== "GET" || url.pathname.startsWith("/api/") || url.pathname.startsWith("/admin") || url.pathname.startsWith("/family") || url.pathname.startsWith("/settings")) return;
 
   event.respondWith(
     fetch(request)

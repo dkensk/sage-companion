@@ -1840,6 +1840,35 @@ app.post("/api/admin/users/:id/suspend", adminAuth, async (req, res) => {
   } catch (e) { console.error(`[Error] ${req.method} ${req.path}:`, e.message); res.status(500).json({ error: "Something went wrong. Please try again." }); }
 });
 
+// ── Delete user (admin) ──────────────────────────────────────────────────────
+app.delete("/api/admin/users/:id", adminAuth, async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    // Verify user exists
+    const { data: senior } = await supabase.from("seniors").select("id, name").eq("id", id).single();
+    if (!senior) return res.status(404).json({ error: "User not found" });
+
+    // Delete all related data in order (foreign key dependencies)
+    const tables = [
+      "conversations", "med_log", "medications", "doctor_questions",
+      "doctor_visits", "appointments", "reminders", "activity", "alerts",
+    ];
+    for (const table of tables) {
+      await supabase.from(table).delete().eq("senior_id", id);
+    }
+
+    // Finally delete the senior record
+    await supabase.from("seniors").delete().eq("id", id);
+
+    console.log(`[Admin] Deleted user ${senior.name} (${id}) and all related data`);
+    res.json({ success: true });
+  } catch (e) {
+    console.error("[Admin] Delete user error:", e.message);
+    res.status(500).json({ error: "Failed to delete user: " + e.message });
+  }
+});
+
 // ─────────────────────────────────────────────────────────────────────────────
 // AUTH ENDPOINTS
 // ─────────────────────────────────────────────────────────────────────────────
