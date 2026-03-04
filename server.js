@@ -888,10 +888,16 @@ When ${seniorName} asks you to remind them of something, add something to their 
 Today's medication status:
 ${medSummary || "No medications scheduled today"}
 
-MEDICATION CHECK-IN INSTRUCTIONS:
-If any medications above show "NOT YET TAKEN" and the current time is past that dose time, you should proactively and gently remind ${seniorName} during the conversation. For example: "By the way, it looks like you haven't taken your Metformin yet today — have you had a chance to take it?" Keep it warm and caring, not nagging. Only mention it once per conversation, and only for medications that are overdue. If ALL medications are marked as taken, you can say something encouraging like "Looks like you're all caught up on your medications today — great job!"
+${scheduleSummary ? `TODAY'S SCHEDULE & REMINDERS:\n${scheduleSummary}` : "No appointments or reminders scheduled for today."}
 
-${scheduleSummary ? `TODAY'S SCHEDULE & REMINDERS:\n${scheduleSummary}\n\nIMPORTANT: If this is the first message of the conversation (no prior messages above), proactively mention any appointments happening today. For example: "Just a reminder, you have a dentist appointment at 2 PM today." Keep it natural and warm — don't read the whole list robotically, just highlight the most important or time-sensitive items. If there are active reminders, briefly mention them too.` : "No appointments or reminders scheduled for today."}
+DAILY CHECK-IN INSTRUCTIONS — READ CAREFULLY:
+The conversation so far has ${recentHistory.length} prior messages.
+
+${recentHistory.length === 0 ? `This is the FIRST message of the conversation. PRIORITY: Answer ${seniorName}'s question or greeting first. Do NOT give a daily rundown or medication reminders yet — just respond naturally to what they said. You will have a chance to share the daily summary on the next message.` : ""}
+
+${recentHistory.length === 2 ? `This is the SECOND exchange. After answering ${seniorName}'s current message, add a brief and warm daily check-in. Mention the most important or time-sensitive appointments today if any exist above. Then, if any medications show "NOT YET TAKEN" and the current time is past that dose time, gently ask if they've had a chance to take them. Keep the whole check-in to 2 to 3 sentences. For example: "By the way, just a heads up — you have a dentist appointment at 2 PM today. And it looks like you haven't taken your Metformin yet, have you had a chance to take it?" If everything is taken and there are no appointments, you can skip the check-in or just say something encouraging.` : ""}
+
+${recentHistory.length > 2 ? `Do NOT repeat the daily rundown or medication reminders — you've already covered it. Just respond naturally to what ${seniorName} says.` : ""}
 
 LOCAL & LOCATION-AWARE HELP:
 ${location ? `${seniorName} lives in ${location}. When they ask about local places (pharmacies, doctors, restaurants, stores, hospitals, churches, libraries, etc.), give helpful answers using your knowledge of that area. Mention well-known chains or landmarks nearby when you can. If they ask about hours, give typical hours but remind them to call ahead to confirm.` : `Location is not available. If they ask about local places, suggest they tell you their city so you can help better.`}
