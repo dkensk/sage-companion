@@ -630,7 +630,12 @@
     const btn = document.getElementById("googleBtn");
     btn.innerHTML = btn.innerHTML.replace("🗓️", '<span class="spinner" style="border-top-color:var(--navy)"></span>');
     try {
-      const res  = await apiCall(`/api/google/sync/${SENIOR_ID}`, { method: "POST" });
+      const tz = Intl.DateTimeFormat().resolvedOptions().timeZone || "America/New_York";
+      const res  = await apiCall(`/api/google/sync/${SENIOR_ID}`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ timezone: tz })
+      });
       const data = await res.json();
       if (data.success) {
         showToast(`Synced! ${data.pulled} new from Google, ${data.pushed} sent to Google`);

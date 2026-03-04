@@ -774,6 +774,12 @@ app.post("/api/chat", seniorAuth, suspendCheck, rateLimit(60000, 20), async (req
     const senior = seniorRes.data;
     const seniorName = senior?.name || "Friend";
     const conditions = (senior?.conditions || []).join(", ");
+
+    // Persist user timezone for calendar sync, reminders, etc. (non-blocking)
+    if (timezone && senior && timezone !== senior.timezone) {
+      supabase.from("seniors").update({ timezone }).eq("id", effectiveSeniorId).then(() => {});
+    }
+
     const meds = medsRes.data;
     const takenIds = new Set((logsRes.data || []).map(l => l.medication_id));
     const medSummary = (meds || []).map(m => {
@@ -1442,7 +1448,8 @@ app.get("/api/calendar/:seniorId/feed.ics", validateUUID("seniorId"), async (req
     if (!isValidSenior && !isValidFamily && !isValidFeed) {
       return res.status(401).json({ error: "Authentication required — pass token as query param or header" });
     }
-    const { data: senior } = await supabase.from("seniors").select("name").eq("id", seniorId).single();
+    const { data: senior } = await supabase.from("seniors").select("name, timezone").eq("id", seniorId).single();
+    const feedTz = senior?.timezone || "America/New_York";
     const { data: appts }  = await supabase.from("appointments").select("*").eq("senior_id", seniorId);
 
     // Parse time string like "2:00 PM", "14:00", "3:30 pm" into { hours, minutes }
@@ -1498,7 +1505,7 @@ app.get("/api/calendar/:seniorId/feed.ics", validateUUID("seniorId"), async (req
       "CALSCALE:GREGORIAN",
       "METHOD:PUBLISH",
       `X-WR-CALNAME:Sage Companion — ${senior?.name || "Calendar"}`,
-      "X-WR-TIMEZONE:America/Chicago",
+      `X-WR-TIMEZONE:${feedTz}`,
       "REFRESH-INTERVAL;VALUE=DURATION:PT1H",
       ...lines,
       "END:VCALENDAR"
@@ -1604,8 +1611,14 @@ app.get("/api/google/status/:seniorId", anyAuth, validateUUID("seniorId"), async
 app.post("/api/google/sync/:seniorId", anyAuth, validateUUID("seniorId"), async (req, res) => {
   try {
     const { seniorId } = req.params;
+    const userTz = req.body?.timezone || "America/New_York";
     const { data: senior } = await supabase.from("seniors").select("*").eq("id", seniorId).single();
     if (!senior?.google_tokens) return res.status(401).json({ error: "Google not connected" });
+
+    // Save timezone for future use (reminders, display, etc.)
+    if (userTz && userTz !== senior.timezone) {
+      await supabase.from("seniors").update({ timezone: userTz }).eq("id", seniorId);
+    }
 
     const client = getGoogleClient();
     client.setCredentials(senior.google_tokens);
@@ -1618,29 +1631,42 @@ app.post("/api/google/sync/:seniorId", anyAuth, validateUUID("seniorId"), async 
     const gRes = await cal.events.list({
       calendarId: "primary", singleEvents: true, orderBy: "startTime",
       timeMin: now.toISOString(), timeMax: future.toISOString(), maxResults: 100,
+      timeZone: userTz,
     });
 
     // Strip HTML tags and clean up Google Calendar descriptions to just core info
     function cleanDescription(desc) {
       if (!desc) return "";
-      // Remove HTML tags
       let text = desc.replace(/<[^>]+>/g, " ").replace(/&nbsp;/g, " ").replace(/&amp;/g, "&").replace(/&lt;/g, "<").replace(/&gt;/g, ">");
-      // Remove common Google Meet / Zoom / conferencing noise
       text = text.replace(/(Join with Google Meet|https?:\/\/meet\.google\.com\S*|https?:\/\/\S*zoom\.us\S*|Meeting ID:.*|Passcode:.*|Phone:.*\+\d[\d\s-]*)/gi, "");
-      // Collapse whitespace and trim
       text = text.replace(/\s+/g, " ").trim();
-      // Truncate to 120 chars max
       if (text.length > 120) text = text.substring(0, 117) + "…";
       return text;
+    }
+
+    // Format event time in the user's timezone
+    function formatEventTime(dateTimeStr, tz) {
+      try {
+        const d = new Date(dateTimeStr);
+        return d.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit", hour12: true, timeZone: tz });
+      } catch { return new Date(dateTimeStr).toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" }); }
+    }
+
+    // Format event date in the user's timezone
+    function formatEventDate(dateTimeStr, tz) {
+      try {
+        const d = new Date(dateTimeStr);
+        return d.toLocaleDateString("en-CA", { timeZone: tz }); // "YYYY-MM-DD" format
+      } catch { return new Date(dateTimeStr).toISOString().split("T")[0]; }
     }
 
     let pulled = 0;
     for (const ev of (gRes.data.items || [])) {
       if (!ev.summary) continue;
       const startRaw  = ev.start.dateTime || ev.start.date;
-      const startDate = new Date(startRaw);
-      const dateStr   = startDate.toISOString().split("T")[0];
-      const timeStr   = ev.start.dateTime ? startDate.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" }) : null;
+      // For timed events, format in user's timezone; for all-day events, use the date as-is
+      const dateStr   = ev.start.dateTime ? formatEventDate(startRaw, userTz) : startRaw;
+      const timeStr   = ev.start.dateTime ? formatEventTime(startRaw, userTz) : null;
       const cleanNotes = cleanDescription(ev.description);
       const { data: existing } = await supabase.from("appointments").select("id").eq("google_event_id", ev.id).eq("senior_id", seniorId).single();
       if (existing) {
@@ -1655,15 +1681,24 @@ app.post("/api/google/sync/:seniorId", anyAuth, validateUUID("seniorId"), async 
     const { data: local } = await supabase.from("appointments").select("*").eq("senior_id", seniorId).is("google_event_id", null);
     for (const appt of (local || [])) {
       try {
-        const startDT = new Date(appt.date + (appt.time ? " " + appt.time : "T09:00:00"));
-        const endDT   = new Date(startDT.getTime() + 60 * 60 * 1000);
-        const event = {
-          summary: appt.title, location: appt.location || "", description: appt.notes || "",
-          start: appt.time ? { dateTime: startDT.toISOString() } : { date: appt.date },
-          end:   appt.time ? { dateTime: endDT.toISOString()   } : { date: appt.date },
-        };
-        const created = await cal.events.insert({ calendarId: "primary", resource: event });
-        await supabase.from("appointments").update({ google_event_id: created.data.id }).eq("id", appt.id);
+        // Build start/end with user's timezone for proper Google Calendar placement
+        if (appt.time) {
+          const event = {
+            summary: appt.title, location: appt.location || "", description: appt.notes || "",
+            start: { dateTime: parseLocalDateTime(appt.date, appt.time, userTz), timeZone: userTz },
+            end:   { dateTime: parseLocalDateTime(appt.date, appt.time, userTz, 60), timeZone: userTz },
+          };
+          const created = await cal.events.insert({ calendarId: "primary", resource: event });
+          await supabase.from("appointments").update({ google_event_id: created.data.id }).eq("id", appt.id);
+        } else {
+          const event = {
+            summary: appt.title, location: appt.location || "", description: appt.notes || "",
+            start: { date: appt.date },
+            end:   { date: appt.date },
+          };
+          const created = await cal.events.insert({ calendarId: "primary", resource: event });
+          await supabase.from("appointments").update({ google_event_id: created.data.id }).eq("id", appt.id);
+        }
         pushed++;
       } catch (e) { /* skip individual failures */ }
     }
@@ -1680,6 +1715,32 @@ app.post("/api/google/sync/:seniorId", anyAuth, validateUUID("seniorId"), async 
     res.status(500).json({ error: "Something went wrong. Please try again." });
   }
 });
+
+// Helper: parse "2026-03-04" + "2:00 PM" + timezone into ISO string
+function parseLocalDateTime(dateStr, timeStr, tz, addMinutes) {
+  try {
+    // Parse the 12h time
+    const match = timeStr.match(/^(\d{1,2}):(\d{2})\s*(AM|PM)$/i);
+    if (!match) return new Date(dateStr + "T09:00:00").toISOString();
+    let h = parseInt(match[1]), m = parseInt(match[2]);
+    const ampm = match[3].toUpperCase();
+    if (ampm === "PM" && h < 12) h += 12;
+    if (ampm === "AM" && h === 12) h = 0;
+    // Build an ISO-ish string and use the timezone
+    const dt = new Date(`${dateStr}T${String(h).padStart(2,"0")}:${String(m).padStart(2,"0")}:00`);
+    // Adjust: get the offset between UTC and the target timezone
+    const utcStr = dt.toLocaleString("en-US", { timeZone: "UTC" });
+    const tzStr  = dt.toLocaleString("en-US", { timeZone: tz });
+    const offset = new Date(utcStr).getTime() - new Date(tzStr).getTime();
+    const adjusted = new Date(dt.getTime() + offset);
+    if (addMinutes) adjusted.setMinutes(adjusted.getMinutes() + addMinutes);
+    return adjusted.toISOString();
+  } catch {
+    const d = new Date(dateStr + "T09:00:00");
+    if (addMinutes) d.setMinutes(d.getMinutes() + addMinutes);
+    return d.toISOString();
+  }
+}
 
 // ─────────────────────────────────────────────────────────────────────────────
 // ONBOARDING — Create senior profile
