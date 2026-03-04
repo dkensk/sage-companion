@@ -818,12 +818,22 @@
       </label>
       <input type="file" id="medScanInput" accept="image/*" capture="environment"
         style="display:none;" onchange="handleMedScan(this)" />
+      <button onclick="showAddMedForm()" id="addMedManualBtn" style="
+        display:flex; align-items:center; justify-content:center; gap:10px;
+        width:100%; background:var(--bg); border:2px solid var(--border);
+        border-radius:16px; padding:16px; font-size:17px; font-weight:700;
+        color:var(--navy); cursor:pointer; margin-top:10px;
+        -webkit-tap-highlight-color:transparent;">
+        <span style="font-size:22px;">+</span>
+        <span>Add Medication Manually</span>
+      </button>
     </div>
 
-    <!-- Scan result / confirmation panel -->
+    <!-- Add / Edit medication form (shared panel) -->
+    <input type="hidden" id="medEditId" value="" />
     <div id="medScanResult" style="display:none; margin-top:14px; background:#F0FDF4;
       border:1.5px solid #BBF7D0; border-radius:16px; padding:18px;">
-      <div style="font-size:17px; font-weight:700; color:var(--teal); margin-bottom:14px;">
+      <div id="medFormTitle" style="font-size:17px; font-weight:700; color:var(--teal); margin-bottom:14px;">
         ✓ Medication found — confirm details:
       </div>
       <div style="display:flex; flex-direction:column; gap:10px; margin-bottom:16px;">
@@ -852,9 +862,15 @@
           </div>
         </div>
         <div id="scanDirections" style="font-size:15px;color:var(--muted);font-style:italic;line-height:1.5;padding:2px 0;"></div>
+        <div style="display:flex;align-items:center;gap:10px;padding-top:4px;">
+          <label style="display:flex;align-items:center;gap:8px;font-size:16px;color:var(--text);cursor:pointer;">
+            <input type="checkbox" id="scanWithFood" style="width:20px;height:20px;accent-color:var(--teal);cursor:pointer;" />
+            Take with food
+          </label>
+        </div>
       </div>
       <div style="display:flex;gap:10px;">
-        <button onclick="saveScanResult()" style="
+        <button onclick="saveMedForm()" id="medFormSaveBtn" style="
           flex:1; background:var(--green); color:white; border:none; border-radius:12px;
           padding:15px; font-size:18px; font-weight:700; cursor:pointer;">
           Save to My Medications
@@ -1297,12 +1313,22 @@
             ).join("") + `</div>`;
         }
 
+        const medData = { id: m._id, name: m.name, dose: m.dose || "", times: doses.map(d => d.time), frequency: doses.length, withFood: !!m.withFood };
+        const medB64 = btoa(JSON.stringify(medData));
+        const safeName = (m.name || "").replace(/'/g, "\\'").replace(/"/g, "&quot;");
+
         return `<div class="med-item" style="flex-direction:column;align-items:stretch;gap:8px;">
           <div style="display:flex;justify-content:space-between;align-items:center;">
-            <div>
+            <div style="flex:1;">
               <div class="med-name">${m.name}</div>
               <div class="med-detail">${m.dose ? m.dose + " · " : ""}${timeStr}${freqLabel}${m.withFood ? " · with food" : ""}</div>
             </div>
+            <div style="display:flex;gap:6px;align-items:center;flex-shrink:0;">
+              <button onclick="editMed(JSON.parse(atob('${medB64}')))" style="background:none;border:none;font-size:18px;cursor:pointer;padding:6px;opacity:0.5;" title="Edit">✏️</button>
+              <button onclick="deleteMed('${m._id}','${safeName}')" style="background:none;border:none;font-size:18px;cursor:pointer;padding:6px;opacity:0.5;" title="Remove">🗑️</button>
+            </div>
+          </div>
+          <div style="display:flex;justify-content:space-between;align-items:center;">
             ${doses.length === 1 ? doseButtons : ""}
           </div>
           ${doses.length > 1 ? doseButtons : ""}
@@ -2467,9 +2493,13 @@
         return;
       }
 
-      // Populate confirmation form
+      // Populate confirmation form (reset edit mode — this is a new scan)
+      document.getElementById("medEditId").value = "";
+      document.getElementById("medFormTitle").textContent = "✓ Medication found — confirm details:";
+      document.getElementById("medFormSaveBtn").textContent = "Save to My Medications";
       document.getElementById("scanName").value = data.name || "";
       document.getElementById("scanDose").value = data.dose || "";
+      document.getElementById("scanWithFood").checked = !!(data.withFood);
 
       // Handle frequency and times from scan
       const freq = data.frequency || 1;
@@ -2514,44 +2544,106 @@
     container.innerHTML = html;
   }
 
-  async function saveScanResult() {
+  // ── Show manual add form ────────────────────────────────────────────────────
+  function showAddMedForm() {
+    cancelScan(); // reset form
+    document.getElementById("medEditId").value = "";
+    document.getElementById("medFormTitle").textContent = "Add a new medication:";
+    document.getElementById("medFormSaveBtn").textContent = "Save to My Medications";
+    document.getElementById("medScanResult").style.display = "block";
+    document.getElementById("medScanResult").scrollIntoView({ behavior: "smooth" });
+    document.getElementById("scanName").focus();
+  }
+
+  // ── Edit existing medication ───────────────────────────────────────────────
+  function editMed(med) {
+    cancelScan(); // reset form first
+    document.getElementById("medEditId").value = med.id;
+    document.getElementById("medFormTitle").textContent = "Edit medication:";
+    document.getElementById("medFormSaveBtn").textContent = "Save Changes";
+    document.getElementById("scanName").value = med.name || "";
+    document.getElementById("scanDose").value = med.dose || "";
+    document.getElementById("scanFrequency").value = String(med.frequency || med.times?.length || 1);
+    document.getElementById("scanWithFood").checked = !!med.withFood;
+    updateScanTimeInputs(med.times || []);
+    document.getElementById("medScanResult").style.display = "block";
+    document.getElementById("medScanResult").scrollIntoView({ behavior: "smooth" });
+  }
+
+  // ── Delete medication ──────────────────────────────────────────────────────
+  async function deleteMed(id, name) {
+    if (!confirm(`Remove ${name} from your medications?`)) return;
+    try {
+      const res = await apiCall(`/api/medications/${id}`, { method: "DELETE" });
+      if (!res.ok) { showToast("Couldn't remove — try again."); return; }
+      showToast(`${name} removed from your medications.`);
+      await loadMedications();
+    } catch (e) {
+      showToast("Connection error — try again.");
+      console.error("[Meds] Delete error:", e);
+    }
+  }
+
+  // ── Unified save (add new or edit existing) ────────────────────────────────
+  async function saveMedForm() {
+    const editId   = document.getElementById("medEditId").value;
     const name     = document.getElementById("scanName").value.trim();
     const dose     = document.getElementById("scanDose").value.trim();
     const frequency = parseInt(document.getElementById("scanFrequency").value) || 1;
     const timeInputs = document.querySelectorAll("#scanTimesInputs .scan-time-input");
     const medTimes = Array.from(timeInputs).map(i => i.value.trim()).filter(t => t);
+    const withFood = document.getElementById("scanWithFood").checked;
     if (!name) { showToast("Please enter the medication name."); return; }
     if (medTimes.length === 0) medTimes.push("8:00 AM");
 
     try {
-      const res = await apiCall("/api/medications", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ seniorId: SENIOR_ID, name, dose, time: medTimes[0], medTimes, frequency, withFood: false }),
-      });
+      let res;
+      if (editId) {
+        // Update existing
+        res = await apiCall(`/api/medications/${editId}`, {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ name, dose, medTimes, frequency, withFood }),
+        });
+      } else {
+        // Add new
+        res = await apiCall("/api/medications", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ seniorId: SENIOR_ID, name, dose, time: medTimes[0], medTimes, frequency, withFood }),
+        });
+      }
       if (!res.ok) {
         const err = await res.json().catch(() => ({}));
-        console.error("[MedScan] Save failed:", res.status, err);
+        console.error("[Meds] Save failed:", res.status, err);
         showToast("Couldn't save medication — try again.");
         return;
       }
       cancelScan();
-      showToast("✓ " + name + " added to your medications!");
-      speak(`Great, I've added ${name} to your medication list.`);
+      if (editId) {
+        showToast("✓ " + name + " updated!");
+      } else {
+        showToast("✓ " + name + " added to your medications!");
+        speak(`Great, I've added ${name} to your medication list.`);
+      }
       await loadMedications();
     } catch (e) {
-      console.error("[MedScan] Save error:", e);
+      console.error("[Meds] Save error:", e);
       showToast("Connection error — try again.");
     }
   }
 
   function cancelScan() {
     document.getElementById("medScanResult").style.display = "none";
+    document.getElementById("medEditId").value = "";
     document.getElementById("scanName").value = "";
     document.getElementById("scanDose").value = "";
     document.getElementById("scanFrequency").value = "1";
+    document.getElementById("scanWithFood").checked = false;
     updateScanTimeInputs();
     document.getElementById("scanDirections").textContent = "";
+    document.getElementById("medFormTitle").textContent = "✓ Medication found — confirm details:";
+    document.getElementById("medFormSaveBtn").textContent = "Save to My Medications";
   }
 
   // ── Utilities ─────────────────────────────────────────────────────────────────

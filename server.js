@@ -720,6 +720,22 @@ app.post("/api/medications", anyAuth, async (req, res) => {
   } catch (e) { console.error(`[Error] ${req.method} ${req.path}:`, e.message); res.status(500).json({ error: "Something went wrong. Please try again." }); }
 });
 
+app.put("/api/medications/:id", seniorAuth, validateUUID("id"), async (req, res) => {
+  try {
+    const { name, dose, medTimes, frequency, withFood } = req.body;
+    if (!name || !name.trim()) return res.status(400).json({ error: "Medication name is required" });
+    let timesArr = Array.isArray(medTimes) ? medTimes.filter(t => t && t.trim()) : [];
+    if (timesArr.length === 0) timesArr = ["8:00 AM"];
+    const freq = frequency || timesArr.length || 1;
+    await supabase.from("medications").update({
+      name: name.trim(), dose: dose || null, time: timesArr[0],
+      med_times: JSON.stringify(timesArr), frequency: freq,
+      with_food: !!withFood,
+    }).eq("id", req.params.id);
+    res.json({ success: true });
+  } catch (e) { console.error(`[Error] ${req.method} ${req.path}:`, e.message); res.status(500).json({ error: "Something went wrong. Please try again." }); }
+});
+
 app.delete("/api/medications/:id", seniorAuth, validateUUID("id"), async (req, res) => {
   try {
     await supabase.from("medications").update({ active: false }).eq("id", req.params.id);

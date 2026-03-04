@@ -976,6 +976,7 @@
           showMessage('nameMessage', 'Name updated successfully!', 'success');
           document.getElementById('changeNameForm').reset();
           document.getElementById('accountName').textContent = newName;
+          localStorage.setItem("sageSeniorName", newName);
           setTimeout(() => clearMessage('nameMessage'), 5000);
         } else {
           showMessage('nameMessage', data.error || 'Error updating name', 'error');
