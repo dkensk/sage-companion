@@ -1445,11 +1445,20 @@
           addAskDoctorBtn(data.suggestedQuestion);
         }
       } else {
-        addBubble("assistant", data.error || "Sorry, I couldn't understand that.");
+        // Show user-friendly error messages
+        const errMsg = data.error || "Sorry, I couldn't understand that.";
+        addBubble("assistant", errMsg);
+        speak(data.errorType === "overloaded"
+          ? "I'm a little busy right now, but I'll be right back. Please try again in a moment."
+          : data.errorType === "rate_limit"
+          ? "I need just a moment to catch up. Please try again shortly."
+          : errMsg);
       }
     } catch (err) {
       document.getElementById("thinking")?.remove();
-      addBubble("assistant", "I'm having trouble connecting right now. Please try again.");
+      const offlineMsg = "I'm having trouble connecting right now. Please check your internet and try again in a moment.";
+      addBubble("assistant", offlineMsg);
+      speak(offlineMsg);
     }
   }
 

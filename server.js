@@ -1045,7 +1045,14 @@ ${weatherInfo ? `Current weather: ${weatherInfo}` : ""}`;
     res.json(result);
   } catch (e) {
     console.error("Chat error:", e.message, e.stack);
-    res.status(500).json({ error: "Something went wrong. Please try again." });
+    const status = e?.status || e?.statusCode || 0;
+    if (status === 529 || (e.message && e.message.includes("overloaded"))) {
+      res.status(503).json({ error: "Sage is taking a quick breather — the AI service is busy right now. Please try again in a moment!", errorType: "overloaded" });
+    } else if (status === 429) {
+      res.status(429).json({ error: "Sage needs a moment to catch up. Please wait a few seconds and try again.", errorType: "rate_limit" });
+    } else {
+      res.status(500).json({ error: "Something went wrong. Please try again." });
+    }
   }
 });
 
