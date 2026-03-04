@@ -2285,6 +2285,19 @@ app.post("/api/account/change-password", seniorAuth, rateLimit("login"), async (
   } catch (e) { console.error(`[Error] ${req.method} ${req.path}:`, e.message); res.status(500).json({ error: "Something went wrong. Please try again." }); }
 });
 
+// Update name
+app.post("/api/account/change-name", seniorAuth, rateLimit("default"), async (req, res) => {
+  try {
+    const { newName } = req.body;
+    if (!newName || !newName.trim()) return res.status(400).json({ error: "Name is required" });
+    const trimmed = newName.trim();
+    if (trimmed.length > 100) return res.status(400).json({ error: "Name must be under 100 characters" });
+
+    await supabase.from("seniors").update({ name: trimmed }).eq("id", req.seniorId);
+    res.json({ success: true });
+  } catch (e) { console.error(`[Error] ${req.method} ${req.path}:`, e.message); res.status(500).json({ error: "Something went wrong. Please try again." }); }
+});
+
 // Update email
 app.post("/api/account/change-email", seniorAuth, rateLimit("login"), async (req, res) => {
   try {

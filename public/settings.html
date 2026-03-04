@@ -637,6 +637,19 @@
       </form>
     </div>
 
+    <!-- Change Name -->
+    <div class="card">
+      <div class="card-title">Change Name</div>
+      <div id="nameMessage" class="message"></div>
+      <form id="changeNameForm" onsubmit="changeName(event)">
+        <div class="form-group">
+          <label class="form-label">New Name</label>
+          <input type="text" class="form-input" id="newName" required placeholder="Enter your new name">
+        </div>
+        <button type="submit" class="form-button">Update Name</button>
+      </form>
+    </div>
+
     <!-- Change Email -->
     <div class="card">
       <div class="card-title">Change Email</div>
@@ -939,6 +952,43 @@
       }
     }
 
+    // Change Name
+    async function changeName(e) {
+      e.preventDefault();
+      clearMessage('nameMessage');
+
+      const newName = document.getElementById('newName').value.trim();
+      if (!newName) return showMessage('nameMessage', 'Please enter a name', 'error');
+
+      try {
+        const form = document.getElementById('changeNameForm');
+        form.classList.add('loading');
+
+        const res = await apiCall('/api/account/change-name', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ newName })
+        });
+
+        const data = await res.json();
+
+        if (res.ok) {
+          showMessage('nameMessage', 'Name updated successfully!', 'success');
+          document.getElementById('changeNameForm').reset();
+          document.getElementById('accountName').textContent = newName;
+          setTimeout(() => clearMessage('nameMessage'), 5000);
+        } else {
+          showMessage('nameMessage', data.error || 'Error updating name', 'error');
+        }
+
+        form.classList.remove('loading');
+      } catch (error) {
+        console.error('Error changing name:', error);
+        showMessage('nameMessage', 'Error updating name', 'error');
+        document.getElementById('changeNameForm').classList.remove('loading');
+      }
+    }
+
     // Change Email
     async function changeEmail(e) {
       e.preventDefault();
@@ -962,9 +1012,10 @@
         if (res.ok) {
           showMessage('emailMessage', 'Email updated successfully!', 'success');
           document.getElementById('changeEmailForm').reset();
+          document.getElementById('accountEmail').textContent = newEmail;
           setTimeout(() => clearMessage('emailMessage'), 5000);
         } else {
-          showMessage('emailMessage', data.message || 'Error updating email', 'error');
+          showMessage('emailMessage', data.error || data.message || 'Error updating email', 'error');
         }
 
         form.classList.remove('loading');
