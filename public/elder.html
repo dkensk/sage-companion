@@ -975,14 +975,14 @@
   // Cookie helpers — cookies persist across Safari ↔ Dock app contexts
   function setCookie(name, value, days) {
     const d = new Date(); d.setTime(d.getTime() + days * 86400000);
-    document.cookie = `${name}=${encodeURIComponent(value)};expires=${d.toUTCString()};path=/;SameSite=Strict;Secure`;
+    document.cookie = `${name}=${encodeURIComponent(value)};expires=${d.toUTCString()};path=/;SameSite=Lax`;
   }
   function getCookie(name) {
     const v = document.cookie.match('(^|;)\\s*' + name + '\\s*=\\s*([^;]+)');
     return v ? decodeURIComponent(v.pop()) : null;
   }
   function deleteCookie(name) {
-    document.cookie = `${name}=;expires=Thu, 01 Jan 1970 00:00:00 GMT;path=/;SameSite=Strict;Secure`;
+    document.cookie = `${name}=;expires=Thu, 01 Jan 1970 00:00:00 GMT;path=/;SameSite=Lax`;
   }
 
   function getSeniorToken() {
@@ -1155,12 +1155,22 @@
   }
 
   // ── State ─────────────────────────────────────────────────────────────────────
-  // Sync from cookies → localStorage on load (handles Safari Dock app context)
-  if (!localStorage.getItem("sageSeniorToken") && getCookie("sageSeniorToken")) {
-    localStorage.setItem("sageSeniorToken", getCookie("sageSeniorToken"));
-    if (getCookie("sageSeniorId")) localStorage.setItem("sageSeniorId", getCookie("sageSeniorId"));
-    if (getCookie("sageSeniorName")) localStorage.setItem("sageSeniorName", getCookie("sageSeniorName"));
-  }
+  // Bidirectional sync: cookies ↔ localStorage (Safari standalone PWA can lose one or the other)
+  (function syncAuth() {
+    const lsToken = localStorage.getItem("sageSeniorToken");
+    const ckToken = getCookie("sageSeniorToken");
+    if (lsToken && !ckToken) {
+      // localStorage has it but cookie lost — restore cookie
+      setCookie("sageSeniorToken", lsToken, 90);
+      if (localStorage.getItem("sageSeniorId")) setCookie("sageSeniorId", localStorage.getItem("sageSeniorId"), 90);
+      if (localStorage.getItem("sageSeniorName")) setCookie("sageSeniorName", localStorage.getItem("sageSeniorName"), 90);
+    } else if (!lsToken && ckToken) {
+      // Cookie has it but localStorage lost — restore localStorage
+      localStorage.setItem("sageSeniorToken", ckToken);
+      if (getCookie("sageSeniorId")) localStorage.setItem("sageSeniorId", getCookie("sageSeniorId"));
+      if (getCookie("sageSeniorName")) localStorage.setItem("sageSeniorName", getCookie("sageSeniorName"));
+    }
+  })();
 
   const SENIOR_ID = localStorage.getItem("sageSeniorId") || "00000000-0000-0000-0000-000000000001";
   let seniorName = localStorage.getItem("sageSeniorName") || "Margaret";
@@ -1196,23 +1206,29 @@
     }
   });
 
-  // Get location once and cache it
+  // Get location once and cache it. Returns a promise that resolves when done (or times out).
+  let locationReady = Promise.resolve();
   function initLocation() {
     if (userLocation) return;
     if (!navigator.geolocation) return;
-    navigator.geolocation.getCurrentPosition(async (pos) => {
-      try {
-        const { latitude: lat, longitude: lon } = pos.coords;
-        localStorage.setItem("sageCoords", JSON.stringify({ lat, lon }));
-        const r = await fetch(`https://nominatim.openstreetmap.org/reverse?lat=${lat}&lon=${lon}&format=json`);
-        const d = await r.json();
-        const city  = d.address?.city || d.address?.town || d.address?.village || "";
-        const state = d.address?.state || "";
-        const zip   = d.address?.postcode || "";
-        userLocation = city ? `${city}, ${state}${zip ? " " + zip : ""}`.trim().replace(/,$/, "") : null;
-        if (userLocation) localStorage.setItem("sageLocation", userLocation);
-      } catch { /* non-critical */ }
-    }, () => { /* permission denied — that's fine */ });
+    locationReady = new Promise((resolve) => {
+      const timeout = setTimeout(resolve, 3000); // don't block init for more than 3s
+      navigator.geolocation.getCurrentPosition(async (pos) => {
+        try {
+          const { latitude: lat, longitude: lon } = pos.coords;
+          localStorage.setItem("sageCoords", JSON.stringify({ lat, lon }));
+          const r = await fetch(`https://nominatim.openstreetmap.org/reverse?lat=${lat}&lon=${lon}&format=json`);
+          const d = await r.json();
+          const city  = d.address?.city || d.address?.town || d.address?.village || "";
+          const state = d.address?.state || "";
+          const zip   = d.address?.postcode || "";
+          userLocation = city ? `${city}, ${state}${zip ? " " + zip : ""}`.trim().replace(/,$/, "") : null;
+          if (userLocation) localStorage.setItem("sageLocation", userLocation);
+        } catch { /* non-critical */ }
+        clearTimeout(timeout);
+        resolve();
+      }, () => { clearTimeout(timeout); resolve(); }, { timeout: 2500, maximumAge: 300000 });
+    });
   }
   initLocation();
 
@@ -1260,6 +1276,8 @@
 
     if (!sessionStorage.getItem("sageGreeted")) {
       setTimeout(async () => {
+        // Wait for location to resolve before greeting (max 3s timeout built in)
+        await locationReady;
         // Send a greeting message to the AI so it can mention today's appointments/reminders
         try {
           const greetRes = await apiCall("/api/chat", {
@@ -1680,26 +1698,6 @@
   }
 
   async function startListening() {
-    // Always request mic permission on first tap per session (or always in standalone)
-    const needsMicRequest = isStandalone || !sessionStorage.getItem("sageMicSession");
-    if (needsMicRequest) {
-      try {
-        const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-        stream.getTracks().forEach(t => t.stop());
-        sessionStorage.setItem("sageMicSession", "1");
-      } catch (err) {
-        if (err.name === "NotAllowedError" || err.name === "PermissionDeniedError") {
-          const isChromeIOS = /CriOS/.test(navigator.userAgent);
-          if (isChromeIOS) {
-            showToast("Microphone blocked. Open iPhone Settings > Chrome > Microphone and turn it on.");
-          } else {
-            showToast("Sage needs your microphone to listen. You can type below instead.");
-          }
-          return;
-        }
-      }
-    }
-
     stopCurrentAudio();
 
     if (hasSR) {
@@ -1719,14 +1717,19 @@
       } catch (err) {
         if (err.name === "NotAllowedError" || err.name === "PermissionDeniedError") {
           const isChromeIOS = /CriOS/.test(navigator.userAgent);
+          const isSafariIOS = /Safari/.test(navigator.userAgent) && /iPhone|iPad/.test(navigator.userAgent) && !isChromeIOS;
           if (isChromeIOS) {
             showToast("Microphone blocked. Open iPhone Settings > Chrome > Microphone and turn it on.");
+          } else if (isSafariIOS && isStandalone) {
+            showToast("Microphone blocked. Open this page in Safari first, allow the microphone, then return here.");
+          } else if (isSafariIOS) {
+            showToast("Microphone blocked. Tap the 'aA' button in the address bar, then Website Settings, and allow Microphone.");
           } else {
-            showToast("Sage needs your microphone to listen. You can type below instead.");
+            showToast("Sage needs your microphone to listen. Check your browser settings to allow mic access.");
           }
           return;
         }
-        showToast("No microphone found — please type below to chat.");
+        showToast("Couldn't access microphone — please type below to chat.");
         return;
       }
       audioChunks = [];

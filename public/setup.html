@@ -385,6 +385,9 @@
 </div>
 
 <script>
+  // Cookie helper for Safari standalone PWA persistence
+  function _setCk(n,v){document.cookie=`${n}=${encodeURIComponent(v)};path=/;max-age=${90*86400};SameSite=Lax`;}
+
   // ── Step navigation ────────────────────────────────────────────────────────
   function goStep(id) {
     if (id === 3) {
@@ -460,11 +463,15 @@
 
       createdSenior = data.senior;
 
-      // Save to localStorage (including auth token)
+      // Save to localStorage + cookies (Safari standalone PWA needs both)
       localStorage.setItem("sageSeniorId",   data.senior._id);
       localStorage.setItem("sageSeniorName", data.senior.name);
       localStorage.setItem("sageFamilyCode", data.senior.familyCode);
       if (data.token) localStorage.setItem("sageSeniorToken", data.token);
+      // Cookies for Safari Add-to-Home-Screen persistence
+      if (data.token) _setCk("sageSeniorToken", data.token);
+      _setCk("sageSeniorId", data.senior._id);
+      _setCk("sageSeniorName", data.senior.name);
 
       // Show success state
       document.getElementById("step3Logo").textContent  = "✅";
@@ -536,6 +543,7 @@
       localStorage.setItem("sageSeniorName", data.senior.name);
       localStorage.setItem("sageFamilyCode", data.senior.familyCode);
       localStorage.setItem("sageSeniorToken", data.token);
+      _setCk("sageSeniorToken", data.token); _setCk("sageSeniorId", data.senior._id); _setCk("sageSeniorName", data.senior.name);
       window.location.href = "/elder";
     } catch {
       document.getElementById("returningError").textContent = "Invalid email or password. Please try again.";
@@ -564,6 +572,7 @@
       localStorage.setItem("sageSeniorName", data.senior.name);
       localStorage.setItem("sageFamilyCode", data.senior.familyCode);
       localStorage.setItem("sageSeniorToken", data.token);
+      _setCk("sageSeniorToken", data.token); _setCk("sageSeniorId", data.senior._id); _setCk("sageSeniorName", data.senior.name);
       window.location.href = "/elder";
     } catch {
       document.getElementById("returningError").textContent = "Invalid family code. Please check and try again.";
