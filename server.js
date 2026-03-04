@@ -910,12 +910,26 @@ ${weatherInfo ? `Current weather: ${weatherInfo}` : ""}`;
 
     // Haiku is 10-20x faster than Opus — ideal for conversational voice responses
     const chatModel = process.env.CHAT_MODEL || "claude-haiku-4-5-20251001";
-    const response = await anthropic.messages.create({
-      model: chatModel,
-      max_tokens: 300,
-      system: systemPrompt,
-      messages,
-    });
+    let response;
+    for (let attempt = 0; attempt < 3; attempt++) {
+      try {
+        response = await anthropic.messages.create({
+          model: chatModel,
+          max_tokens: 300,
+          system: systemPrompt,
+          messages,
+        });
+        break; // success
+      } catch (apiErr) {
+        const status = apiErr?.status || apiErr?.statusCode || 0;
+        console.error(`[Chat] API attempt ${attempt + 1} failed: ${status} ${apiErr.message}`);
+        if (status === 529 && attempt < 2) {
+          await new Promise(r => setTimeout(r, 1500 * (attempt + 1))); // wait 1.5s, 3s
+          continue;
+        }
+        throw apiErr; // re-throw on final attempt or non-retryable error
+      }
+    }
 
     const rawReply = response.content[0].text;
 
