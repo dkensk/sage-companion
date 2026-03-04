@@ -239,3 +239,66 @@ ALTER TABLE medications ADD COLUMN IF NOT EXISTS med_times TEXT;
 ALTER TABLE medications ADD COLUMN IF NOT EXISTS frequency INTEGER DEFAULT 1;
 ALTER TABLE med_log ADD COLUMN IF NOT EXISTS dose_time TEXT;
 ALTER TABLE seniors ADD COLUMN IF NOT EXISTS timezone TEXT;
+
+-- ── Row Level Security ──────────────────────────────────────────────────────
+-- Enable RLS on all tables (service_role key bypasses RLS, so your server
+-- continues to work. This blocks direct access via the anon/public key.)
+ALTER TABLE seniors ENABLE ROW LEVEL SECURITY;
+ALTER TABLE medications ENABLE ROW LEVEL SECURITY;
+ALTER TABLE med_log ENABLE ROW LEVEL SECURITY;
+ALTER TABLE activity ENABLE ROW LEVEL SECURITY;
+ALTER TABLE alerts ENABLE ROW LEVEL SECURITY;
+ALTER TABLE conversations ENABLE ROW LEVEL SECURITY;
+ALTER TABLE doctor_questions ENABLE ROW LEVEL SECURITY;
+ALTER TABLE doctor_visits ENABLE ROW LEVEL SECURITY;
+ALTER TABLE appointments ENABLE ROW LEVEL SECURITY;
+ALTER TABLE usage_metrics ENABLE ROW LEVEL SECURITY;
+ALTER TABLE push_subscriptions ENABLE ROW LEVEL SECURITY;
+ALTER TABLE reminder_snooze ENABLE ROW LEVEL SECURITY;
+ALTER TABLE reminders ENABLE ROW LEVEL SECURITY;
+
+-- Restrictive policies: deny all access via anon/authenticated keys
+DROP POLICY IF EXISTS "Service role full access" ON seniors;
+DROP POLICY IF EXISTS "Service role full access" ON medications;
+DROP POLICY IF EXISTS "Service role full access" ON med_log;
+DROP POLICY IF EXISTS "Service role full access" ON activity;
+DROP POLICY IF EXISTS "Service role full access" ON alerts;
+DROP POLICY IF EXISTS "Service role full access" ON conversations;
+DROP POLICY IF EXISTS "Service role full access" ON doctor_questions;
+DROP POLICY IF EXISTS "Service role full access" ON doctor_visits;
+DROP POLICY IF EXISTS "Service role full access" ON appointments;
+DROP POLICY IF EXISTS "Service role full access" ON usage_metrics;
+DROP POLICY IF EXISTS "Service role full access" ON push_subscriptions;
+DROP POLICY IF EXISTS "Service role full access" ON reminder_snooze;
+DROP POLICY IF EXISTS "Service role full access" ON reminders;
+
+DROP POLICY IF EXISTS "Deny public access" ON seniors;
+DROP POLICY IF EXISTS "Deny public access" ON medications;
+DROP POLICY IF EXISTS "Deny public access" ON med_log;
+DROP POLICY IF EXISTS "Deny public access" ON activity;
+DROP POLICY IF EXISTS "Deny public access" ON alerts;
+DROP POLICY IF EXISTS "Deny public access" ON conversations;
+DROP POLICY IF EXISTS "Deny public access" ON doctor_questions;
+DROP POLICY IF EXISTS "Deny public access" ON doctor_visits;
+DROP POLICY IF EXISTS "Deny public access" ON appointments;
+DROP POLICY IF EXISTS "Deny public access" ON usage_metrics;
+DROP POLICY IF EXISTS "Deny public access" ON push_subscriptions;
+DROP POLICY IF EXISTS "Deny public access" ON reminder_snooze;
+DROP POLICY IF EXISTS "Deny public access" ON reminders;
+
+CREATE POLICY "Deny public access" ON seniors FOR ALL USING (false);
+CREATE POLICY "Deny public access" ON medications FOR ALL USING (false);
+CREATE POLICY "Deny public access" ON med_log FOR ALL USING (false);
+CREATE POLICY "Deny public access" ON activity FOR ALL USING (false);
+CREATE POLICY "Deny public access" ON alerts FOR ALL USING (false);
+CREATE POLICY "Deny public access" ON conversations FOR ALL USING (false);
+CREATE POLICY "Deny public access" ON doctor_questions FOR ALL USING (false);
+CREATE POLICY "Deny public access" ON doctor_visits FOR ALL USING (false);
+CREATE POLICY "Deny public access" ON appointments FOR ALL USING (false);
+CREATE POLICY "Deny public access" ON usage_metrics FOR ALL USING (false);
+CREATE POLICY "Deny public access" ON push_subscriptions FOR ALL USING (false);
+CREATE POLICY "Deny public access" ON reminder_snooze FOR ALL USING (false);
+CREATE POLICY "Deny public access" ON reminders FOR ALL USING (false);
+
+-- Fix function search path warning
+ALTER FUNCTION increment_usage(UUID, DATE, TEXT) SET search_path = public;
