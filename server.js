@@ -766,7 +766,7 @@ app.post("/api/chat", seniorAuth, suspendCheck, rateLimit(60000, 20), async (req
     const [seniorRes, medsRes, logsRes, historyRes, todayApptsRes, remindersRes] = await Promise.all([
       supabase.from("seniors").select("*").eq("id", effectiveSeniorId).single(),
       supabase.from("medications").select("*").eq("senior_id", effectiveSeniorId).eq("active", true),
-      supabase.from("med_log").select("medication_id, dose_time").eq("senior_id", effectiveSeniorId).gte("taken_at", todayStart.toISOString()),
+      supabase.from("med_log").select("medication_id, dose_time").eq("senior_id", effectiveSeniorId).gte("taken_at", todayStart.toISOString()).then(r => r.error ? { data: [] } : r),
       supabase.from("conversations").select("role, content").eq("senior_id", effectiveSeniorId).order("timestamp", { ascending: false }).limit(20),
       supabase.from("appointments").select("title, date, time, location, notes").eq("senior_id", effectiveSeniorId).gte("date", todayStr).lte("date", tomorrowStr).order("date").order("time"),
       supabase.from("reminders").select("text, due_date, due_time").eq("senior_id", effectiveSeniorId).eq("completed", false).order("created_at"),
@@ -1030,7 +1030,7 @@ ${weatherInfo ? `Current weather: ${weatherInfo}` : ""}`;
     if (ttsAudioBase64) result.audioBase64 = ttsAudioBase64;
     res.json(result);
   } catch (e) {
-    console.error("Chat error:", e.message);
+    console.error("Chat error:", e.message, e.stack);
     res.status(500).json({ error: "Something went wrong. Please try again." });
   }
 });
