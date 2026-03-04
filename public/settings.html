@@ -977,6 +977,8 @@
           document.getElementById('changeNameForm').reset();
           document.getElementById('accountName').textContent = newName;
           localStorage.setItem("sageSeniorName", newName);
+          // Also update cookie so elder.html picks it up (Safari PWA uses cookies)
+          document.cookie = `sageSeniorName=${encodeURIComponent(newName)};path=/;max-age=${90*86400};SameSite=Lax`;
           setTimeout(() => clearMessage('nameMessage'), 5000);
         } else {
           showMessage('nameMessage', data.error || 'Error updating name', 'error');

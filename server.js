@@ -1799,8 +1799,9 @@ function parseLocalDateTime(dateStr, timeStr, tz, addMinutes) {
 // ─────────────────────────────────────────────────────────────────────────────
 
 function generateFamilyCode() {
+  // 6 random chars from 32-char alphabet = ~1 billion combos (was SAGE + 2 chars = 1,024)
   const chars = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
-  return "SAGE" + Array.from({ length: 2 }, () => chars[Math.floor(Math.random() * chars.length)]).join("");
+  return Array.from({ length: 6 }, () => chars[Math.floor(Math.random() * chars.length)]).join("");
 }
 
 app.post("/api/seniors", rateLimit("login"), async (req, res) => {

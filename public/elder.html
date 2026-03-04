@@ -1237,6 +1237,20 @@
     const part = hour < 12 ? "morning" : hour < 17 ? "afternoon" : "evening";
     document.getElementById("headerGreeting").textContent = `Good ${part}, ${seniorName}!`;
 
+    // Refresh name from server (catches settings changes, keeps greeting current)
+    try {
+      const acctRes = await apiCall("/api/account");
+      if (acctRes.ok) {
+        const acct = await acctRes.json();
+        if (acct.name && acct.name !== seniorName) {
+          seniorName = acct.name;
+          localStorage.setItem("sageSeniorName", acct.name);
+          setCookie("sageSeniorName", acct.name, 90);
+          document.getElementById("headerGreeting").textContent = `Good ${part}, ${seniorName}!`;
+        }
+      }
+    } catch { /* non-critical */ }
+
     await loadMedications();
     await loadDoctorQuestions();
     loadElderPhones();
