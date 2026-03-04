@@ -1575,6 +1575,7 @@
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
       // Permission granted — stop the stream immediately (we just needed the grant)
       stream.getTracks().forEach(t => t.stop());
+      sessionStorage.setItem("sageMicSession", "1");
       showToast("Microphone enabled! Tap Talk to try again.");
     } catch (err) {
       // User denied or device has no mic
@@ -1594,14 +1595,16 @@
       if (!recognition) { showToast("Voice not supported — please type below."); return; }
     }
 
-    // On first tap (or if permission was reset), request mic via getUserMedia
-    // BEFORE starting SpeechRecognition. This triggers the friendly Allow popup
-    // instead of a silent "not-allowed" error. The grant carries over to SR.
-    if (!localStorage.getItem("sageMicGranted")) {
+    // Request mic permission via getUserMedia BEFORE starting SpeechRecognition.
+    // This triggers the friendly Allow popup instead of a silent "not-allowed" error.
+    // IMPORTANT: On iOS standalone PWAs, mic permission resets every launch even
+    // though localStorage persists — so we ALWAYS request in standalone mode.
+    const needsMicRequest = isStandalone || !sessionStorage.getItem("sageMicSession");
+    if (needsMicRequest) {
       try {
         const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
         stream.getTracks().forEach(t => t.stop()); // release immediately
-        localStorage.setItem("sageMicGranted", "1");
+        sessionStorage.setItem("sageMicSession", "1");
       } catch (err) {
         if (err.name === "NotAllowedError" || err.name === "PermissionDeniedError") {
           showToast("Sage needs your microphone to listen. You can type below instead.");
@@ -2527,7 +2530,7 @@
     }
     // iPhone / iPad
     else if (isIOS()) {
-      msg.innerHTML = 'Tap <strong>Share</strong> (bottom bar) then <strong>"Add to Home Screen"</strong>';
+      msg.innerHTML = 'Tap <strong>Share</strong> (top of screen, next to the address bar) then <strong>"Add to Home Screen"</strong>';
       btn.textContent = 'Got It';
       btn.onclick = function() { dismissInstall(); };
     }

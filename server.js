@@ -1952,7 +1952,7 @@ app.post("/api/billing/checkout", seniorAuth, async (req, res) => {
       payment_method_types: ["card"],
       line_items: [{ price: priceId, quantity: 1 }],
       subscription_data: {
-        trial_period_days: 7,
+        trial_period_days: 14,
         metadata: { seniorId: req.seniorId, plan },
       },
       success_url: `${req.protocol}://${req.get("host")}/settings?billing=success`,

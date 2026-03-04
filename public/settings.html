@@ -820,24 +820,24 @@
             </div>
           `;
         } else {
-          // No subscription — show pricing with 7-day trial
+          // No subscription — show pricing with 14-day trial
           planBadge.textContent = 'No Plan';
           planBadge.className = 'plan-badge free';
           subscriptionContent.innerHTML = `
             <div class="subscription-status">
               <div class="plan-badge free">No Active Plan</div>
-              <p style="color: #64748B; font-size: 1.025rem;">Start your 7-day free trial today</p>
+              <p style="color: #64748B; font-size: 1.025rem;">Start your 14-day free trial today</p>
             </div>
             <div class="subscription-buttons">
               <button class="subscription-button" onclick="subscribe('monthly')">
                 <div class="subscription-button-price">$9.99</div>
                 <div class="subscription-button-period">Per Month</div>
-                <div class="subscription-button-saving">7-day free trial</div>
+                <div class="subscription-button-saving">14-day free trial</div>
               </button>
               <button class="subscription-button" onclick="subscribe('yearly')">
                 <div class="subscription-button-price">$89.99</div>
                 <div class="subscription-button-period">Per Year</div>
-                <div class="subscription-button-saving">Save 25% · 7-day free trial</div>
+                <div class="subscription-button-saving">Save 25% · 14-day free trial</div>
               </button>
             </div>
           `;
