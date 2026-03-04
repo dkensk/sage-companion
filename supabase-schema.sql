@@ -31,6 +31,8 @@ CREATE TABLE IF NOT EXISTS medications (
   name       TEXT    NOT NULL,
   dose       TEXT,
   time       TEXT,
+  med_times  TEXT,
+  frequency  INTEGER DEFAULT 1,
   with_food  BOOLEAN DEFAULT FALSE,
   active     BOOLEAN DEFAULT TRUE,
   created_at TIMESTAMPTZ DEFAULT NOW()
@@ -42,6 +44,7 @@ CREATE TABLE IF NOT EXISTS med_log (
   senior_id       UUID REFERENCES seniors(id) ON DELETE CASCADE,
   medication_id   UUID REFERENCES medications(id),
   medication_name TEXT,
+  dose_time       TEXT,
   taken_at        TIMESTAMPTZ DEFAULT NOW()
 );
 
@@ -228,3 +231,9 @@ CREATE TABLE IF NOT EXISTS reminders (
 );
 
 CREATE INDEX IF NOT EXISTS idx_reminders_senior ON reminders(senior_id, completed);
+
+-- ── Migration: Multi-dose medication support ────────────────────────────────
+-- Run these if upgrading an existing database:
+ALTER TABLE medications ADD COLUMN IF NOT EXISTS med_times TEXT;
+ALTER TABLE medications ADD COLUMN IF NOT EXISTS frequency INTEGER DEFAULT 1;
+ALTER TABLE med_log ADD COLUMN IF NOT EXISTS dose_time TEXT;

@@ -837,8 +837,18 @@
             <input id="scanDose" type="text" placeholder="e.g. 10mg" style="width:100%;border:2px solid var(--border);border-radius:10px;padding:12px 14px;font-size:17px;color:var(--text);outline:none;background:white;" />
           </div>
           <div style="flex:1;">
-            <label style="font-size:14px;font-weight:700;color:var(--muted);display:block;margin-bottom:4px;">TIME</label>
-            <input id="scanTime" type="text" placeholder="e.g. 8:00 AM" style="width:100%;border:2px solid var(--border);border-radius:10px;padding:12px 14px;font-size:17px;color:var(--text);outline:none;background:white;" />
+            <label style="font-size:14px;font-weight:700;color:var(--muted);display:block;margin-bottom:4px;">FREQUENCY</label>
+            <select id="scanFrequency" onchange="updateScanTimeInputs()" style="width:100%;border:2px solid var(--border);border-radius:10px;padding:12px 14px;font-size:17px;color:var(--text);outline:none;background:white;">
+              <option value="1">Once daily</option>
+              <option value="2">Twice daily</option>
+              <option value="3">Three times daily</option>
+            </select>
+          </div>
+        </div>
+        <div id="scanTimesContainer">
+          <label style="font-size:14px;font-weight:700;color:var(--muted);display:block;margin-bottom:4px;">TIME(S)</label>
+          <div id="scanTimesInputs" style="display:flex;flex-wrap:wrap;gap:8px;">
+            <input class="scan-time-input" type="text" placeholder="e.g. 8:00 AM" style="flex:1;min-width:120px;border:2px solid var(--border);border-radius:10px;padding:12px 14px;font-size:17px;color:var(--text);outline:none;background:white;" />
           </div>
         </div>
         <div id="scanDirections" style="font-size:15px;color:var(--muted);font-style:italic;line-height:1.5;padding:2px 0;"></div>
@@ -1265,29 +1275,52 @@
         return;
       }
 
-      el.innerHTML = meds.map(m => `
-        <div class="med-item">
-          <div>
-            <div class="med-name">${m.name}</div>
-            <div class="med-detail">${m.dose ? m.dose + " · " : ""}${m.time}${m.withFood ? " · with food" : ""}</div>
-          </div>
-          ${m.takenToday
+      el.innerHTML = meds.map(m => {
+        const doses = m.doses || [{ time: m.time || "8:00 AM", taken: m.takenToday }];
+        const allTaken = doses.every(d => d.taken);
+        const timeStr = doses.map(d => d.time).join(", ");
+        const freqLabel = doses.length > 1 ? ` (${doses.length}x daily)` : "";
+
+        // Per-dose buttons for multi-dose meds
+        let doseButtons = "";
+        if (allTaken) {
+          doseButtons = `<div class="taken-badge">✓ All Taken</div>`;
+        } else if (doses.length === 1) {
+          doseButtons = doses[0].taken
             ? `<div class="taken-badge">✓ Taken</div>`
-            : `<button class="take-btn" onclick="takeMed('${m._id}','${m.name}')">Take</button>`
-          }
-        </div>`).join("");
+            : `<button class="take-btn" onclick="takeMed('${m._id}','${m.name}','${doses[0].time}')">Take</button>`;
+        } else {
+          doseButtons = `<div style="display:flex;flex-wrap:wrap;gap:6px;align-items:center;">` +
+            doses.map(d => d.taken
+              ? `<span style="font-size:13px;color:var(--green);font-weight:700;padding:6px 10px;background:#F0FDF4;border-radius:8px;">✓ ${d.time}</span>`
+              : `<button class="take-btn" style="font-size:13px;padding:8px 12px;" onclick="takeMed('${m._id}','${m.name}','${d.time}')">${d.time}</button>`
+            ).join("") + `</div>`;
+        }
+
+        return `<div class="med-item" style="flex-direction:column;align-items:stretch;gap:8px;">
+          <div style="display:flex;justify-content:space-between;align-items:center;">
+            <div>
+              <div class="med-name">${m.name}</div>
+              <div class="med-detail">${m.dose ? m.dose + " · " : ""}${timeStr}${freqLabel}${m.withFood ? " · with food" : ""}</div>
+            </div>
+            ${doses.length === 1 ? doseButtons : ""}
+          </div>
+          ${doses.length > 1 ? doseButtons : ""}
+        </div>`;
+      }).join("");
     } catch (e) { console.error("[Meds] Load error:", e); }
   }
 
-  async function takeMed(id, name) {
+  async function takeMed(id, name, doseTime) {
     try {
       const res = await apiCall(`/api/medications/${id}/taken`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ confirmedBy: "button" })
+        body: JSON.stringify({ confirmedBy: "button", doseTime: doseTime || null })
       });
       if (!res.ok) { showToast("Couldn't record — try again."); return; }
-      showToast(`✓ ${name} marked as taken`);
+      const label = doseTime ? `${name} (${doseTime})` : name;
+      showToast(`✓ ${label} marked as taken`);
       speak(`Great job taking your ${name}!`);
       await loadMedications();
     } catch (e) {
@@ -2428,7 +2461,13 @@
       // Populate confirmation form
       document.getElementById("scanName").value = data.name || "";
       document.getElementById("scanDose").value = data.dose || "";
-      document.getElementById("scanTime").value = data.time || "";
+
+      // Handle frequency and times from scan
+      const freq = data.frequency || 1;
+      const times = Array.isArray(data.times) ? data.times : (data.time ? [data.time] : ["8:00 AM"]);
+      document.getElementById("scanFrequency").value = String(Math.min(freq, 3));
+      updateScanTimeInputs(times);
+
       const dir = document.getElementById("scanDirections");
       dir.textContent = data.directions ? "Directions: " + data.directions : "";
 
@@ -2453,17 +2492,33 @@
     btn.style.background  = "";
   }
 
+  function updateScanTimeInputs(prefill) {
+    const freq = parseInt(document.getElementById("scanFrequency").value) || 1;
+    const container = document.getElementById("scanTimesInputs");
+    const defaults = [["8:00 AM"], ["8:00 AM","8:00 PM"], ["8:00 AM","2:00 PM","9:00 PM"]];
+    const existing = prefill || defaults[freq - 1] || defaults[0];
+    let html = "";
+    for (let i = 0; i < freq; i++) {
+      const val = existing[i] || defaults[freq - 1][i] || "";
+      html += `<input class="scan-time-input" type="text" value="${val}" placeholder="e.g. 8:00 AM" style="flex:1;min-width:120px;border:2px solid var(--border);border-radius:10px;padding:12px 14px;font-size:17px;color:var(--text);outline:none;background:white;" />`;
+    }
+    container.innerHTML = html;
+  }
+
   async function saveScanResult() {
     const name     = document.getElementById("scanName").value.trim();
     const dose     = document.getElementById("scanDose").value.trim();
-    const time     = document.getElementById("scanTime").value.trim();
+    const frequency = parseInt(document.getElementById("scanFrequency").value) || 1;
+    const timeInputs = document.querySelectorAll("#scanTimesInputs .scan-time-input");
+    const medTimes = Array.from(timeInputs).map(i => i.value.trim()).filter(t => t);
     if (!name) { showToast("Please enter the medication name."); return; }
+    if (medTimes.length === 0) medTimes.push("8:00 AM");
 
     try {
       const res = await apiCall("/api/medications", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ seniorId: SENIOR_ID, name, dose, time: time || "8:00 AM", withFood: false }),
+        body: JSON.stringify({ seniorId: SENIOR_ID, name, dose, time: medTimes[0], medTimes, frequency, withFood: false }),
       });
       if (!res.ok) {
         const err = await res.json().catch(() => ({}));
@@ -2485,7 +2540,8 @@
     document.getElementById("medScanResult").style.display = "none";
     document.getElementById("scanName").value = "";
     document.getElementById("scanDose").value = "";
-    document.getElementById("scanTime").value = "";
+    document.getElementById("scanFrequency").value = "1";
+    updateScanTimeInputs();
     document.getElementById("scanDirections").textContent = "";
   }
 

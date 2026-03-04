@@ -272,25 +272,40 @@ async function checkMedicationReminders() {
       hour: "numeric", minute: "2-digit", hour12: true,
     }); // e.g. "8:00 AM"
 
-    // Get all active medications scheduled for right now
-    const { data: meds } = await supabase
+    // Get ALL active medications (we need to check med_times arrays too)
+    const { data: allMeds } = await supabase
       .from("medications")
-      .select("id, name, dose, senior_id")
-      .eq("active", true)
-      .eq("time", currentTime);
+      .select("id, name, dose, senior_id, time, med_times")
+      .eq("active", true);
 
-    if (!meds || !meds.length) return;
+    if (!allMeds || !allMeds.length) return;
 
-    const today    = now.toISOString().split("T")[0];
+    // Filter to meds that have currentTime in their schedule
+    const dueMeds = [];
+    for (const med of allMeds) {
+      let times;
+      try { times = med.med_times ? JSON.parse(med.med_times) : null; } catch { times = null; }
+      if (!times || !Array.isArray(times) || times.length === 0) {
+        times = med.time ? [med.time] : [];
+      }
+      if (times.includes(currentTime)) {
+        dueMeds.push({ ...med, doseTime: currentTime });
+      }
+    }
+
+    if (!dueMeds.length) return;
+
+    const today      = now.toISOString().split("T")[0];
     const todayStart = today + "T00:00:00.000Z";
 
-    for (const med of meds) {
-      // Skip if already taken today
+    for (const med of dueMeds) {
+      // Skip if this specific dose_time already taken today
       const { count: taken } = await supabase
         .from("med_log")
         .select("*", { count: "exact", head: true })
         .eq("senior_id", med.senior_id)
         .eq("medication_id", med.id)
+        .eq("dose_time", med.doseTime)
         .gte("taken_at", todayStart);
 
       if (taken > 0) continue;
@@ -307,20 +322,19 @@ async function checkMedicationReminders() {
             JSON.parse(sub.subscription_json),
             JSON.stringify({
               title:        "💊 Time for your medication",
-              body:         `It's time to take ${med.name}${med.dose ? " (" + med.dose + ")" : ""}`,
+              body:         `It's time to take ${med.name}${med.dose ? " (" + med.dose + ")" : ""} — ${med.doseTime} dose`,
               icon:         "/icons/icon-192.png",
               badge:        "/icons/badge-72.png",
-              tag:          `med-${med.id}-${today}`,
+              tag:          `med-${med.id}-${med.doseTime.replace(/\s/g,"")}-${today}`,
               medicationId: med.id,
               seniorId:     med.senior_id,
+              doseTime:     med.doseTime,
             })
           );
-          // Update last_used timestamp
           await supabase.from("push_subscriptions")
             .update({ last_used: new Date().toISOString() })
             .eq("id", sub.id);
         } catch (e) {
-          // Subscription expired or invalid — remove it
           if (e.statusCode === 410 || e.statusCode === 404) {
             await supabase.from("push_subscriptions").delete().eq("id", sub.id);
           }
@@ -328,7 +342,6 @@ async function checkMedicationReminders() {
       }
     }
   } catch (e) {
-    // Non-critical — don't crash server
     console.error("Reminder check error:", e.message);
   }
 }
@@ -575,28 +588,54 @@ app.get("/api/medications/:seniorId", seniorAuth, validateUUID("seniorId"), asyn
       .eq("senior_id", req.params.seniorId).eq("active", true);
 
     const todayStart = new Date(); todayStart.setHours(0, 0, 0, 0);
-    const { data: logs } = await supabase.from("med_log").select("medication_id")
+    const { data: logs } = await supabase.from("med_log").select("medication_id, dose_time")
       .eq("senior_id", req.params.seniorId)
       .gte("taken_at", todayStart.toISOString());
 
-    const takenIds = new Set((logs || []).map(l => l.medication_id));
-    res.json(normArr(meds).map(m => ({ ...m, takenToday: takenIds.has(m.id) })));
+    // Build map: medId -> Set of dose_times taken today
+    const takenMap = {};
+    for (const l of (logs || [])) {
+      if (!takenMap[l.medication_id]) takenMap[l.medication_id] = new Set();
+      takenMap[l.medication_id].add(l.dose_time || "default");
+    }
+
+    res.json(normArr(meds).map(m => {
+      // Parse med_times (backward compat: fall back to single time field)
+      let times;
+      try { times = m.medTimes ? JSON.parse(m.medTimes) : null; } catch { times = null; }
+      if (!times || !Array.isArray(times) || times.length === 0) {
+        times = m.time ? [m.time] : ["8:00 AM"];
+      }
+      const takenSet = takenMap[m.id || m._id] || new Set();
+      const dosesTotal = times.length;
+      const dosesTaken = times.filter(t => takenSet.has(t)).length;
+      // Per-dose status for UI
+      const doses = times.map(t => ({ time: t, taken: takenSet.has(t) }));
+      return {
+        ...m, medTimes: times, frequency: m.frequency || times.length,
+        doses, dosesTaken, dosesTotal,
+        takenToday: dosesTaken >= dosesTotal,
+      };
+    }));
   } catch (e) { console.error(`[Error] ${req.method} ${req.path}:`, e.message); res.status(500).json({ error: "Something went wrong. Please try again." }); }
 });
 
 app.post("/api/medications/:id/taken", seniorAuth, validateUUID("id"), async (req, res) => {
   try {
+    const { doseTime } = req.body || {};
     const { data: med } = await supabase.from("medications").select("*")
       .eq("id", req.params.id).single();
     if (!med) return res.status(404).json({ error: "Medication not found" });
 
     await supabase.from("med_log").insert({
       senior_id: med.senior_id, medication_id: med.id,
-      medication_name: med.name, taken_at: new Date().toISOString(),
+      medication_name: med.name, dose_time: doseTime || med.time || null,
+      taken_at: new Date().toISOString(),
     });
     await supabase.from("activity").insert({
       senior_id: med.senior_id, type: "medication_taken",
-      description: `Took ${med.name} ${med.dose || ""}`, timestamp: new Date().toISOString(),
+      description: `Took ${med.name} ${med.dose || ""}${doseTime ? " (" + doseTime + " dose)" : ""}`,
+      timestamp: new Date().toISOString(),
     });
     await trackUsage(med.senior_id, "medications_taken");
     res.json({ success: true, message: `${med.name} marked as taken` });
@@ -632,7 +671,8 @@ Extract the medication information and return ONLY a valid JSON object — no ex
 Fields:
 - "name": medication name (string, required)
 - "dose": dosage/strength like "10mg", "500mg" (string or null)
-- "time": best time to take — infer from directions e.g. "once daily in the morning" → "8:00 AM", "at bedtime" → "9:00 PM" (string or null)
+- "frequency": how many times per day — infer from directions. "once daily"=1, "twice daily"/"every 12 hours"=2, "three times daily"/"every 8 hours"=3 (number, default 1)
+- "times": array of times to take — infer from frequency and directions. Examples: once daily morning → ["8:00 AM"], twice daily → ["8:00 AM","8:00 PM"], three times daily → ["8:00 AM","2:00 PM","9:00 PM"], at bedtime → ["9:00 PM"] (array of strings, required)
 - "withFood": true if label says "take with food" or "take with meals" (boolean, default false)
 - "directions": the full directions text as written (string or null)
 - "prescriber": doctor name if visible on label (string or null)
@@ -656,17 +696,24 @@ Fields:
 // POST /api/medications — add medication (family or scan)
 app.post("/api/medications", anyAuth, async (req, res) => {
   try {
-    const { seniorId, name, dose, time, withFood } = req.body;
+    const { seniorId, name, dose, time, withFood, medTimes, frequency } = req.body;
     if (!seniorId || !name) return res.status(400).json({ error: "seniorId and name required" });
+
+    // Build med_times array: prefer explicit medTimes, else wrap single time
+    let timesArr = Array.isArray(medTimes) ? medTimes.filter(t => t && t.trim()) : [];
+    if (timesArr.length === 0 && time) timesArr = [time];
+    if (timesArr.length === 0) timesArr = ["8:00 AM"];
+    const freq = frequency || timesArr.length || 1;
 
     const { data: med } = await supabase.from("medications").insert({
       senior_id: seniorId, name, dose: dose || null,
-      time: time || null, with_food: !!withFood, active: true,
+      time: timesArr[0], med_times: JSON.stringify(timesArr),
+      frequency: freq, with_food: !!withFood, active: true,
     }).select().single();
 
     await supabase.from("activity").insert({
       senior_id: seniorId, type: "medication_added",
-      description: `Medication added: ${name}${dose ? " " + dose : ""}`,
+      description: `Medication added: ${name}${dose ? " " + dose : ""} (${freq}x daily)`,
       timestamp: new Date().toISOString(),
     });
     res.json({ success: true, medication: norm(med) });
@@ -719,7 +766,7 @@ app.post("/api/chat", seniorAuth, suspendCheck, rateLimit(60000, 20), async (req
     const [seniorRes, medsRes, logsRes, historyRes, todayApptsRes, remindersRes] = await Promise.all([
       supabase.from("seniors").select("*").eq("id", effectiveSeniorId).single(),
       supabase.from("medications").select("*").eq("senior_id", effectiveSeniorId).eq("active", true),
-      supabase.from("med_log").select("medication_id").eq("senior_id", effectiveSeniorId).gte("taken_at", todayStart.toISOString()),
+      supabase.from("med_log").select("medication_id, dose_time").eq("senior_id", effectiveSeniorId).gte("taken_at", todayStart.toISOString()),
       supabase.from("conversations").select("role, content").eq("senior_id", effectiveSeniorId).order("timestamp", { ascending: false }).limit(20),
       supabase.from("appointments").select("title, date, time, location, notes").eq("senior_id", effectiveSeniorId).gte("date", todayStr).lte("date", tomorrowStr).order("date").order("time"),
       supabase.from("reminders").select("text, due_date, due_time").eq("senior_id", effectiveSeniorId).eq("completed", false).order("created_at"),
@@ -729,9 +776,15 @@ app.post("/api/chat", seniorAuth, suspendCheck, rateLimit(60000, 20), async (req
     const conditions = (senior?.conditions || []).join(", ");
     const meds = medsRes.data;
     const takenIds = new Set((logsRes.data || []).map(l => l.medication_id));
-    const medSummary = (meds || []).map(m =>
-      `- ${m.name} ${m.dose || ""} at ${m.time || ""}${m.with_food ? " (with food)" : ""}: ${takenIds.has(m.id) ? "taken" : "not yet taken"}`
-    ).join("\n");
+    const medSummary = (meds || []).map(m => {
+      let times;
+      try { times = m.med_times ? JSON.parse(m.med_times) : null; } catch { times = null; }
+      if (!times || !Array.isArray(times) || times.length === 0) times = m.time ? [m.time] : [];
+      const takenTimes = (logsRes.data || []).filter(l => l.medication_id === m.id).map(l => l.dose_time);
+      const takenSet = new Set(takenTimes);
+      const doseStatus = times.map(t => `${t}: ${takenSet.has(t) ? "taken" : "NOT YET TAKEN"}`).join(", ");
+      return `- ${m.name} ${m.dose || ""}${m.with_food ? " (with food)" : ""} [${times.length}x daily]: ${doseStatus}`;
+    }).join("\n");
     const recentHistory = (historyRes.data || []).reverse();
 
     // Build today's schedule context
@@ -828,6 +881,9 @@ When ${seniorName} asks you to remind them of something, add something to their 
 
 Today's medication status:
 ${medSummary || "No medications scheduled today"}
+
+MEDICATION CHECK-IN INSTRUCTIONS:
+If any medications above show "NOT YET TAKEN" and the current time is past that dose time, you should proactively and gently remind ${seniorName} during the conversation. For example: "By the way, it looks like you haven't taken your Metformin yet today — have you had a chance to take it?" Keep it warm and caring, not nagging. Only mention it once per conversation, and only for medications that are overdue. If ALL medications are marked as taken, you can say something encouraging like "Looks like you're all caught up on your medications today — great job!"
 
 ${scheduleSummary ? `TODAY'S SCHEDULE & REMINDERS:\n${scheduleSummary}\n\nIMPORTANT: If this is the first message of the conversation (no prior messages above), proactively mention any appointments happening today. For example: "Just a reminder, you have a dentist appointment at 2 PM today." Keep it natural and warm — don't read the whole list robotically, just highlight the most important or time-sensitive items. If there are active reminders, briefly mention them too.` : "No appointments or reminders scheduled for today."}
 
