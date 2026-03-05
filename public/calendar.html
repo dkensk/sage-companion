@@ -103,15 +103,26 @@
     .day-label { font-size:13px; font-weight:800; color:var(--muted); text-transform:uppercase; letter-spacing:.06em; margin-bottom:8px; padding: 0 2px; }
     .day-label.today { color:var(--navy); }
 
-    .appt-item { display:flex; align-items:flex-start; gap:12px; padding:14px 16px; background:var(--bg); border-radius:14px; margin-bottom:8px; position:relative; }
+    .appt-item { padding:14px 16px; background:var(--bg); border-radius:14px; margin-bottom:8px; position:relative; cursor:pointer; transition: background 0.15s; -webkit-tap-highlight-color:transparent; }
+    .appt-item:active { background:#E2E8F0; }
     .appt-item.is-today { background:#EFF6FF; border-left:3px solid var(--navy); }
+    .appt-item.is-today:active { background:#DBEAFE; }
+    .appt-row { display:flex; align-items:flex-start; gap:12px; }
     .appt-time { font-size:15px; font-weight:700; color:var(--navy); min-width:68px; flex-shrink:0; padding-top:2px; }
     .appt-time.no-time { color:var(--muted); font-weight:600; }
     .appt-info { flex:1; min-width:0; overflow:hidden; }
     .appt-title { font-size:18px; font-weight:700; line-height:1.3; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
     .appt-meta { font-size:14px; color:var(--muted); margin-top:3px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
-    .appt-del { background:none; border:none; color:var(--muted); font-size:20px; cursor:pointer; padding:4px 6px; border-radius:6px; transition:color 0.15s; flex-shrink:0; align-self:center; }
-    .appt-del:hover { color:var(--red); }
+    .appt-expand { font-size:16px; color:var(--muted); flex-shrink:0; align-self:center; transition:transform 0.2s; }
+    .appt-item.expanded .appt-expand { transform:rotate(180deg); }
+    .appt-details { display:none; margin-top:12px; padding-top:12px; border-top:1px solid var(--border); }
+    .appt-item.expanded .appt-details { display:block; }
+    .appt-item.expanded .appt-title { white-space:normal; }
+    .appt-detail-row { font-size:15px; color:var(--text); margin-bottom:6px; line-height:1.5; }
+    .appt-detail-label { font-weight:600; color:var(--muted); }
+    .appt-actions { display:flex; gap:10px; margin-top:12px; }
+    .appt-del-btn { background:none; border:1.5px solid var(--red); color:var(--red); font-size:15px; font-weight:600; padding:8px 16px; border-radius:10px; cursor:pointer; transition:background 0.15s, color 0.15s; }
+    .appt-del-btn:hover { background:var(--red); color:white; }
 
     .empty-msg { color:var(--muted); font-size:17px; font-style:italic; padding:8px 0; }
 
@@ -351,20 +362,43 @@
         <div class="day-group">
           <div class="day-label ${isToday ? 'today' : ''}">${label}</div>
           ${items.map(a => {
-            const loc = a.location ? `<div class="appt-meta">📍 ${escHtml(a.location)}</div>` : "";
+            const id = a._id || a.id;
+            const hasDetails = a.location || a.notes || a.source;
+            const loc = a.location ? `<div class="appt-detail-row"><span class="appt-detail-label">Location:</span> ${escHtml(a.location)}</div>` : "";
+            const notes = a.notes ? `<div class="appt-detail-row"><span class="appt-detail-label">Notes:</span> ${escHtml(a.notes)}</div>` : "";
+            const source = a.source === "google" ? `<div class="appt-detail-row"><span class="appt-detail-label">Source:</span> Google Calendar</div>` : a.source === "voice" ? `<div class="appt-detail-row"><span class="appt-detail-label">Source:</span> Added by Sage</div>` : "";
+            const locPreview = a.location ? `<div class="appt-meta">📍 ${escHtml(a.location)}</div>` : "";
             return `
-            <div class="appt-item ${isToday ? 'is-today' : ''}">
-              <div class="appt-time ${a.time ? '' : 'no-time'}">${a.time || 'All day'}</div>
-              <div class="appt-info">
-                <div class="appt-title">${escHtml(a.title)}</div>
-                ${loc}
+            <div class="appt-item ${isToday ? 'is-today' : ''}" onclick="toggleApptExpand(this, event)">
+              <div class="appt-row">
+                <div class="appt-time ${a.time ? '' : 'no-time'}">${a.time || 'All day'}</div>
+                <div class="appt-info">
+                  <div class="appt-title">${escHtml(a.title)}</div>
+                  ${locPreview}
+                </div>
+                <div class="appt-expand">▼</div>
               </div>
-              <button class="appt-del" onclick="deleteAppt('${a._id || a.id}')" title="Remove">✕</button>
+              <div class="appt-details">
+                <div class="appt-detail-row"><span class="appt-detail-label">Time:</span> ${a.time || 'All day'}</div>
+                <div class="appt-detail-row"><span class="appt-detail-label">Date:</span> ${d.toLocaleDateString("en-US", { weekday:"long", month:"long", day:"numeric", year:"numeric" })}</div>
+                ${loc}
+                ${notes}
+                ${source}
+                <div class="appt-actions">
+                  <button class="appt-del-btn" onclick="event.stopPropagation(); deleteAppt('${id}')">Remove</button>
+                </div>
+              </div>
             </div>`;
           }).join("")}
         </div>
       `;
     }).join("");
+  }
+
+  function toggleApptExpand(el, e) {
+    // Don't expand if clicking a button
+    if (e.target.closest('.appt-del-btn')) return;
+    el.classList.toggle('expanded');
   }
 
   async function deleteAppt(id) {

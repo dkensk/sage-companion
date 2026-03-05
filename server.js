@@ -1041,7 +1041,7 @@ Never invent facts not listed above. If something contradicts a memory, ask gent
       try {
         response = await anthropic.messages.create({
           model: chatModel,
-          max_tokens: 300,
+          max_tokens: 500,
           system: systemPrompt,
           messages,
         });
@@ -1799,20 +1799,29 @@ app.post("/api/google/sync/:seniorId", anyAuth, validateUUID("seniorId"), async 
       return text;
     }
 
-    // Format event time in the user's timezone
-    function formatEventTime(dateTimeStr, tz) {
-      try {
-        const d = new Date(dateTimeStr);
-        return d.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit", hour12: true, timeZone: tz });
-      } catch { return new Date(dateTimeStr).toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" }); }
+    // Google returns ISO strings like "2026-03-05T14:00:00-05:00".
+    // The offset is already baked in. We parse the local date/time parts directly
+    // from the string without converting through Date (which shifts to UTC on the server).
+    function parseGoogleLocalParts(dateTimeStr) {
+      // Match: YYYY-MM-DDThh:mm:ss with optional offset
+      const m = dateTimeStr.match(/^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2})/);
+      if (!m) return null;
+      return { year: m[1], month: m[2], day: m[3], hour: parseInt(m[4]), minute: m[5] };
     }
 
-    // Format event date in the user's timezone
+    function formatEventTime(dateTimeStr, tz) {
+      const p = parseGoogleLocalParts(dateTimeStr);
+      if (!p) return "";
+      const h = p.hour;
+      const period = h >= 12 ? "PM" : "AM";
+      const h12 = h === 0 ? 12 : h > 12 ? h - 12 : h;
+      return `${h12}:${p.minute} ${period}`;
+    }
+
     function formatEventDate(dateTimeStr, tz) {
-      try {
-        const d = new Date(dateTimeStr);
-        return d.toLocaleDateString("en-CA", { timeZone: tz }); // "YYYY-MM-DD" format
-      } catch { return new Date(dateTimeStr).toISOString().split("T")[0]; }
+      const p = parseGoogleLocalParts(dateTimeStr);
+      if (!p) return dateTimeStr.split("T")[0];
+      return `${p.year}-${p.month}-${p.day}`;
     }
 
     let pulled = 0;
