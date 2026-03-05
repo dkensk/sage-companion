@@ -2521,7 +2521,7 @@ app.post("/api/auth/reset-password", rateLimit("login"), async (req, res) => {
 // Get account info for settings page
 app.get("/api/account", seniorAuth, async (req, res) => {
   try {
-    const { data: senior } = await supabase.from("seniors").select("name, email, age, family_code, subscription_status, subscription_plan, created_at").eq("id", req.seniorId).single();
+    const { data: senior } = await supabase.from("seniors").select("name, email, age, family_code, subscription_status, subscription_plan, created_at, location").eq("id", req.seniorId).single();
     if (!senior) return res.status(404).json({ error: "Account not found" });
     res.json(norm(senior));
   } catch (e) { console.error(`[Error] ${req.method} ${req.path}:`, e.message); res.status(500).json({ error: "Something went wrong. Please try again." }); }
@@ -2560,6 +2560,19 @@ app.post("/api/account/change-name", seniorAuth, rateLimit("api"), async (req, r
     if (trimmed.length > 100) return res.status(400).json({ error: "Name must be under 100 characters" });
 
     await supabase.from("seniors").update({ name: trimmed }).eq("id", req.seniorId);
+    res.json({ success: true });
+  } catch (e) { console.error(`[Error] ${req.method} ${req.path}:`, e.message); res.status(500).json({ error: "Something went wrong. Please try again." }); }
+});
+
+// Update location (manual fallback)
+app.post("/api/account/change-location", seniorAuth, rateLimit("api"), async (req, res) => {
+  try {
+    const { location } = req.body;
+    const trimmed = (location || "").trim();
+    if (!trimmed) return res.status(400).json({ error: "City/location is required" });
+    if (trimmed.length > 150) return res.status(400).json({ error: "Location must be under 150 characters" });
+
+    await supabase.from("seniors").update({ location: trimmed }).eq("id", req.seniorId);
     res.json({ success: true });
   } catch (e) { console.error(`[Error] ${req.method} ${req.path}:`, e.message); res.status(500).json({ error: "Something went wrong. Please try again." }); }
 });

@@ -577,6 +577,20 @@
       </div>
     </div>
 
+    <!-- Location -->
+    <div class="card">
+      <div class="card-title">Your Location</div>
+      <div id="locationMessage" class="message"></div>
+      <p style="color: #64748B; font-size: 1rem; margin-bottom: 1rem; line-height: 1.5;">
+        Sage uses your city to help with local recommendations like nearby pharmacies, doctors, and weather.
+      </p>
+      <div class="form-group">
+        <label class="form-label">City, State</label>
+        <input type="text" class="form-input" id="settingLocation" placeholder="e.g. Austin, Texas">
+      </div>
+      <button class="form-button" onclick="saveLocation()">Save Location</button>
+    </div>
+
     <!-- Family Code -->
     <div class="card">
       <div class="card-title">Your Family Code</div>
@@ -769,6 +783,11 @@
             document.getElementById('accountMemberSince').textContent = formatted;
           }
 
+          // Populate location field
+          if (data.location) {
+            document.getElementById('settingLocation').value = data.location;
+          }
+
           // Load subscription from billing endpoint
           loadSubscription();
         }
@@ -949,6 +968,32 @@
         console.error('Error changing password:', error);
         showMessage('passwordMessage', 'Error updating password', 'error');
         document.getElementById('changePasswordForm').classList.remove('loading');
+      }
+    }
+
+    // Save Location
+    async function saveLocation() {
+      clearMessage('locationMessage');
+      const location = document.getElementById('settingLocation').value.trim();
+      if (!location) return showMessage('locationMessage', 'Please enter your city', 'error');
+
+      try {
+        const res = await apiCall('/api/account/change-location', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ location })
+        });
+        const data = await res.json();
+        if (res.ok) {
+          showMessage('locationMessage', 'Location saved! Sage will use this for local help.', 'success');
+          localStorage.setItem("sageLocation", location);
+          setTimeout(() => clearMessage('locationMessage'), 5000);
+        } else {
+          showMessage('locationMessage', data.error || 'Error saving location', 'error');
+        }
+      } catch (error) {
+        console.error('Error saving location:', error);
+        showMessage('locationMessage', 'Error saving location', 'error');
       }
     }
 
