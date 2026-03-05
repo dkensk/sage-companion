@@ -1800,29 +1800,30 @@ app.post("/api/google/sync/:seniorId", anyAuth, validateUUID("seniorId"), async 
       return text;
     }
 
-    // Google returns ISO strings like "2026-03-05T14:00:00-05:00".
-    // The offset is already baked in. We parse the local date/time parts directly
-    // from the string without converting through Date (which shifts to UTC on the server).
-    function parseGoogleLocalParts(dateTimeStr) {
-      // Match: YYYY-MM-DDThh:mm:ss with optional offset
-      const m = dateTimeStr.match(/^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2})/);
-      if (!m) return null;
-      return { year: m[1], month: m[2], day: m[3], hour: parseInt(m[4]), minute: m[5] };
+    // Convert Google dateTime to the user's local date/time using Intl.DateTimeFormat.formatToParts
+    // This properly handles events created in other timezones (e.g. flights departing from EST)
+    function getLocalParts(dateTimeStr, tz) {
+      const d = new Date(dateTimeStr);
+      const parts = new Intl.DateTimeFormat("en-US", {
+        timeZone: tz, year: "numeric", month: "2-digit", day: "2-digit",
+        hour: "numeric", minute: "2-digit", hour12: true,
+      }).formatToParts(d);
+      const get = (type) => (parts.find(p => p.type === type) || {}).value || "";
+      return { year: get("year"), month: get("month"), day: get("day"), hour: get("hour"), minute: get("minute"), period: get("dayPeriod") };
     }
 
     function formatEventTime(dateTimeStr, tz) {
-      const p = parseGoogleLocalParts(dateTimeStr);
-      if (!p) return "";
-      const h = p.hour;
-      const period = h >= 12 ? "PM" : "AM";
-      const h12 = h === 0 ? 12 : h > 12 ? h - 12 : h;
-      return `${h12}:${p.minute} ${period}`;
+      try {
+        const p = getLocalParts(dateTimeStr, tz);
+        return `${p.hour}:${p.minute} ${p.period}`;
+      } catch { return ""; }
     }
 
     function formatEventDate(dateTimeStr, tz) {
-      const p = parseGoogleLocalParts(dateTimeStr);
-      if (!p) return dateTimeStr.split("T")[0];
-      return `${p.year}-${p.month}-${p.day}`;
+      try {
+        const p = getLocalParts(dateTimeStr, tz);
+        return `${p.year}-${p.month}-${p.day}`;
+      } catch { return dateTimeStr.split("T")[0]; }
     }
 
     let pulled = 0;
@@ -1834,6 +1835,7 @@ app.post("/api/google/sync/:seniorId", anyAuth, validateUUID("seniorId"), async 
       // For timed events, format in user's timezone; for all-day events, use the date as-is
       const dateStr   = ev.start.dateTime ? formatEventDate(startRaw, userTz) : startRaw;
       const timeStr   = ev.start.dateTime ? formatEventTime(startRaw, userTz) : null;
+      console.log("[GoogleSync] event:", ev.summary, "| raw:", startRaw, "| parsed date:", dateStr, "| parsed time:", timeStr);
       const cleanNotes = cleanDescription(ev.description);
       const { data: existing } = await supabase.from("appointments").select("id").eq("google_event_id", ev.id).eq("senior_id", seniorId).single();
       if (existing) {
