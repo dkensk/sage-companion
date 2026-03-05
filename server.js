@@ -935,10 +935,11 @@ app.post("/api/chat", seniorAuth, suspendCheck, rateLimit("chat"), async (req, r
       scheduleSummary += "Active reminders/to-do:\n" + remLines.join("\n");
     }
 
-    // Fetch weather if location provided and message seems weather-related
+    // Fetch weather if location provided and message is weather-related OR it's the first message (daily check-in)
     let weatherInfo = null;
-    const weatherKeywords = /weather|temperature|outside|warm|cold|rain|sunny|snow|hot|humid|chill|wind|rain|sunny|snow|degrees|forecast|jacket|coat|umbrella|dress.*(for|today|tomorrow)/i;
-    if (effectiveLocation && weatherKeywords.test(message)) {
+    const isFirstMessage = recentHistory.length === 0;
+    const weatherKeywords = /weather|temperature|outside|warm|cold|rain|sunny|snow|hot|humid|chill|wind|storm|rain|degrees|forecast|jacket|coat|umbrella|dress.*(for|today|tomorrow)|what.*like out|how.*out(side)?|should i bring|do i need a/i;
+    if (effectiveLocation && (weatherKeywords.test(message) || isFirstMessage)) {
       try {
         weatherInfo = await new Promise((resolve) => {
 
@@ -979,8 +980,8 @@ IMPORTANT — What you MUST NOT do:
 - Never provide legal or financial advice
 
 YOUR CAPABILITIES — Be honest about what you can and cannot do:
-You CAN: have friendly conversations, add appointments and reminders, track medications, provide general knowledge from your training, give weather info (when provided), and offer encouragement.
-You CANNOT: make phone calls, send texts or emails, browse the internet, look up real-time business info (hours, phone numbers, addresses), book appointments, access maps, or take any action outside this chat. NEVER offer to do these things.
+You CAN: have friendly conversations, add appointments and reminders, track medications, provide general knowledge from your training, check the current weather, and offer encouragement.
+You CANNOT: make phone calls, send texts or emails, look up real-time business info (hours, phone numbers, addresses), book appointments, access maps, or take any action outside this chat. NEVER offer to do these things.
 Instead of saying "I can help you find that" or "Would you like me to call them," say something like "You might want to call your doctor's office directly" or "Your family member could help you look that up." Be helpful by suggesting what the USER can do, not by promising things YOU cannot do.
 
 When ${seniorName} asks about symptoms, medications, medical concerns, or anything health-related:
@@ -1021,7 +1022,7 @@ ${recentHistory.length >= 2 ? `You've ALREADY given the daily check-in in your f
 
 LOCAL & LOCATION-AWARE HELP:
 ${effectiveLocation ? `${seniorName} lives in ${effectiveLocation}. When they ask about local places (pharmacies, doctors, restaurants, stores, hospitals, churches, libraries, etc.), give helpful answers using your general knowledge of that area. Mention well-known chains or landmarks nearby when you can. Important: You are using general knowledge, NOT real-time data. Always say something like "I believe there's a Walgreens near you, but you might want to call ahead to check hours" rather than stating hours or addresses as facts.` : `Location is not available. If they ask about local places, ask them what city they live in so you can help better next time.`}
-When they ask about weather, give a simple friendly summary — for example "It's a nice warm day out there, around 75 degrees" rather than raw numbers.
+WEATHER: You DO have access to real-time weather data. When "Current weather" appears below, use it to answer weather questions naturally — for example "It's a nice warm day out there, around 75 degrees" rather than raw numbers. If no weather data appears below, tell them you need their location to check the weather.
 
 Current time: ${clientTime || new Date().toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit" })}
 Today: ${timezone ? new Date().toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric", timeZone: timezone }) : new Date().toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric" })}
