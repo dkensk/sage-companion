@@ -302,5 +302,22 @@ CREATE POLICY "Deny public access" ON push_subscriptions FOR ALL USING (false);
 CREATE POLICY "Deny public access" ON reminder_snooze FOR ALL USING (false);
 CREATE POLICY "Deny public access" ON reminders FOR ALL USING (false);
 
+-- ── Long-term memories ──────────────────────────────────────────────────────
+CREATE TABLE IF NOT EXISTS memories (
+  id             UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  senior_id      UUID REFERENCES seniors(id) ON DELETE CASCADE NOT NULL,
+  category       TEXT NOT NULL,  -- family, hobby, health, preference, life_event, concern, routine
+  memory_text    TEXT NOT NULL,
+  mention_count  INTEGER DEFAULT 1,
+  last_mentioned TIMESTAMPTZ DEFAULT NOW(),
+  created_at     TIMESTAMPTZ DEFAULT NOW()
+);
+CREATE INDEX IF NOT EXISTS idx_memories_senior ON memories(senior_id, category, last_mentioned DESC);
+ALTER TABLE memories ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "Deny public access" ON memories FOR ALL USING (false);
+
+-- Migration: ALTER TABLE — run once in Supabase SQL editor if table doesn't exist yet
+-- The CREATE TABLE IF NOT EXISTS above handles fresh installs.
+
 -- Fix function search path warning
 ALTER FUNCTION increment_usage(UUID, DATE, TEXT) SET search_path = public;

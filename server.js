@@ -119,6 +119,97 @@ async function trackUsage(seniorId, field) {
   } catch (e) { /* non-critical — don't fail the request */ }
 }
 
+// ── Long-term memory helpers ──────────────────────────────────────────────────
+
+function calculateSimilarity(str1, str2) {
+  const words = (s) => new Set(s.toLowerCase().split(/\W+/).filter(w => w.length > 3));
+  const a = words(str1), b = words(str2);
+  if (a.size === 0 && b.size === 0) return 1;
+  if (a.size === 0 || b.size === 0) return 0;
+  let intersection = 0;
+  for (const w of a) if (b.has(w)) intersection++;
+  return intersection / new Set([...a, ...b]).size;
+}
+
+async function deduplicateAndSave(seniorId, category, text) {
+  try {
+    const { data: existing } = await supabase
+      .from("memories")
+      .select("id, memory_text, mention_count")
+      .eq("senior_id", seniorId)
+      .eq("category", category);
+
+    const similar = (existing || []).find(m => calculateSimilarity(m.memory_text, text) > 0.6);
+
+    if (similar) {
+      await supabase.from("memories").update({
+        last_mentioned: new Date().toISOString(),
+        mention_count: similar.mention_count + 1,
+      }).eq("id", similar.id);
+    } else {
+      // Cap at 30 per category — skip insert if at limit
+      if ((existing || []).length >= 30) return;
+      await supabase.from("memories").insert({
+        senior_id: seniorId,
+        category,
+        memory_text: text,
+      });
+    }
+  } catch (e) { console.error("[Memory] dedup error:", e.message); }
+}
+
+async function extractMemories(seniorId, userMessage, aiReply) {
+  if (!userMessage || userMessage.trim().length < 15) return; // skip "ok", "thanks", etc.
+  try {
+    const extraction = await anthropic.messages.create({
+      model: process.env.CHAT_MODEL || "claude-haiku-4-5-20251001",
+      max_tokens: 300,
+      system: "Extract personal facts about the senior from this conversation. Return a JSON array only.",
+      messages: [{
+        role: "user",
+        content: `Extract personal facts about the senior from this conversation snippet.
+Categories: family, hobby, health, preference, life_event, concern, routine
+Return JSON array: [{"category":"family","text":"Grandson Tommy plays soccer"}]
+Only extract clear facts explicitly stated by the senior. If none, return [].
+
+Senior said: "${userMessage}"
+Sage replied: "${aiReply.slice(0, 200)}"`,
+      }],
+    });
+
+    const raw = extraction.content[0]?.text || "[]";
+    // Extract JSON array from response (handle markdown code blocks)
+    const jsonMatch = raw.match(/\[[\s\S]*\]/);
+    if (!jsonMatch) return;
+    const memories = JSON.parse(jsonMatch[0]);
+    if (!Array.isArray(memories)) return;
+
+    const validCategories = new Set(["family", "hobby", "health", "preference", "life_event", "concern", "routine"]);
+    for (const mem of memories.slice(0, 5)) { // max 5 per message
+      if (mem.category && mem.text && validCategories.has(mem.category) && mem.text.length > 5 && mem.text.length < 200) {
+        await deduplicateAndSave(seniorId, mem.category, mem.text);
+      }
+    }
+  } catch (e) { console.error("[Memory] extraction error:", e.message); }
+}
+
+async function getRelevantMemories(seniorId, limit = 10) {
+  try {
+    const { data } = await supabase
+      .from("memories")
+      .select("category, memory_text")
+      .eq("senior_id", seniorId)
+      .order("last_mentioned", { ascending: false })
+      .order("mention_count", { ascending: false })
+      .limit(limit);
+    if (!data || data.length === 0) return "";
+    return data.map(m => `- ${m.category}: ${m.memory_text}`).join("\n");
+  } catch (e) {
+    console.error("[Memory] retrieval error:", e.message);
+    return "";
+  }
+}
+
 // ── Admin auth ────────────────────────────────────────────────────────────────
 function adminToken() {
   return crypto
@@ -782,13 +873,14 @@ app.post("/api/chat", seniorAuth, suspendCheck, rateLimit("chat"), async (req, r
     const todayStart = new Date(); todayStart.setHours(0, 0, 0, 0);
     const todayStr = todayStart.toISOString().slice(0, 10); // "YYYY-MM-DD"
     const tomorrowStr = new Date(todayStart.getTime() + 86400000).toISOString().slice(0, 10);
-    const [seniorRes, medsRes, logsRes, historyRes, todayApptsRes, remindersRes] = await Promise.all([
+    const [seniorRes, medsRes, logsRes, historyRes, todayApptsRes, remindersRes, memorySummary] = await Promise.all([
       supabase.from("seniors").select("*").eq("id", effectiveSeniorId).single(),
       supabase.from("medications").select("*").eq("senior_id", effectiveSeniorId).eq("active", true),
       supabase.from("med_log").select("medication_id, dose_time").eq("senior_id", effectiveSeniorId).gte("taken_at", todayStart.toISOString()).then(r => r.error ? { data: [] } : r),
       supabase.from("conversations").select("role, content").eq("senior_id", effectiveSeniorId).order("timestamp", { ascending: false }).limit(20),
       supabase.from("appointments").select("title, date, time, location, notes").eq("senior_id", effectiveSeniorId).gte("date", todayStr).lte("date", tomorrowStr).order("date").order("time"),
       supabase.from("reminders").select("text, due_date, due_time").eq("senior_id", effectiveSeniorId).eq("completed", false).order("created_at"),
+      getRelevantMemories(effectiveSeniorId),
     ]);
     const senior = seniorRes.data;
     const seniorName = senior?.name || "Friend";
@@ -933,7 +1025,13 @@ When they ask about weather, give a simple friendly summary — for example "It'
 Current time: ${clientTime || new Date().toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit" })}
 Today: ${timezone ? new Date().toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric", timeZone: timezone }) : new Date().toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric" })}
 ${effectiveLocation ? `User's location: ${effectiveLocation}` : ""}
-${weatherInfo ? `Current weather: ${weatherInfo}` : ""}`;
+${weatherInfo ? `Current weather: ${weatherInfo}` : ""}
+
+WHAT YOU KNOW ABOUT ${seniorName.toUpperCase()}:
+${memorySummary || `You're still getting to know ${seniorName}. Build memories naturally through conversation.`}
+
+Use these memories naturally — reference them when relevant to show you remember and care about ${seniorName}.
+Never invent facts not listed above. If something contradicts a memory, ask gently to clarify.`;
 
     // Haiku is 10-20x faster than Opus — ideal for conversational voice responses
     const chatModel = process.env.CHAT_MODEL || "claude-haiku-4-5-20251001";
@@ -1069,6 +1167,9 @@ ${weatherInfo ? `Current weather: ${weatherInfo}` : ""}`;
     const result = { reply: aiReply, sessionId: sid, suggestedQuestion, appointment: savedAppointment, reminder: savedReminder };
     if (ttsAudioBase64) result.audioBase64 = ttsAudioBase64;
     res.json(result);
+
+    // Non-blocking: extract long-term memories from this exchange
+    extractMemories(effectiveSeniorId, message, aiReply).catch(e => console.error("[Memory] bg extract:", e.message));
   } catch (e) {
     console.error("Chat error:", e.message, e.stack);
     const status = e?.status || e?.statusCode || 0;
