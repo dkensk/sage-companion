@@ -223,6 +223,7 @@
   <!-- Upcoming appointments -->
   <div class="card">
     <div class="section-title">Upcoming Appointments</div>
+    <div id="tzNote" style="font-size:13px; color:var(--muted); margin-bottom:10px;"></div>
     <div id="apptList">Loading…</div>
   </div>
 
@@ -314,6 +315,10 @@
   async function init() {
     const authed = await checkAuth();
     if (!authed) return;
+    // Show detected timezone
+    const detectedTz = Intl.DateTimeFormat().resolvedOptions().timeZone || "Unknown";
+    const tzLabel = detectedTz.replace(/_/g, " ").split("/").pop();
+    document.getElementById("tzNote").textContent = `Times shown in ${tzLabel} (${detectedTz})`;
     setupVoice();
     await loadAppointments();
     await checkGoogleStatus();
@@ -665,6 +670,7 @@
     btn.innerHTML = btn.innerHTML.replace("🗓️", '<span class="spinner" style="border-top-color:var(--navy)"></span>');
     try {
       const tz = Intl.DateTimeFormat().resolvedOptions().timeZone || "America/New_York";
+      console.log("[Sync] browser timezone:", tz);
       const res  = await apiCall(`/api/google/sync/${SENIOR_ID}`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },

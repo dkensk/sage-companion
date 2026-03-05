@@ -1767,6 +1767,7 @@ app.post("/api/google/sync/:seniorId", anyAuth, validateUUID("seniorId"), async 
   try {
     const { seniorId } = req.params;
     const userTz = req.body?.timezone || "America/New_York";
+    console.log("[GoogleSync] timezone from client:", userTz);
     const { data: senior } = await supabase.from("seniors").select("*").eq("id", seniorId).single();
     if (!senior?.google_tokens) return res.status(401).json({ error: "Google not connected" });
 
@@ -1825,7 +1826,9 @@ app.post("/api/google/sync/:seniorId", anyAuth, validateUUID("seniorId"), async 
     }
 
     let pulled = 0;
-    for (const ev of (gRes.data.items || [])) {
+    const items = gRes.data.items || [];
+    if (items.length > 0) console.log("[GoogleSync] first event raw:", JSON.stringify({ summary: items[0].summary, start: items[0].start, end: items[0].end }));
+    for (const ev of items) {
       if (!ev.summary) continue;
       const startRaw  = ev.start.dateTime || ev.start.date;
       // For timed events, format in user's timezone; for all-day events, use the date as-is
