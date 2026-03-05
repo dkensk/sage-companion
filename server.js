@@ -991,12 +991,13 @@ When ${seniorName} asks about symptoms, medications, medical concerns, or anythi
 For true emergencies like chest pain, difficulty breathing, or a fall: Always say to call 911 or press the emergency button right away.
 
 APPOINTMENTS & CALENDAR:
-When ${seniorName} mentions an upcoming appointment, event, or anything that should go on a calendar (doctor visits, lunch plans, birthdays, errands, etc.):
+When ${seniorName} mentions an upcoming appointment, event, or anything that should go on a calendar (doctor visits, lunch plans, games, birthdays, errands, etc.):
 1. Confirm what you heard back to them warmly, for example: "Got it, I've added your dentist appointment on Thursday at 2 PM to your calendar!"
-2. At the very END of your response, add a structured tag: [APPOINTMENT: {"title": "...", "date": "YYYY-MM-DD", "time": "2:00 PM" or null, "location": "..." or null, "notes": "..." or null}]
-3. Use the current date/time context below to figure out the correct YYYY-MM-DD date. For example, if today is Monday Feb 27 and they say "this Thursday", that is March 2.
+2. CRITICAL: You MUST include this structured tag at the very END of your response — without it, nothing gets saved: [APPOINTMENT: {"title": "...", "date": "YYYY-MM-DD", "time": "2:00 PM" or null, "location": "..." or null, "notes": "..." or null}]
+3. Use the current date/time context below to figure out the correct YYYY-MM-DD date. For example, if today is Monday Feb 27 and they say "this Thursday", that is March 2. "This Saturday" means the coming Saturday. "Next Saturday" means the Saturday of next week.
 4. If they do NOT give enough info to determine a date (just "sometime" or "eventually"), ask them gently what day it is, do NOT output the tag.
 5. The tag is machine-parsed and NEVER read aloud — the user only hears your friendly confirmation.
+6. NEVER say you added something to the calendar without including the [APPOINTMENT: ...] tag. If you say it, you must tag it.
 
 REMINDERS & TO-DO:
 When ${seniorName} asks you to remind them of something, add something to their list, or mentions a task they need to do (pick up dry cleaning, call the bank, buy milk, etc.):
@@ -1105,7 +1106,13 @@ Never invent facts not listed above. If something contradicts a memory, ask gent
 
     const tagSaves = [];
 
+    // Log when AI claims to add an appointment but doesn't include the tag
+    if (!appointmentMatch && /added.*calendar|added.*appointment|put.*on.*calendar/i.test(aiReply)) {
+      console.warn("[Chat] AI claimed to add appointment but no [APPOINTMENT:] tag found in raw reply:", rawReply.slice(-300));
+    }
+
     if (appointmentMatch) {
+      console.log("[Chat] APPOINTMENT tag found:", appointmentMatch[1]);
       tagSaves.push((async () => {
         try {
           const apptData = JSON.parse(appointmentMatch[1]);
@@ -1864,29 +1871,24 @@ app.post("/api/google/sync/:seniorId", anyAuth, validateUUID("seniorId"), async 
   }
 });
 
-// Helper: parse "2026-03-04" + "2:00 PM" + timezone into ISO string
+// Helper: parse "2026-03-04" + "2:00 PM" + timezone into ISO string for Google Calendar
 function parseLocalDateTime(dateStr, timeStr, tz, addMinutes) {
   try {
     // Parse the 12h time
     const match = timeStr.match(/^(\d{1,2}):(\d{2})\s*(AM|PM)$/i);
-    if (!match) return new Date(dateStr + "T09:00:00").toISOString();
+    if (!match) return `${dateStr}T09:00:00`;
     let h = parseInt(match[1]), m = parseInt(match[2]);
     const ampm = match[3].toUpperCase();
     if (ampm === "PM" && h < 12) h += 12;
     if (ampm === "AM" && h === 12) h = 0;
-    // Build an ISO-ish string and use the timezone
-    const dt = new Date(`${dateStr}T${String(h).padStart(2,"0")}:${String(m).padStart(2,"0")}:00`);
-    // Adjust: get the offset between UTC and the target timezone
-    const utcStr = dt.toLocaleString("en-US", { timeZone: "UTC" });
-    const tzStr  = dt.toLocaleString("en-US", { timeZone: tz });
-    const offset = new Date(utcStr).getTime() - new Date(tzStr).getTime();
-    const adjusted = new Date(dt.getTime() + offset);
-    if (addMinutes) adjusted.setMinutes(adjusted.getMinutes() + addMinutes);
-    return adjusted.toISOString();
+    if (addMinutes) {
+      m += addMinutes;
+      while (m >= 60) { h++; m -= 60; }
+    }
+    // Return as a local time string — Google Calendar uses the timeZone field to interpret it
+    return `${dateStr}T${String(h).padStart(2,"0")}:${String(m).padStart(2,"0")}:00`;
   } catch {
-    const d = new Date(dateStr + "T09:00:00");
-    if (addMinutes) d.setMinutes(d.getMinutes() + addMinutes);
-    return d.toISOString();
+    return `${dateStr}T09:00:00`;
   }
 }
 
