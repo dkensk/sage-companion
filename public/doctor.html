@@ -585,16 +585,12 @@
     btn.textContent = "Saving…";
 
     try {
-      const token = getSeniorToken();
-      console.log("[DoctorVisit] Saving — seniorId:", SENIOR_ID, "| token:", token ? token.substring(0, 20) + "…" : "NONE");
       const payload = { seniorId: SENIOR_ID, transcript, doctorName, notes };
-      console.log("[DoctorVisit] Payload size:", JSON.stringify(payload).length, "bytes");
       const res = await apiCall("/api/doctor-visits", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload),
       });
-      console.log("[DoctorVisit] Response status:", res.status);
       if (!res.ok) {
         const errData = await res.json().catch(() => ({}));
         console.error("[DoctorVisit] Server error:", res.status, errData);

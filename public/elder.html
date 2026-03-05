@@ -431,8 +431,6 @@
       border: 1.5px solid #BBF7D0;
     }
 
-    /* Emergency button is now in the header */
-
     /* ── EMERGENCY MODAL ─────────────────────────────────── */
     #emergencyModal {
       display: none;
@@ -600,8 +598,6 @@
       -webkit-tap-highlight-color: transparent;
     }
     .hdr-btn:hover { background: rgba(255,255,255,0.25); }
-
-    /* ── ADD TO HOME (now inline in banner) ──────────────── */
 
     /* ── MOBILE RESPONSIVE ────────────────────────────────── */
     @media (min-width: 769px) {
@@ -950,8 +946,6 @@
   </div>
 
 </div>
-
-<!-- Emergency button moved to header -->
 
 <!-- Emergency modal -->
 <div id="emergencyModal">
@@ -2099,9 +2093,12 @@
         window.speechSynthesis.speak(utter);
         // Safari bug: speechSynthesis sometimes stops mid-sentence on long text
         // This keepalive timer resumes it if paused
+        let keepAliveCount = 0;
         const keepAlive = setInterval(() => {
-          if (!window.speechSynthesis.speaking) {
+          keepAliveCount++;
+          if (!window.speechSynthesis.speaking || keepAliveCount > 60) {
             clearInterval(keepAlive);
+            setSpeakingIndicator(false);
           } else if (window.speechSynthesis.paused) {
             window.speechSynthesis.resume();
           }
@@ -2158,14 +2155,12 @@
 
   // ── Phone Numbers ────────────────────────────────────────────────────────────
   let elderFamilyPhoneStored = "";
-  let elderSeniorPhoneStored = "";
 
   async function loadElderPhones() {
     try {
       const res = await apiCall("/api/phones/" + SENIOR_ID);
       if (!res.ok) return;
       const data = await res.json();
-      elderSeniorPhoneStored = data.seniorPhone || "";
       elderFamilyPhoneStored = data.familyPhone || "";
     } catch (e) { console.log("[Elder] phone load error:", e); }
   }

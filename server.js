@@ -17,6 +17,7 @@ const webpush    = require("web-push");
 const cron       = require("node-cron");
 const Stripe     = require("stripe");
 const { Resend } = require("resend");
+const https      = require("https");
 
 // ── Multer (image uploads — memory only) ─────────────────────────────────────
 const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 15 * 1024 * 1024 } });
@@ -229,7 +230,7 @@ async function suspendCheck(req, res, next) {
     if (data?.suspended) {
       return res.status(403).json({ error: "Your account has been suspended. Please contact support@mysagecompanion.com." });
     }
-  } catch {}
+  } catch (e) { console.error("[Auth] suspendCheck error:", e.message); }
   next();
 }
 
@@ -445,6 +446,8 @@ const RATE_LIMITS = {
   login: { max: 5, window: RATE_WINDOW },       // 5 login attempts per minute
   api: { max: 60, window: RATE_WINDOW },         // 60 API calls per minute
   upload: { max: 10, window: RATE_WINDOW * 5 },  // 10 uploads per 5 minutes
+  chat: { max: 20, window: RATE_WINDOW },        // 20 chat messages per minute
+  tts: { max: 30, window: RATE_WINDOW },         // 30 TTS requests per minute
 };
 
 function rateLimit(category = "api") {
@@ -694,7 +697,7 @@ Fields:
 });
 
 // POST /api/medications — add medication (family or scan)
-app.post("/api/medications", anyAuth, async (req, res) => {
+app.post("/api/medications", anyAuth, rateLimit("api"), async (req, res) => {
   try {
     const { seniorId, name, dose, time, withFood, medTimes, frequency } = req.body;
     if (!seniorId || !name) return res.status(400).json({ error: "seniorId and name required" });
@@ -769,7 +772,7 @@ app.post("/api/emergency", seniorAuth, async (req, res) => {
 // CHAT
 // ─────────────────────────────────────────────────────────────────────────────
 
-app.post("/api/chat", seniorAuth, suspendCheck, rateLimit(60000, 20), async (req, res) => {
+app.post("/api/chat", seniorAuth, suspendCheck, rateLimit("chat"), async (req, res) => {
   try {
     const { seniorId, message, sessionId, clientTime, timezone, location, includeTTS } = req.body;
     if (!message) return res.status(400).json({ error: "Message required" });
@@ -793,17 +796,16 @@ app.post("/api/chat", seniorAuth, suspendCheck, rateLimit(60000, 20), async (req
 
     // Persist user timezone and location for future sessions (non-blocking)
     if (timezone && senior && timezone !== senior.timezone) {
-      supabase.from("seniors").update({ timezone }).eq("id", effectiveSeniorId).then(() => {});
+      supabase.from("seniors").update({ timezone }).eq("id", effectiveSeniorId).catch(e => console.error("[Chat] timezone save:", e.message));
     }
     if (location && senior && location !== senior.location) {
-      supabase.from("seniors").update({ location }).eq("id", effectiveSeniorId).then(() => {});
+      supabase.from("seniors").update({ location }).eq("id", effectiveSeniorId).catch(e => console.error("[Chat] location save:", e.message));
     }
 
     // Fall back to stored location if client didn't send one (e.g. geolocation not yet resolved)
     const effectiveLocation = location || senior?.location || null;
 
     const meds = medsRes.data;
-    const takenIds = new Set((logsRes.data || []).map(l => l.medication_id));
     const medSummary = (meds || []).map(m => {
       let times;
       try { times = m.med_times ? JSON.parse(m.med_times) : null; } catch { times = null; }
@@ -847,7 +849,7 @@ app.post("/api/chat", seniorAuth, suspendCheck, rateLimit(60000, 20), async (req
     if (effectiveLocation && weatherKeywords.test(message)) {
       try {
         weatherInfo = await new Promise((resolve) => {
-          const https = require("https");
+
           const city  = encodeURIComponent(effectiveLocation);
           https.get(`https://wttr.in/${city}?format=%C+%t+%h+%w`, (r) => {
             let data = "";
@@ -984,7 +986,6 @@ ${weatherInfo ? `Current weather: ${weatherInfo}` : ""}`;
         ...(ttsModel === "gpt-4o-mini-tts" ? { instructions: "Speak in a warm, caring, gentle tone — like a kind friend checking in. Natural pace, not rushed. Calm and reassuring." } : {}),
         response_format: "mp3", speed: 1.05,
       });
-      const https = require("https");
       const ttsReq = https.request({
         hostname: "api.openai.com", path: "/v1/audio/speech", method: "POST",
         headers: { "Authorization": `Bearer ${ttsApiKey}`, "Content-Type": "application/json", "Content-Length": Buffer.byteLength(payload) },
@@ -1103,7 +1104,6 @@ app.get("/api/tts/test", adminAuth, async (req, res) => {
   if (!apiKey || apiKey.startsWith("YOUR_") || apiKey.length < 20) {
     return res.json({ ok: false, error: "OPENAI_API_KEY not configured" });
   }
-  const https = require("https");
   try {
     const result = await new Promise((resolve, reject) => {
       const payload = JSON.stringify({ model: "gpt-4o-mini-tts", input: "Hello there, how are you doing today?", voice: "coral", response_format: "mp3" });
@@ -1132,7 +1132,7 @@ app.get("/api/tts/test", adminAuth, async (req, res) => {
   }
 });
 
-app.post("/api/tts", seniorAuth, rateLimit(60000, 30), async (req, res) => {
+app.post("/api/tts", seniorAuth, rateLimit("tts"), async (req, res) => {
   const { text } = req.body;
   if (!text) return res.status(400).json({ error: "text required" });
 
@@ -1149,7 +1149,6 @@ app.post("/api/tts", seniorAuth, rateLimit(60000, 30), async (req, res) => {
 
   console.log(`TTS request: voice=${voice}, text length=${cleanText.length}`);
 
-  const https = require("https");
 
   try {
     const audioStream = await new Promise((resolve, reject) => {
@@ -1208,7 +1207,7 @@ app.post("/api/tts", seniorAuth, rateLimit(60000, 30), async (req, res) => {
 // SPEECH-TO-TEXT (Whisper) — fallback for browsers without SpeechRecognition
 // ─────────────────────────────────────────────────────────────────────────────
 
-app.post("/api/transcribe", rateLimit("default"), upload.single("audio"), seniorAuth, async (req, res) => {
+app.post("/api/transcribe", rateLimit("api"), upload.single("audio"), seniorAuth, async (req, res) => {
   try {
     const apiKey = (process.env.OPENAI_API_KEY || "").trim();
     if (!apiKey || apiKey.startsWith("YOUR_") || apiKey.length < 20) {
@@ -1228,8 +1227,7 @@ app.post("/api/transcribe", rateLimit("default"), upload.single("audio"), senior
 
     const body = Buffer.concat(parts.map(p => typeof p === "string" ? Buffer.from(p) : p));
 
-    const https = require("https");
-    const whisperRes = await new Promise((resolve, reject) => {
+      const whisperRes = await new Promise((resolve, reject) => {
       const wreq = https.request({
         hostname: "api.openai.com",
         path: "/v1/audio/transcriptions",
@@ -1341,9 +1339,6 @@ app.post("/api/doctor-visits", seniorAuth, async (req, res) => {
 // FAMILY API
 // ─────────────────────────────────────────────────────────────────────────────
 
-// Deprecated — login by name removed for security. Use email+password or family code.
-// app.get("/api/senior/by-name/:name", ...);
-
 app.get("/api/senior/by-code/:code", rateLimit("login"), async (req, res) => {
   try {
     const { data } = await supabase.from("seniors").select("id, name, family_code, age")
@@ -1430,7 +1425,7 @@ app.get("/api/appointments/:seniorId", anyAuth, validateUUID("seniorId"), async 
   } catch (e) { console.error(`[Error] ${req.method} ${req.path}:`, e.message); res.status(500).json({ error: "Something went wrong. Please try again." }); }
 });
 
-app.post("/api/appointments", seniorAuth, async (req, res) => {
+app.post("/api/appointments", seniorAuth, rateLimit("api"), async (req, res) => {
   try {
     const { seniorId, title, date, time, location, notes, source } = req.body;
     if (!seniorId || !title || !date) return res.status(400).json({ error: "seniorId, title, date required" });
@@ -1583,7 +1578,7 @@ app.get("/api/reminders/:seniorId", anyAuth, validateUUID("seniorId"), async (re
   } catch (e) { console.error(`[Error] ${req.method} ${req.path}:`, e.message); res.status(500).json({ error: "Something went wrong. Please try again." }); }
 });
 
-app.post("/api/reminders", seniorAuth, async (req, res) => {
+app.post("/api/reminders", seniorAuth, rateLimit("api"), async (req, res) => {
   try {
     const seniorId = req.body.seniorId || req.seniorId;
     const { text, dueDate, dueTime, source } = req.body;
@@ -2456,7 +2451,7 @@ app.post("/api/account/change-password", seniorAuth, rateLimit("login"), async (
 });
 
 // Update name
-app.post("/api/account/change-name", seniorAuth, rateLimit("default"), async (req, res) => {
+app.post("/api/account/change-name", seniorAuth, rateLimit("api"), async (req, res) => {
   try {
     const { newName } = req.body;
     if (!newName || !newName.trim()) return res.status(400).json({ error: "Name is required" });
