@@ -1868,6 +1868,7 @@
 
   // ── TTS ───────────────────────────────────────────────────────────────────────
   let currentAudio = null; // tracks what's playing for stop/interrupt
+  let speakGeneration = 0; // increments on each speak() call — stale responses get discarded
 
   // Strip emojis, markdown, and anything that sounds wrong when spoken aloud
   function cleanForSpeech(text) {
@@ -1891,6 +1892,7 @@
   // ── Play base64-encoded audio from bundled chat+TTS response ────────────────
   async function playBase64Audio(b64) {
     stopCurrentAudio();
+    speakGeneration++; // invalidate any in-flight speak() calls so they don't overlap
     setSpeakingIndicator(true);
     try {
       const raw = atob(b64);
@@ -1938,12 +1940,19 @@
     // Stop anything currently playing before starting new speech
     stopCurrentAudio();
 
+    // Generation counter: if a newer speak() call fires while we're fetching TTS,
+    // this call becomes stale and should NOT play its audio (prevents overlapping voices)
+    const myGeneration = ++speakGeneration;
+
     // Show speaking indicator on mic button
     setSpeakingIndicator(true);
 
+    // Helper: check if this speak() call is still the most recent one
+    function isStale() { return speakGeneration !== myGeneration; }
+
     // ── Strategy 1: OpenAI TTS via server → Web Audio API ───────────────────
     try {
-      console.log("[tts] Fetching OpenAI TTS audio…");
+      console.log("[tts] Fetching OpenAI TTS audio… (gen:", myGeneration, ")");
       const controller = new AbortController();
       const timeout = setTimeout(() => controller.abort(), 8000);
 
@@ -1955,9 +1964,14 @@
       });
       clearTimeout(timeout);
 
+      // Check if a newer speak() call has fired while we were fetching
+      if (isStale()) { console.log("[tts] Discarding stale TTS response (gen:", myGeneration, ")"); return; }
+
       if (res.ok) {
         const arrayBuf = await res.arrayBuffer();
         console.log("[tts] Got", arrayBuf.byteLength, "bytes from server");
+
+        if (isStale()) { console.log("[tts] Discarding stale TTS audio (gen:", myGeneration, ")"); return; }
 
         if (arrayBuf.byteLength > 0) {
           // Try Web Audio API first (works best on mobile)
@@ -1980,8 +1994,12 @@
                 console.log("[tts] AudioContext after resume, state:", ttsAudioCtx.state);
               }
 
+              if (isStale()) { console.log("[tts] Discarding stale TTS before decode (gen:", myGeneration, ")"); return; }
+
               const audioBuf = await ttsAudioCtx.decodeAudioData(arrayBuf.slice(0)); // slice to copy
               console.log("[tts] WebAudio decoded, duration:", audioBuf.duration.toFixed(1), "s");
+
+              if (isStale()) { console.log("[tts] Discarding stale decoded audio (gen:", myGeneration, ")"); return; }
 
               if (ttsAudioCtx.state === "running") {
                 const source = ttsAudioCtx.createBufferSource();
@@ -1991,7 +2009,7 @@
                 source.start(0);
                 currentSource = source;
                 currentAudio = "webapi";
-                console.log("[tts] Playing via WebAudio API");
+                console.log("[tts] Playing via WebAudio API (gen:", myGeneration, ")");
                 return;
               } else {
                 console.warn("[tts] AudioContext still", ttsAudioCtx.state, "after resume — trying HTMLAudio");
@@ -2000,6 +2018,8 @@
               console.warn("[tts] WebAudio failed:", decodeErr.message, "— trying HTMLAudio…");
             }
           }
+
+          if (isStale()) return;
 
           // Fallback: HTMLAudioElement with blob URL
           try {
@@ -2011,7 +2031,7 @@
             audio.onerror = () => { URL.revokeObjectURL(url); console.warn("[tts] HTMLAudio playback error"); speakBrowser(clean); };
             await audio.play();
             currentAudio = "htmlaudio";
-            console.log("[tts] Playing via HTMLAudioElement");
+            console.log("[tts] Playing via HTMLAudioElement (gen:", myGeneration, ")");
             return;
           } catch (audioErr) {
             console.warn("[tts] HTMLAudio failed:", audioErr.message, "— falling back to browser voice");
@@ -2028,7 +2048,8 @@
     }
 
     // ── Strategy 2: Browser speech synthesis (always available, no network) ──
-    console.log("[tts] Falling back to browser voice");
+    if (isStale()) return; // don't fall back to robot voice if a newer call is in progress
+    console.log("[tts] Falling back to browser voice (gen:", myGeneration, ")");
     speakBrowser(clean);
   }
 
