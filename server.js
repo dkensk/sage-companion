@@ -195,14 +195,16 @@ Sage replied: "${aiReply.slice(0, 200)}"`,
 
 async function getRelevantMemories(seniorId, limit = 10) {
   try {
-    const { data } = await supabase
+    const { data, error } = await supabase
       .from("memories")
       .select("category, memory_text")
       .eq("senior_id", seniorId)
       .order("last_mentioned", { ascending: false })
       .order("mention_count", { ascending: false })
       .limit(limit);
-    if (!data || data.length === 0) return "";
+    if (error) { console.error("[Memory] retrieval DB error:", error.message); return ""; }
+    if (!data || data.length === 0) { console.log("[Memory] No memories found for senior:", seniorId); return ""; }
+    console.log("[Memory] Retrieved", data.length, "memories for senior:", seniorId);
     return data.map(m => `- ${m.category}: ${m.memory_text}`).join("\n");
   } catch (e) {
     console.error("[Memory] retrieval error:", e.message);
@@ -1177,7 +1179,9 @@ Never invent facts not listed above. If something contradicts a memory, ask gent
     res.json(result);
 
     // Non-blocking: extract long-term memories from this exchange
-    extractMemories(effectiveSeniorId, message, aiReply).catch(e => console.error("[Memory] bg extract:", e.message));
+    extractMemories(effectiveSeniorId, message, aiReply)
+      .then(() => console.log("[Memory] extraction completed for:", message.slice(0, 40)))
+      .catch(e => console.error("[Memory] bg extract:", e.message));
   } catch (e) {
     console.error("Chat error:", e.message, e.stack);
     const status = e?.status || e?.statusCode || 0;
