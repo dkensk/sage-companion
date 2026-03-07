@@ -888,10 +888,10 @@ app.post("/api/chat", seniorAuth, suspendCheck, rateLimit("chat"), async (req, r
 
     // Persist user timezone and location for future sessions (non-blocking)
     if (timezone && senior && timezone !== senior.timezone) {
-      supabase.from("seniors").update({ timezone }).eq("id", effectiveSeniorId).catch(e => console.error("[Chat] timezone save:", e.message));
+      supabase.from("seniors").update({ timezone }).eq("id", effectiveSeniorId).then(({ error }) => { if (error) console.error("[Chat] timezone save:", error.message); });
     }
     if (location && senior && location !== senior.location) {
-      supabase.from("seniors").update({ location }).eq("id", effectiveSeniorId).catch(e => console.error("[Chat] location save:", e.message));
+      supabase.from("seniors").update({ location }).eq("id", effectiveSeniorId).then(({ error }) => { if (error) console.error("[Chat] location save:", error.message); });
     }
 
     // Fall back to stored location if client didn't send one (e.g. geolocation not yet resolved)
