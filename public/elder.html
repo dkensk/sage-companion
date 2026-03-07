@@ -1935,7 +1935,7 @@
     const clean = cleanForSpeech(text);
     if (!clean) return;
 
-    // Stop anything currently playing
+    // Stop anything currently playing before starting new speech
     stopCurrentAudio();
 
     // Show speaking indicator on mic button
@@ -2033,13 +2033,15 @@
   }
 
   function stopCurrentAudio() {
-    if (currentAudio === "webapi" && currentSource) {
+    // Stop WebAudio API playback (OpenAI TTS via AudioContext)
+    if (currentSource) {
       try { currentSource.stop(); } catch(e) {}
       currentSource = null;
     }
-    // Stop any playing HTMLAudioElements
+    // Stop any playing HTMLAudioElements (OpenAI TTS via blob URL)
     document.querySelectorAll("audio").forEach(a => { try { a.pause(); a.currentTime = 0; } catch(e) {} });
-    if (window.speechSynthesis && window.speechSynthesis.speaking) {
+    // Stop browser speechSynthesis (robot voice fallback)
+    if (window.speechSynthesis) {
       window.speechSynthesis.cancel();
     }
     currentAudio = null;
@@ -2061,7 +2063,18 @@
   function speakBrowser(text) {
     if (!window.speechSynthesis) { setSpeakingIndicator(false); return; }
 
+    // Guard: if OpenAI TTS audio is already playing, don't layer browser voice on top
+    if (currentAudio === "webapi" || currentAudio === "htmlaudio") {
+      console.log("[tts] Skipping browser voice — OpenAI TTS already playing");
+      return;
+    }
+
+    let spokeBrowser = false; // prevent double-fire from voiceschanged + timeout race
+
     function doSpeak(voices) {
+      if (spokeBrowser) return; // already started speaking — don't fire again
+      spokeBrowser = true;
+
       // Safari fix: cancel any pending utterances first
       window.speechSynthesis.cancel();
 
@@ -2069,8 +2082,8 @@
       utter.rate = 0.82;  // slightly slower — easier for seniors to follow
       utter.pitch = 1.0;
       utter.volume = 1.0;
-      utter.onend = () => setSpeakingIndicator(false);
-      utter.onerror = (e) => { console.warn("[tts] Browser speech error:", e.error); setSpeakingIndicator(false); };
+      utter.onend = () => { currentAudio = null; setSpeakingIndicator(false); };
+      utter.onerror = (e) => { console.warn("[tts] Browser speech error:", e.error); currentAudio = null; setSpeakingIndicator(false); };
 
       const en = voices.filter(v => v.lang.startsWith("en"));
       // Priority: Premium → Enhanced → well-known named → non-Google en-US → any English
@@ -2088,6 +2101,8 @@
         console.log("[tts] Browser voice selected:", pick.name);
       }
 
+      currentAudio = "browser"; // track that browser speech is active
+
       // Safari workaround: short delay after cancel before speaking
       setTimeout(() => {
         window.speechSynthesis.speak(utter);
@@ -2098,13 +2113,14 @@
           keepAliveCount++;
           if (!window.speechSynthesis.speaking || keepAliveCount > 60) {
             clearInterval(keepAlive);
+            currentAudio = null;
             setSpeakingIndicator(false);
           } else if (window.speechSynthesis.paused) {
             window.speechSynthesis.resume();
           }
         }, 3000);
-        utter.onend = () => { clearInterval(keepAlive); setSpeakingIndicator(false); };
-        utter.onerror = () => { clearInterval(keepAlive); setSpeakingIndicator(false); };
+        utter.onend = () => { clearInterval(keepAlive); currentAudio = null; setSpeakingIndicator(false); };
+        utter.onerror = () => { clearInterval(keepAlive); currentAudio = null; setSpeakingIndicator(false); };
       }, 100);
     }
 
@@ -2119,7 +2135,7 @@
       // Safety fallback: if voiceschanged never fires, try after 600ms
       setTimeout(() => {
         const v = window.speechSynthesis.getVoices();
-        if (!window.speechSynthesis.speaking) doSpeak(v.length ? v : []);
+        if (!spokeBrowser) doSpeak(v.length ? v : []);
       }, 600);
     }
   }
