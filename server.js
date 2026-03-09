@@ -875,12 +875,14 @@ app.post("/api/chat", seniorAuth, suspendCheck, rateLimit("chat"), async (req, r
     const todayStart = new Date(); todayStart.setHours(0, 0, 0, 0);
     const todayStr = todayStart.toISOString().slice(0, 10); // "YYYY-MM-DD"
     const tomorrowStr = new Date(todayStart.getTime() + 86400000).toISOString().slice(0, 10);
-    const [seniorRes, medsRes, logsRes, historyRes, todayApptsRes, remindersRes, memorySummary] = await Promise.all([
+    const twoWeeksStr = new Date(todayStart.getTime() + 14 * 86400000).toISOString().slice(0, 10);
+    const [seniorRes, medsRes, logsRes, historyRes, todayApptsRes, upcomingApptsRes, remindersRes, memorySummary] = await Promise.all([
       supabase.from("seniors").select("*").eq("id", effectiveSeniorId).single(),
       supabase.from("medications").select("*").eq("senior_id", effectiveSeniorId).eq("active", true),
       supabase.from("med_log").select("medication_id, dose_time").eq("senior_id", effectiveSeniorId).gte("taken_at", todayStart.toISOString()).then(r => r.error ? { data: [] } : r),
       supabase.from("conversations").select("role, content").eq("senior_id", effectiveSeniorId).order("timestamp", { ascending: false }).limit(20),
       supabase.from("appointments").select("title, date, time, location, notes").eq("senior_id", effectiveSeniorId).gte("date", todayStr).lte("date", tomorrowStr).order("date").order("time"),
+      supabase.from("appointments").select("title, date, time, location, notes").eq("senior_id", effectiveSeniorId).gt("date", tomorrowStr).lte("date", twoWeeksStr).order("date").order("time").limit(10),
       supabase.from("reminders").select("text, due_date, due_time").eq("senior_id", effectiveSeniorId).eq("completed", false).order("created_at"),
       getRelevantMemories(effectiveSeniorId),
     ]);
@@ -913,6 +915,7 @@ app.post("/api/chat", seniorAuth, suspendCheck, rateLimit("chat"), async (req, r
 
     // Build today's schedule context
     const todayAppts = todayApptsRes.data || [];
+    const upcomingAppts = upcomingApptsRes.data || [];
     const activeReminders = remindersRes.data || [];
     let scheduleSummary = "";
     if (todayAppts.length > 0) {
@@ -926,6 +929,16 @@ app.post("/api/chat", seniorAuth, suspendCheck, rateLimit("chat"), async (req, r
         return line;
       });
       scheduleSummary += "Today's and tomorrow's appointments:\n" + apptLines.join("\n");
+    }
+    if (upcomingAppts.length > 0) {
+      const upLines = upcomingAppts.map(a => {
+        let line = `- ${a.title} on ${a.date}`;
+        if (a.time) line += ` at ${a.time}`;
+        if (a.location) line += ` at ${a.location}`;
+        return line;
+      });
+      if (scheduleSummary) scheduleSummary += "\n";
+      scheduleSummary += "Upcoming appointments (next 2 weeks):\n" + upLines.join("\n");
     }
     if (activeReminders.length > 0) {
       const remLines = activeReminders.slice(0, 10).map(r => {
@@ -1013,7 +1026,7 @@ When ${seniorName} asks you to remind them of something, add something to their 
 Today's medication status:
 ${medSummary || "No medications scheduled today"}
 
-${scheduleSummary ? `TODAY'S SCHEDULE & REMINDERS:\n${scheduleSummary}` : "No appointments or reminders scheduled for today."}
+${scheduleSummary ? `SCHEDULE & REMINDERS:\n${scheduleSummary}` : "No appointments or reminders scheduled."}
 
 DAILY CHECK-IN INSTRUCTIONS — READ CAREFULLY:
 The conversation so far has ${recentHistory.length} prior messages.
@@ -1027,7 +1040,8 @@ ${effectiveLocation ? `${seniorName} lives in ${effectiveLocation}. When they as
 WEATHER: You DO have access to real-time weather data. When "Current weather" appears below, use it to answer weather questions naturally — for example "It's a nice warm day out there, around 75 degrees" rather than raw numbers. If no weather data appears below, tell them you need their location to check the weather.
 
 Current time: ${clientTime || new Date().toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit" })}
-Today: ${timezone ? new Date().toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric", timeZone: timezone }) : new Date().toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric" })}
+Today: ${timezone ? new Date().toLocaleDateString("en-US", { weekday: "long", year: "numeric", month: "long", day: "numeric", timeZone: timezone }) : new Date().toLocaleDateString("en-US", { weekday: "long", year: "numeric", month: "long", day: "numeric" })}
+IMPORTANT: Only reference appointments that are TODAY or in the FUTURE. Never mention appointments whose date and time have already passed.
 ${effectiveLocation ? `User's location: ${effectiveLocation}` : ""}
 ${weatherInfo ? `Current weather: ${weatherInfo}` : ""}
 

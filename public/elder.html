@@ -240,9 +240,17 @@
     .bubble.thinking {
       background: #F1F5F9;
       color: var(--muted);
-      font-style: italic;
       align-self: flex-start;
       border-bottom-left-radius: 5px;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .thinking-text {
+      font-size: 14px;
+      font-style: italic;
+      color: var(--muted);
     }
 
     .dots { display: inline-flex; gap: 4px; }
@@ -1452,13 +1460,14 @@
 
     addBubble("user", msg);
 
-    // Animated thinking dots
+    // Animated thinking indicator with message and gentle sound
     const thinking = document.createElement("div");
     thinking.className = "bubble thinking";
     thinking.id = "thinking";
-    thinking.innerHTML = `<div class="dots"><span></span><span></span><span></span></div>`;
+    thinking.innerHTML = `<span class="thinking-text">Sage is thinking</span><div class="dots"><span></span><span></span><span></span></div>`;
     document.getElementById("chatArea").appendChild(thinking);
     document.getElementById("chatArea").scrollTop = 999999;
+    playThinkingSound();
 
     try {
       const res = await apiCall("/api/chat", {
@@ -1822,6 +1831,26 @@
   let audioUnlocked = false;
   let ttsAudioCtx   = null; // persistent AudioContext for OpenAI TTS playback
   let currentSource  = null; // currently playing AudioBufferSourceNode
+
+  function playThinkingSound() {
+    try {
+      const ctx = ttsAudioCtx || new (window.AudioContext || window.webkitAudioContext)();
+      if (ctx.state === "suspended") ctx.resume();
+      // Gentle two-note chime: soft and brief
+      [440, 554].forEach((freq, i) => {
+        const osc = ctx.createOscillator();
+        const gain = ctx.createGain();
+        osc.type = "sine";
+        osc.frequency.value = freq;
+        gain.gain.setValueAtTime(0, ctx.currentTime + i * 0.12);
+        gain.gain.linearRampToValueAtTime(0.08, ctx.currentTime + i * 0.12 + 0.04);
+        gain.gain.linearRampToValueAtTime(0, ctx.currentTime + i * 0.12 + 0.25);
+        osc.connect(gain).connect(ctx.destination);
+        osc.start(ctx.currentTime + i * 0.12);
+        osc.stop(ctx.currentTime + i * 0.12 + 0.3);
+      });
+    } catch (e) { /* audio not available — silent fallback */ }
+  }
 
   function unlockAudio() {
     // 1. Create AudioContext if needed
