@@ -271,6 +271,38 @@
       background: none; border: none; color: var(--navy); font-size: 15px;
       font-weight: 700; cursor: pointer; margin-top: 8px; padding: 0;
     }
+
+    /* ── DOCTOR LIST ──────────────────────────────── */
+    .doctor-list { display: flex; flex-direction: column; gap: 8px; margin-bottom: 12px; }
+    .doctor-item {
+      display: flex; align-items: center; justify-content: space-between;
+      background: var(--bg); border: 2px solid var(--border); border-radius: 12px;
+      padding: 12px 14px; cursor: pointer; transition: border-color 0.15s, background 0.15s;
+      -webkit-tap-highlight-color: transparent;
+    }
+    .doctor-item:hover { border-color: var(--teal); }
+    .doctor-item.selected { border-color: var(--teal); background: #F0FDFA; }
+    .doctor-item-name { font-size: 17px; font-weight: 600; color: var(--text); }
+    .doctor-remove-btn {
+      background: none; border: none; color: var(--muted); font-size: 20px;
+      cursor: pointer; padding: 4px 8px; border-radius: 8px;
+      transition: color 0.15s, background 0.15s;
+      -webkit-tap-highlight-color: transparent;
+    }
+    .doctor-remove-btn:hover { color: var(--red); background: #FEE2E2; }
+    .doctor-add-row { display: flex; gap: 8px; }
+    .doctor-add-row input {
+      flex: 1; border: 2px solid var(--border); border-radius: 12px;
+      padding: 10px 14px; font-size: 16px; outline: none;
+      background: var(--bg); color: var(--text); transition: border-color 0.15s;
+    }
+    .doctor-add-row input:focus { border-color: var(--teal); background: white; }
+    .doctor-add-row button {
+      background: var(--teal); color: white; border: none; border-radius: 12px;
+      padding: 10px 16px; font-size: 15px; font-weight: 700; cursor: pointer;
+      white-space: nowrap; transition: opacity 0.15s;
+    }
+    .doctor-add-row button:hover { opacity: 0.9; }
   </style>
   <script>
     if ('serviceWorker' in navigator) {
@@ -296,11 +328,12 @@
   <div class="card">
     <div class="section-title">🎙️ Record Your Visit</div>
 
-    <div class="setup-row">
-      <select id="doctorNameSelect" onchange="handleDoctorSelect(this)" style="flex:1;min-width:160px;border:2px solid var(--border);border-radius:12px;padding:12px 14px;font-size:17px;outline:none;background:var(--bg);color:var(--text);transition:border-color 0.15s;appearance:none;-webkit-appearance:none;">
-        <option value="">Select a doctor (optional)</option>
-      </select>
-      <input type="text" id="doctorNameInput" placeholder="Or type a name…" style="display:none;" />
+    <div id="doctorListContainer">
+      <div class="doctor-list" id="doctorList"></div>
+      <div class="doctor-add-row">
+        <input type="text" id="doctorNameInput" placeholder="Type a doctor's name…" />
+        <button onclick="addDoctorFromInput()">+ Add</button>
+      </div>
     </div>
 
     <button id="recordBtn" onclick="toggleRecording()">
@@ -407,58 +440,98 @@
     await loadPastVisits();
   }
 
-  // ── Doctor name dropdown from appointments ─────────────────────────────
+  // ── Doctor name list with remove ────────────────────────────────────────
+  let selectedDoctor = "";
+
+  function getRemovedDoctors() {
+    try { return JSON.parse(localStorage.getItem("sageRemovedDoctors") || "[]"); } catch { return []; }
+  }
+  function saveRemovedDoctors(list) {
+    localStorage.setItem("sageRemovedDoctors", JSON.stringify(list));
+  }
+
   async function loadDoctorNames() {
     try {
-      const res = await apiCall(`/api/doctor-visits/${SENIOR_ID}`);
-      const visits = await res.json();
-      const sel = document.getElementById("doctorNameSelect");
-      // Collect unique doctor names from past visits
       const names = new Set();
-      if (visits && visits.length > 0) {
-        visits.forEach(v => { if (v.doctorName) names.add(v.doctorName); });
-      }
-      // Also try to pull doctor names from appointments
+      // Collect from past visits
+      try {
+        const res = await apiCall(`/api/doctor-visits/${SENIOR_ID}`);
+        const visits = await res.json();
+        if (visits && visits.length > 0) {
+          visits.forEach(v => { if (v.doctorName) names.add(v.doctorName); });
+        }
+      } catch (e) {}
+      // Collect from appointments
       try {
         const apptRes = await apiCall(`/api/appointments/${SENIOR_ID}`);
         const appts = await apptRes.json();
         if (appts && appts.length > 0) {
           appts.forEach(a => {
-            const t = (a.title || "").toLowerCase();
-            // Extract "Dr. Name" patterns from appointment titles
             const drMatch = (a.title || "").match(/(?:Dr\.?\s+|Doctor\s+)([A-Z][a-zA-Z]+(?:\s+[A-Z][a-zA-Z]+)?)/i);
             if (drMatch) names.add(drMatch[1]);
           });
         }
-      } catch (e) { /* appointments optional */ }
+      } catch (e) {}
 
-      names.forEach(name => {
-        const opt = document.createElement("option");
-        opt.value = name;
-        opt.textContent = `Dr. ${name}`;
-        sel.appendChild(opt);
-      });
-      // Always add "Other" option
-      const other = document.createElement("option");
-      other.value = "__other__";
-      other.textContent = "Other (type a name)";
-      sel.appendChild(other);
+      // Filter out removed doctors
+      const removed = getRemovedDoctors();
+      const filtered = [...names].filter(n => !removed.includes(n)).sort();
+      renderDoctorList(filtered);
     } catch (e) {
-      // If loading fails, just show the text input
-      document.getElementById("doctorNameSelect").style.display = "none";
-      document.getElementById("doctorNameInput").style.display = "block";
+      renderDoctorList([]);
     }
   }
 
-  function handleDoctorSelect(sel) {
-    const inp = document.getElementById("doctorNameInput");
-    if (sel.value === "__other__") {
-      inp.style.display = "block";
-      inp.focus();
-    } else {
-      inp.style.display = "none";
-      inp.value = "";
+  function renderDoctorList(names) {
+    const el = document.getElementById("doctorList");
+    el.innerHTML = "";
+    if (names.length === 0) {
+      el.innerHTML = `<div style="font-size:14px;color:var(--muted);padding:4px 0;">No saved doctors yet. Type a name below to add one.</div>`;
+      return;
     }
+    names.forEach(name => {
+      const row = document.createElement("div");
+      row.className = "doctor-item" + (selectedDoctor === name ? " selected" : "");
+      row.innerHTML = `<span class="doctor-item-name">Dr. ${name}</span><button class="doctor-remove-btn" title="Remove" onclick="event.stopPropagation(); removeDoctor('${name.replace(/'/g, "\\'")}')">✕</button>`;
+      row.addEventListener("click", () => selectDoctor(name));
+      el.appendChild(row);
+    });
+  }
+
+  function selectDoctor(name) {
+    selectedDoctor = (selectedDoctor === name) ? "" : name;
+    document.getElementById("doctorNameInput").value = selectedDoctor ? `Dr. ${selectedDoctor}` : "";
+    // Re-render to update selection highlight
+    const items = document.querySelectorAll(".doctor-item");
+    items.forEach(item => {
+      const itemName = item.querySelector(".doctor-item-name").textContent.replace("Dr. ", "");
+      item.classList.toggle("selected", itemName === selectedDoctor);
+    });
+  }
+
+  function removeDoctor(name) {
+    const removed = getRemovedDoctors();
+    if (!removed.includes(name)) {
+      removed.push(name);
+      saveRemovedDoctors(removed);
+    }
+    if (selectedDoctor === name) { selectedDoctor = ""; document.getElementById("doctorNameInput").value = ""; }
+    loadDoctorNames();
+  }
+
+  function addDoctorFromInput() {
+    const inp = document.getElementById("doctorNameInput");
+    let name = inp.value.trim().replace(/^Dr\.?\s*/i, "");
+    if (!name) return;
+    // Capitalize first letter of each word
+    name = name.replace(/\b\w/g, c => c.toUpperCase());
+    // Un-remove if previously removed
+    const removed = getRemovedDoctors();
+    const idx = removed.indexOf(name);
+    if (idx !== -1) { removed.splice(idx, 1); saveRemovedDoctors(removed); }
+    selectedDoctor = name;
+    inp.value = `Dr. ${name}`;
+    loadDoctorNames();
   }
 
   // ── Recording ─────────────────────────────────────────────────────────────
@@ -575,9 +648,8 @@
     if (!transcript.trim()) return;
     if (isRecording) stopRecording();
 
-    const sel = document.getElementById("doctorNameSelect");
     const inp = document.getElementById("doctorNameInput");
-    const doctorName = (sel.value === "__other__" ? inp.value.trim() : sel.value) || "";
+    const doctorName = inp.value.trim().replace(/^Dr\.?\s*/i, "") || "";
     const notes = document.getElementById("notesBox").value.trim();
 
     const btn = document.getElementById("saveBtn");
