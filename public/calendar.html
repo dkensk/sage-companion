@@ -341,7 +341,7 @@
   function renderAppointments(appts) {
     const el = document.getElementById("apptList");
     const now = new Date();
-    const todayStr = now.toISOString().split("T")[0];
+    const todayStr = `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,"0")}-${String(now.getDate()).padStart(2,"0")}`;
 
     // Only show from today forward
     const upcoming = appts.filter(a => a.date >= todayStr);
@@ -361,7 +361,8 @@
     el.innerHTML = Object.entries(groups).sort(([a],[b]) => a.localeCompare(b)).map(([date, items]) => {
       const d = new Date(date + "T12:00:00");
       const isToday = date === todayStr;
-      const isTomorrow = date === new Date(now.getTime() + 86400000).toISOString().split("T")[0];
+      const tom = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1);
+      const isTomorrow = date === `${tom.getFullYear()}-${String(tom.getMonth()+1).padStart(2,"0")}-${String(tom.getDate()).padStart(2,"0")}`;
       const label = isToday ? "Today" : isTomorrow ? "Tomorrow" : d.toLocaleDateString("en-US", { weekday:"long", month:"long", day:"numeric" });
       return `
         <div class="day-group">
