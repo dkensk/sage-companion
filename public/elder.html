@@ -1023,6 +1023,7 @@
       setCookie("sageSeniorToken", token, 90);
       setCookie("sageSeniorId", senior._id, 90);
       setCookie("sageSeniorName", senior.name, 90);
+      setCookie("sageFamilyCode", senior.familyCode, 90);
       location.reload();
     } catch (e) {
       errEl.textContent = "Connection error — please try again.";
@@ -1054,6 +1055,7 @@
       setCookie("sageSeniorToken", token, 90);
       setCookie("sageSeniorId", senior._id, 90);
       setCookie("sageSeniorName", senior.name, 90);
+      setCookie("sageFamilyCode", code, 90);
       location.reload();
     } catch (e) {
       errEl.textContent = "Connection error — please try again.";
@@ -1110,8 +1112,8 @@
       return true;
     }
     if (!token) {
-      // Try auto-login with stored family code (for users who set up before auth was deployed)
-      const storedCode = localStorage.getItem("sageFamilyCode");
+      // Try auto-login with stored family code (check both localStorage and cookie for Safari PWA)
+      const storedCode = localStorage.getItem("sageFamilyCode") || getCookie("sageFamilyCode");
       if (storedCode) {
         try {
           const res = await fetch("/api/senior/login", {
@@ -1122,7 +1124,14 @@
           if (res.ok) {
             const data = await res.json();
             localStorage.setItem("sageSeniorToken", data.token);
+            if (data.senior) {
+              localStorage.setItem("sageSeniorId", data.senior._id);
+              localStorage.setItem("sageSeniorName", data.senior.name);
+              setCookie("sageSeniorId", data.senior._id, 90);
+              setCookie("sageSeniorName", data.senior.name, 90);
+            }
             setCookie("sageSeniorToken", data.token, 90);
+            setCookie("sageFamilyCode", storedCode, 90);
             document.getElementById("loginScreen").style.display = "none";
             return true;
           }
@@ -1157,28 +1166,23 @@
   }
 
   // ── State ─────────────────────────────────────────────────────────────────────
-  // Bidirectional sync: cookies ↔ localStorage (Safari standalone PWA can lose one or the other)
+  // Bidirectional sync: cookies ↔ localStorage (Safari standalone PWA has separate storage)
   (function syncAuth() {
-    const lsToken = localStorage.getItem("sageSeniorToken");
-    const ckToken = getCookie("sageSeniorToken");
-    if (lsToken && !ckToken) {
-      // localStorage has it but cookie lost — restore cookie
-      setCookie("sageSeniorToken", lsToken, 90);
-      if (localStorage.getItem("sageSeniorId")) setCookie("sageSeniorId", localStorage.getItem("sageSeniorId"), 90);
-      if (localStorage.getItem("sageSeniorName")) setCookie("sageSeniorName", localStorage.getItem("sageSeniorName"), 90);
-    } else if (!lsToken && ckToken) {
-      // Cookie has it but localStorage lost — restore localStorage
-      localStorage.setItem("sageSeniorToken", ckToken);
-      if (getCookie("sageSeniorId")) localStorage.setItem("sageSeniorId", getCookie("sageSeniorId"));
-      if (getCookie("sageSeniorName")) localStorage.setItem("sageSeniorName", getCookie("sageSeniorName"));
-    }
+    const fields = ["sageSeniorToken", "sageSeniorId", "sageSeniorName", "sageFamilyCode"];
+    fields.forEach(key => {
+      const ls = localStorage.getItem(key);
+      const ck = getCookie(key);
+      if (ls && !ck) setCookie(key, ls, 90);
+      else if (!ls && ck) localStorage.setItem(key, ck);
+    });
   })();
 
   const SENIOR_ID = localStorage.getItem("sageSeniorId") || "00000000-0000-0000-0000-000000000001";
   let seniorName = localStorage.getItem("sageSeniorName") || "Margaret";
 
   // Redirect to setup if no profile saved (and not the demo user)
-  if (!localStorage.getItem("sageSeniorId") && !localStorage.getItem("sageDemo")) {
+  // Check cookies too for Safari PWA standalone mode
+  if (!localStorage.getItem("sageSeniorId") && !getCookie("sageSeniorId") && !localStorage.getItem("sageDemo")) {
     window.location.href = "/setup";
   }
   let isListening = false;
@@ -1277,7 +1281,12 @@
     // This avoids the iOS mic permission prompt on every page load.
 
     if (!sessionStorage.getItem("sageGreeted")) {
+      // Auto-greeting on app open — cancelled if user taps Talk first
+      window._greetingPending = true;
       setTimeout(async () => {
+        // If user already started talking, skip the proactive greeting
+        if (!window._greetingPending) return;
+        window._greetingPending = false;
         // Wait for location to resolve before greeting (max 3s timeout built in)
         await locationReady;
         // Send a greeting message to the AI so it can mention today's appointments/reminders
@@ -1453,6 +1462,9 @@
 
   async function sendMessage(text) {
     unlockAudio(); // ensure audio is unlocked whenever a message is sent
+    // Cancel proactive greeting if user sends a message first
+    window._greetingPending = false;
+    if (!sessionStorage.getItem("sageGreeted")) sessionStorage.setItem("sageGreeted", "1");
     const input = document.getElementById("typeInput");
     const msg = text || input.value.trim();
     if (!msg) return;
@@ -1683,6 +1695,9 @@
 
   function toggleVoice() {
     unlockAudio();
+    // Cancel proactive greeting if user taps Talk
+    window._greetingPending = false;
+    if (!sessionStorage.getItem("sageGreeted")) sessionStorage.setItem("sageGreeted", "1");
     if (isListening) {
       clearTimeout(silenceTimer);
       if (hasSR && recognition) {

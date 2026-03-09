@@ -472,6 +472,7 @@
       if (data.token) _setCk("sageSeniorToken", data.token);
       _setCk("sageSeniorId", data.senior._id);
       _setCk("sageSeniorName", data.senior.name);
+      _setCk("sageFamilyCode", data.senior.familyCode);
 
       // Show success state
       document.getElementById("step3Logo").textContent  = "✅";
@@ -541,7 +542,7 @@
       localStorage.setItem("sageSeniorName", data.senior.name);
       localStorage.setItem("sageFamilyCode", data.senior.familyCode);
       localStorage.setItem("sageSeniorToken", data.token);
-      _setCk("sageSeniorToken", data.token); _setCk("sageSeniorId", data.senior._id); _setCk("sageSeniorName", data.senior.name);
+      _setCk("sageSeniorToken", data.token); _setCk("sageSeniorId", data.senior._id); _setCk("sageSeniorName", data.senior.name); _setCk("sageFamilyCode", data.senior.familyCode);
       window.location.href = "/elder";
     } catch {
       document.getElementById("returningError").textContent = "Invalid email or password. Please try again.";
@@ -570,7 +571,7 @@
       localStorage.setItem("sageSeniorName", data.senior.name);
       localStorage.setItem("sageFamilyCode", data.senior.familyCode);
       localStorage.setItem("sageSeniorToken", data.token);
-      _setCk("sageSeniorToken", data.token); _setCk("sageSeniorId", data.senior._id); _setCk("sageSeniorName", data.senior.name);
+      _setCk("sageSeniorToken", data.token); _setCk("sageSeniorId", data.senior._id); _setCk("sageSeniorName", data.senior.name); _setCk("sageFamilyCode", data.senior.familyCode);
       window.location.href = "/elder";
     } catch {
       document.getElementById("returningError").textContent = "Invalid family code. Please check and try again.";

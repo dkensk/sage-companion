@@ -1221,7 +1221,11 @@
 
 <script>
   // Auto-redirect logged-in seniors straight to chat (skip landing page)
-  if (localStorage.getItem("sageToken") && localStorage.getItem("sageSeniorId")) {
+  // Check both localStorage and cookies (Safari PWA has separate storage)
+  function getC(n) { const m = document.cookie.match('(^|;)\\s*' + n + '\\s*=\\s*([^;]+)'); return m ? m.pop() : null; }
+  const hasToken = localStorage.getItem("sageSeniorToken") || getC("sageSeniorToken");
+  const hasId = localStorage.getItem("sageSeniorId") || getC("sageSeniorId");
+  if (hasToken && hasId) {
     window.location.replace("/elder");
   }
 
