@@ -1220,6 +1220,11 @@
 </footer>
 
 <script>
+  // Auto-redirect logged-in seniors straight to chat (skip landing page)
+  if (localStorage.getItem("sageToken") && localStorage.getItem("sageSeniorId")) {
+    window.location.replace("/elder");
+  }
+
   function goSenior() {
     window.location.href = localStorage.getItem("sageSeniorId") ? "/elder" : "/setup";
   }
