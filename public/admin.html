@@ -745,6 +745,7 @@
                 <th>Joined</th>
                 <th>Last Active</th>
                 <th>Chats</th>
+                <th>Cost (30d)</th>
                 <th>Status</th>
                 <th>Actions</th>
               </tr>
@@ -1064,6 +1065,7 @@
       html += '<td>' + fmtDate(u.createdAt) + '</td>';
       html += '<td>' + timeAgo(u.lastActive) + '</td>';
       html += '<td>' + (u.totalChats || 0) + '</td>';
+      html += '<td style="font-weight:600;color:' + (u.cost30d > 1 ? 'var(--amber)' : u.cost30d > 0 ? 'var(--teal)' : 'var(--muted)') + '">$' + (u.cost30d || 0).toFixed(2) + '</td>';
       html += '<td>' + activeStatus(u.lastActive, u.suspended) + '</td>';
       html += '<td style="white-space:nowrap;">';
       html += '<button class="suspend-btn' + (u.suspended ? ' reactivate' : '') + '" onclick="event.stopPropagation(); toggleSuspend(\'' + uid + '\',' + (!u.suspended) + ')" style="margin-right:6px;">' + (u.suspended ? 'Reactivate' : 'Suspend') + '</button>';
@@ -1221,6 +1223,32 @@
           <button class="suspend-btn" onclick="deleteUser('${u._id || u.id}', '${esc(u.name).replace(/'/g, "\\'")}'); closeDetailPanel();"
             style="background:#FEE2E2;color:#DC2626;">Delete User</button>
         </div>
+      </div>
+
+      <div class="detail-section">
+        <div class="detail-section-title">Platform Cost</div>
+        <div class="metrics-grid">
+          <div class="metric-box">
+            <div class="metric-val" style="color:var(--teal)">$${(u.costSummary?.today ?? 0).toFixed(2)}</div>
+            <div class="metric-label">Today</div>
+          </div>
+          <div class="metric-box">
+            <div class="metric-val" style="color:var(--teal)">$${(u.costSummary?.last7d ?? 0).toFixed(2)}</div>
+            <div class="metric-label">Last 7 days</div>
+          </div>
+          <div class="metric-box">
+            <div class="metric-val" style="color:${(u.costSummary?.last30d ?? 0) > 1 ? 'var(--amber)' : 'var(--teal)'}">$${(u.costSummary?.last30d ?? 0).toFixed(2)}</div>
+            <div class="metric-label">Last 30 days</div>
+          </div>
+          <div class="metric-box">
+            <div class="metric-val" style="font-weight:900">$${(u.costSummary?.allTime ?? 0).toFixed(2)}</div>
+            <div class="metric-label">All time</div>
+          </div>
+        </div>
+        ${u.costSummary?.byType ? '<div style="margin-top:10px;font-size:13px;color:var(--muted);line-height:1.6;">' +
+          Object.entries(u.costSummary.byType).map(([type, cost]) =>
+            '<span style="margin-right:14px;">' + type.replace('_', ' ') + ': <strong>$' + cost.toFixed(3) + '</strong></span>'
+          ).join('') + '</div>' : ''}
       </div>
 
       <div class="detail-section">

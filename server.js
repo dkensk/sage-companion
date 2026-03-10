@@ -119,6 +119,44 @@ async function trackUsage(seniorId, field) {
   } catch (e) { /* non-critical — don't fail the request */ }
 }
 
+// ── Cost tracking helpers ────────────────────────────────────────────────────
+
+// Pricing per 1M tokens (as of 2025 — update if models change)
+const MODEL_PRICING = {
+  "claude-haiku-4-5-20251001": { input: 0.80, output: 4.00 },
+  "claude-sonnet-4-5-20250929": { input: 3.00, output: 15.00 },
+  "claude-opus-4-5-20251101":  { input: 15.00, output: 75.00 },
+};
+// OpenAI TTS pricing per 1M characters
+const TTS_PRICING = {
+  "gpt-4o-mini-tts": 12.00,  // $12/1M chars
+  "tts-1":           15.00,
+  "tts-1-hd":        30.00,
+};
+
+async function logCost(seniorId, callType, model, inputTokens, outputTokens, ttsChars) {
+  try {
+    const pricing = MODEL_PRICING[model] || MODEL_PRICING["claude-haiku-4-5-20251001"];
+    let cost = ((inputTokens || 0) * pricing.input + (outputTokens || 0) * pricing.output) / 1_000_000;
+    if (ttsChars && ttsChars > 0) {
+      const ttsModel = (process.env.TTS_MODEL || "gpt-4o-mini-tts").trim();
+      const ttsPricing = TTS_PRICING[ttsModel] || TTS_PRICING["gpt-4o-mini-tts"];
+      cost += (ttsChars * ttsPricing) / 1_000_000;
+    }
+    const today = new Date().toISOString().split("T")[0];
+    await supabase.from("cost_log").insert({
+      senior_id: seniorId,
+      date: today,
+      call_type: callType,
+      model: model || "unknown",
+      input_tokens: inputTokens || 0,
+      output_tokens: outputTokens || 0,
+      tts_chars: ttsChars || 0,
+      cost_usd: Math.round(cost * 1_000_000) / 1_000_000, // 6 decimal places
+    });
+  } catch (e) { /* non-critical */ }
+}
+
 // ── Long-term memory helpers ──────────────────────────────────────────────────
 
 // Skip extraction for short/trivial messages (saves an API call ~80% of the time)
@@ -196,8 +234,9 @@ async function extractMemories(seniorId, userMessage, aiReply) {
       byCategory[m.category].push(m);
     }
 
+    const memModel = process.env.CHAT_MODEL || "claude-haiku-4-5-20251001";
     const extraction = await anthropic.messages.create({
-      model: process.env.CHAT_MODEL || "claude-haiku-4-5-20251001",
+      model: memModel,
       max_tokens: 300,
       system: "Extract personal facts about the senior from this conversation. Return a JSON array only. Be selective — only extract clear, meaningful facts.",
       messages: [{
@@ -211,6 +250,10 @@ Senior said: "${trimmed}"
 Sage replied: "${aiReply.slice(0, 200)}"`,
       }],
     });
+
+    // Log memory extraction cost (non-blocking)
+    const memTokens = extraction.usage || {};
+    logCost(seniorId, "memory_extraction", memModel, memTokens.input_tokens, memTokens.output_tokens, 0).catch(() => {});
 
     const raw = extraction.content[0]?.text || "[]";
     const jsonMatch = raw.match(/\[[\s\S]*\]/);
@@ -1225,6 +1268,9 @@ Never invent facts not listed above. If something contradicts a memory, ask gent
 
     const rawReply = response.content[0].text;
 
+    // ── Track token usage for cost calculation (non-blocking) ────────────────
+    const chatTokens = response.usage || {};
+
     // ── Clean reply and extract tags immediately ──────────────────────────────
     const askDoctorMatch = rawReply.match(/\[ASK_DOCTOR:\s*(.+?)\]/s);
     const suggestedQuestion = askDoctorMatch ? askDoctorMatch[1].trim() : null;
@@ -1341,7 +1387,9 @@ Never invent facts not listed above. If something contradicts a memory, ask gent
     if (ttsAudioBase64) result.audioBase64 = ttsAudioBase64;
     res.json(result);
 
-    // Non-blocking: extract long-term memories from this exchange
+    // Non-blocking: log cost + extract long-term memories
+    const ttsChars = ttsEnabled ? spokenText.length : 0;
+    logCost(effectiveSeniorId, "chat", chatModel, chatTokens.input_tokens, chatTokens.output_tokens, ttsChars).catch(() => {});
     extractMemories(effectiveSeniorId, message, aiReply)
       .then(() => console.log("[Memory] extraction completed for:", message.slice(0, 40)))
       .catch(e => console.error("[Memory] bg extract:", e.message));
@@ -2228,7 +2276,19 @@ app.get("/api/admin/users", adminAuth, async (req, res) => {
     if (sErr) { console.error("[Admin] Users fetch error:", sErr.message); return res.status(500).json({ error: sErr.message }); }
     if (!seniors || !seniors.length) { return res.json([]); }
 
-    // Return users with basic info — no count queries that could fail or time out
+    // Fetch cost totals for all users in one query (last 30 days)
+    const thirtyDaysAgo = new Date(Date.now() - 30 * 86400000).toISOString().split("T")[0];
+    const { data: costRows } = await supabase
+      .from("cost_log")
+      .select("senior_id, cost_usd")
+      .gte("date", thirtyDaysAgo);
+
+    // Sum costs per senior
+    const costBySenior = {};
+    for (const c of (costRows || [])) {
+      costBySenior[c.senior_id] = (costBySenior[c.senior_id] || 0) + (c.cost_usd || 0);
+    }
+
     const enriched = seniors.map(s => ({
       ...norm(s),
       totalChats: 0,
@@ -2236,6 +2296,7 @@ app.get("/api/admin/users", adminAuth, async (req, res) => {
       openAlerts: 0,
       totalAppts: 0,
       totalDoctorQ: 0,
+      cost30d: Math.round((costBySenior[s.id] || 0) * 100) / 100,
     }));
 
     console.log(`[Admin] Returning ${enriched.length} users`);
@@ -2266,12 +2327,34 @@ app.get("/api/admin/users/:id", adminAuth, async (req, res) => {
     ]);
 
     // Aggregate totals for detail panel
-    const totalChats        = (await supabase.from("conversations").select("*", { count: "exact", head: true }).eq("senior_id", id).eq("role", "user")).count ?? 0;
-    const totalMedsTaken    = (await supabase.from("med_log").select("*", { count: "exact", head: true }).eq("senior_id", id)).count ?? 0;
-    const totalEmergencies  = (await supabase.from("alerts").select("*", { count: "exact", head: true }).eq("senior_id", id).eq("type", "emergency")).count ?? 0;
-    const totalAppointments = (await supabase.from("appointments").select("*", { count: "exact", head: true }).eq("senior_id", id)).count ?? 0;
-    const totalDrQuestions  = (await supabase.from("doctor_questions").select("*", { count: "exact", head: true }).eq("senior_id", id)).count ?? 0;
-    const totalDoctorVisits = (await supabase.from("doctor_visits").select("*", { count: "exact", head: true }).eq("senior_id", id)).count ?? 0;
+    const [chatsCount, medsCount, emergCount, apptsCount, drqCount, visitsCount, costData] = await Promise.all([
+      supabase.from("conversations").select("*", { count: "exact", head: true }).eq("senior_id", id).eq("role", "user"),
+      supabase.from("med_log").select("*", { count: "exact", head: true }).eq("senior_id", id),
+      supabase.from("alerts").select("*", { count: "exact", head: true }).eq("senior_id", id).eq("type", "emergency"),
+      supabase.from("appointments").select("*", { count: "exact", head: true }).eq("senior_id", id),
+      supabase.from("doctor_questions").select("*", { count: "exact", head: true }).eq("senior_id", id),
+      supabase.from("doctor_visits").select("*", { count: "exact", head: true }).eq("senior_id", id),
+      supabase.from("cost_log").select("date, call_type, cost_usd, input_tokens, output_tokens, tts_chars").eq("senior_id", id).order("date", { ascending: false }).limit(500),
+    ]);
+
+    // Calculate cost summaries
+    const costs = costData.data || [];
+    const now = new Date();
+    const thirtyDaysAgo = new Date(now.getTime() - 30 * 86400000).toISOString().split("T")[0];
+    const sevenDaysAgo = new Date(now.getTime() - 7 * 86400000).toISOString().split("T")[0];
+    const todayStr = now.toISOString().split("T")[0];
+
+    const costAllTime = costs.reduce((s, c) => s + (c.cost_usd || 0), 0);
+    const cost30d = costs.filter(c => c.date >= thirtyDaysAgo).reduce((s, c) => s + (c.cost_usd || 0), 0);
+    const cost7d = costs.filter(c => c.date >= sevenDaysAgo).reduce((s, c) => s + (c.cost_usd || 0), 0);
+    const costToday = costs.filter(c => c.date === todayStr).reduce((s, c) => s + (c.cost_usd || 0), 0);
+
+    // Cost breakdown by type
+    const costByType = {};
+    for (const c of costs) {
+      if (!costByType[c.call_type]) costByType[c.call_type] = 0;
+      costByType[c.call_type] += c.cost_usd || 0;
+    }
 
     res.json({
       ...safeSenior(norm(senior)),
@@ -2281,12 +2364,19 @@ app.get("/api/admin/users/:id", adminAuth, async (req, res) => {
       appointments:    normArr(appts),
       usageMetrics:    normArr(metrics),
       recentActivity:  normArr(activity),
-      totalChats,
-      totalMedsTaken,
-      totalEmergencies,
-      totalAppointments,
-      totalDrQuestions,
-      totalDoctorVisits,
+      totalChats:        chatsCount.count ?? 0,
+      totalMedsTaken:    medsCount.count ?? 0,
+      totalEmergencies:  emergCount.count ?? 0,
+      totalAppointments: apptsCount.count ?? 0,
+      totalDrQuestions:  drqCount.count ?? 0,
+      totalDoctorVisits: visitsCount.count ?? 0,
+      costSummary: {
+        allTime: Math.round(costAllTime * 100) / 100,
+        last30d: Math.round(cost30d * 100) / 100,
+        last7d:  Math.round(cost7d * 100) / 100,
+        today:   Math.round(costToday * 100) / 100,
+        byType:  costByType,
+      },
     });
   } catch (e) { console.error(`[Error] ${req.method} ${req.path}:`, e.message); res.status(500).json({ error: "Something went wrong. Please try again." }); }
 });
@@ -2340,7 +2430,7 @@ app.delete("/api/admin/users/:id", adminAuth, async (req, res) => {
 
     // Delete all related data in order (foreign key dependencies)
     const tables = [
-      "push_subscriptions", "usage_metrics", "memories",
+      "push_subscriptions", "usage_metrics", "memories", "cost_log",
       "conversations", "med_log", "medications", "doctor_questions",
       "doctor_visits", "appointments", "reminders", "activity", "alerts",
     ];
