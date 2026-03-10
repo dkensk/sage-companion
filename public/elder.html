@@ -640,7 +640,26 @@
   <script>
     if ('serviceWorker' in navigator) {
       window.addEventListener('load', () => {
-        navigator.serviceWorker.register('/sw.js').catch(() => {});
+        navigator.serviceWorker.register('/sw.js').then(reg => {
+          // Force check for updates on every page load
+          reg.update().catch(() => {});
+          // When a new SW is waiting, tell it to activate immediately
+          if (reg.waiting) reg.waiting.postMessage({ type: 'SKIP_WAITING' });
+          reg.addEventListener('updatefound', () => {
+            const newSW = reg.installing;
+            if (newSW) {
+              newSW.addEventListener('statechange', () => {
+                if (newSW.state === 'installed' && navigator.serviceWorker.controller) {
+                  newSW.postMessage({ type: 'SKIP_WAITING' });
+                }
+              });
+            }
+          });
+        }).catch(() => {});
+        // Reload when a new SW takes control
+        navigator.serviceWorker.addEventListener('controllerchange', () => {
+          window.location.reload();
+        });
       });
     }
   </script>
@@ -788,7 +807,7 @@
       <span class="icon">❓</span>
       <span>My Questions</span>
     </button>
-    <button class="action-btn" onclick="showSection('reminders')" style="background:#FFFBEB;border-color:#FDE68A;">
+    <button class="action-btn" onclick="showSection('reminders')">
       <span class="icon">📝</span>
       <span>My Reminders</span>
     </button>

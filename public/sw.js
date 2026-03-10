@@ -1,7 +1,7 @@
 // ── Sage Companion Service Worker ────────────────────────────────────────────
 // Handles: offline caching + push notification display
 
-const CACHE_NAME = "sage-v88";
+const CACHE_NAME = "sage-v89";
 const CACHE_URLS = [
   "/",
   "/elder",
@@ -11,6 +11,13 @@ const CACHE_URLS = [
   "/icons/icon-512.png",
   "/icons/apple-touch-icon.png",
 ];
+
+// ── Listen for skip-waiting message from client ─────────────────────────────
+self.addEventListener("message", (event) => {
+  if (event.data && event.data.type === "SKIP_WAITING") {
+    self.skipWaiting();
+  }
+});
 
 // ── Install: pre-cache shell ──────────────────────────────────────────────────
 self.addEventListener("install", (event) => {
