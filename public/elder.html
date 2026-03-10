@@ -81,14 +81,11 @@
       font-weight: 500;
     }
 
-    .header-time {
-      text-align: right;
-      font-size: 13px;
-      opacity: 0.7;
-      font-weight: 500;
-      line-height: 1.5;
-      flex-shrink: 0;
-      white-space: nowrap;
+    .header-date {
+      font-size: 17px;
+      opacity: 0.85;
+      font-weight: 600;
+      margin-top: 2px;
     }
 
     /* ── MAIN ────────────────────────────────────────────── */
@@ -624,7 +621,7 @@
       header { padding: 14px 12px 16px; }
       .logo { font-size: 20px; }
       .greeting { font-size: 14px; }
-      .header-time { font-size: 11px; }
+      .header-date { font-size: 14px; }
       .help-btn { padding: 12px 16px; font-size: 16px; border-radius: 10px; }
       .hdr-btn { font-size: 12px; padding: 5px 9px; }
       .main { padding: 14px 10px; }
@@ -739,12 +736,10 @@
   <div style="min-width:0;">
     <div class="logo"><span class="logo-shield">🌿</span> Sage</div>
     <div class="greeting" id="headerGreeting">Good morning!</div>
+    <div class="header-date" id="headerDate"></div>
   </div>
   <div class="header-right">
     <button onclick="showEmergencyModal()" class="help-btn">🆘 Get Help</button>
-    <div class="header-actions">
-      <div class="header-time" id="headerTime"></div>
-    </div>
   </div>
 </header>
 
@@ -1264,12 +1259,10 @@
   // ── Clock ─────────────────────────────────────────────────────────────────────
   function updateClock() {
     const now = new Date();
-    const time = now.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" });
-    const date = now.toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" });
-    document.getElementById("headerTime").innerHTML = `${time}<br>${date}`;
+    const date = now.toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric" });
+    document.getElementById("headerDate").textContent = date;
   }
   updateClock();
-  setInterval(updateClock, 30000);
 
   // ── Init ──────────────────────────────────────────────────────────────────────
   async function init() {
