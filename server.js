@@ -121,6 +121,10 @@ async function trackUsage(seniorId, field) {
 
 // ── Long-term memory helpers ──────────────────────────────────────────────────
 
+// Skip extraction for short/trivial messages (saves an API call ~80% of the time)
+const SKIP_EXTRACTION_PATTERNS = /^(ok|okay|yes|no|yeah|yep|nope|sure|thanks|thank you|got it|good|great|bye|hi|hello|hey|alright|fine|cool|hm+|ah+|oh+|hmm+|right|yea)\b/i;
+const MIN_EXTRACTION_LENGTH = 25; // messages shorter than this rarely contain facts
+
 function calculateSimilarity(str1, str2) {
   const words = (s) => new Set(s.toLowerCase().split(/\W+/).filter(w => w.length > 3));
   const a = words(str1), b = words(str2);
@@ -131,24 +135,38 @@ function calculateSimilarity(str1, str2) {
   return intersection / new Set([...a, ...b]).size;
 }
 
-async function deduplicateAndSave(seniorId, category, text) {
+async function deduplicateAndSave(seniorId, category, text, existingByCategory) {
   try {
-    const { data: existing } = await supabase
-      .from("memories")
-      .select("id, memory_text, mention_count")
-      .eq("senior_id", seniorId)
-      .eq("category", category);
+    // Use pre-fetched category data if available (avoids extra DB call)
+    let existing = existingByCategory;
+    if (!existing) {
+      const { data } = await supabase
+        .from("memories")
+        .select("id, memory_text, mention_count")
+        .eq("senior_id", seniorId)
+        .eq("category", category);
+      existing = data || [];
+    }
 
-    const similar = (existing || []).find(m => calculateSimilarity(m.memory_text, text) > 0.6);
+    const similar = existing.find(m => calculateSimilarity(m.memory_text, text) > 0.6);
 
     if (similar) {
       await supabase.from("memories").update({
         last_mentioned: new Date().toISOString(),
         mention_count: similar.mention_count + 1,
       }).eq("id", similar.id);
+    } else if (existing.length >= 30) {
+      // At cap — replace the oldest, least-mentioned memory
+      const weakest = existing.sort((a, b) => a.mention_count - b.mention_count)[0];
+      if (weakest) {
+        await supabase.from("memories").update({
+          category,
+          memory_text: text,
+          mention_count: 1,
+          last_mentioned: new Date().toISOString(),
+        }).eq("id", weakest.id);
+      }
     } else {
-      // Cap at 30 per category — skip insert if at limit
-      if ((existing || []).length >= 30) return;
       await supabase.from("memories").insert({
         senior_id: seniorId,
         category,
@@ -159,53 +177,100 @@ async function deduplicateAndSave(seniorId, category, text) {
 }
 
 async function extractMemories(seniorId, userMessage, aiReply) {
-  if (!userMessage || userMessage.trim().length < 15) return; // skip "ok", "thanks", etc.
+  const trimmed = (userMessage || "").trim();
+  // Skip trivial messages — no API call needed
+  if (trimmed.length < MIN_EXTRACTION_LENGTH) return;
+  if (SKIP_EXTRACTION_PATTERNS.test(trimmed)) return;
+  // Skip pure questions with no personal info (e.g. "what's the weather?")
+  if (trimmed.length < 60 && /^(what|when|where|how|can you|will you|is it|are there|do you|does|did)\b/i.test(trimmed) && !/\b(my|i|i'm|i've|i'd|me|mine)\b/i.test(trimmed)) return;
+
   try {
+    // Pre-fetch ALL memories for this senior in one query (instead of per-category)
+    const { data: allExisting } = await supabase
+      .from("memories")
+      .select("id, category, memory_text, mention_count")
+      .eq("senior_id", seniorId);
+    const byCategory = {};
+    for (const m of (allExisting || [])) {
+      if (!byCategory[m.category]) byCategory[m.category] = [];
+      byCategory[m.category].push(m);
+    }
+
     const extraction = await anthropic.messages.create({
       model: process.env.CHAT_MODEL || "claude-haiku-4-5-20251001",
       max_tokens: 300,
-      system: "Extract personal facts about the senior from this conversation. Return a JSON array only.",
+      system: "Extract personal facts about the senior from this conversation. Return a JSON array only. Be selective — only extract clear, meaningful facts.",
       messages: [{
         role: "user",
         content: `Extract personal facts about the senior from this conversation snippet.
 Categories: family, hobby, health, preference, life_event, concern, routine
 Return JSON array: [{"category":"family","text":"Grandson Tommy plays soccer"}]
-Only extract clear facts explicitly stated by the senior. If none, return [].
+Only extract clear facts explicitly stated by the senior. Skip greetings, questions, and vague statements. If none, return [].
 
-Senior said: "${userMessage}"
+Senior said: "${trimmed}"
 Sage replied: "${aiReply.slice(0, 200)}"`,
       }],
     });
 
     const raw = extraction.content[0]?.text || "[]";
-    // Extract JSON array from response (handle markdown code blocks)
     const jsonMatch = raw.match(/\[[\s\S]*\]/);
     if (!jsonMatch) return;
     const memories = JSON.parse(jsonMatch[0]);
     if (!Array.isArray(memories)) return;
 
     const validCategories = new Set(["family", "hobby", "health", "preference", "life_event", "concern", "routine"]);
-    for (const mem of memories.slice(0, 5)) { // max 5 per message
+    for (const mem of memories.slice(0, 5)) {
       if (mem.category && mem.text && validCategories.has(mem.category) && mem.text.length > 5 && mem.text.length < 200) {
-        await deduplicateAndSave(seniorId, mem.category, mem.text);
+        await deduplicateAndSave(seniorId, mem.category, mem.text, byCategory[mem.category] || []);
       }
     }
   } catch (e) { console.error("[Memory] extraction error:", e.message); }
 }
 
-async function getRelevantMemories(seniorId, limit = 10) {
+async function getRelevantMemories(seniorId, limit = 15) {
   try {
+    // Score = mention_count + recency bonus (memories mentioned recently rank higher)
     const { data, error } = await supabase
       .from("memories")
-      .select("category, memory_text")
+      .select("category, memory_text, mention_count, last_mentioned")
       .eq("senior_id", seniorId)
       .order("last_mentioned", { ascending: false })
-      .order("mention_count", { ascending: false })
-      .limit(limit);
+      .limit(50); // fetch more, then rank client-side
     if (error) { console.error("[Memory] retrieval DB error:", error.message); return ""; }
-    if (!data || data.length === 0) { console.log("[Memory] No memories found for senior:", seniorId); return ""; }
-    console.log("[Memory] Retrieved", data.length, "memories for senior:", seniorId);
-    return data.map(m => `- ${m.category}: ${m.memory_text}`).join("\n");
+    if (!data || data.length === 0) return "";
+
+    // Score: mention_count + recency bonus (0-5 points for last 7 days)
+    const now = Date.now();
+    const scored = data.map(m => {
+      const ageMs = now - new Date(m.last_mentioned || 0).getTime();
+      const ageDays = ageMs / 86400000;
+      const recencyBonus = ageDays < 1 ? 5 : ageDays < 3 ? 3 : ageDays < 7 ? 1 : 0;
+      return { ...m, score: (m.mention_count || 1) + recencyBonus };
+    });
+    scored.sort((a, b) => b.score - a.score);
+
+    // Group by category for organized display
+    const grouped = {};
+    for (const m of scored.slice(0, limit)) {
+      const cat = m.category || "general";
+      if (!grouped[cat]) grouped[cat] = [];
+      grouped[cat].push(m.memory_text);
+    }
+
+    const categoryLabels = {
+      family: "Family & relationships",
+      hobby: "Hobbies & interests",
+      health: "Health notes",
+      preference: "Preferences",
+      life_event: "Life events",
+      concern: "Current concerns",
+      routine: "Daily routine",
+    };
+
+    return Object.entries(grouped).map(([cat, items]) => {
+      const label = categoryLabels[cat] || cat;
+      return `${label}: ${items.join("; ")}`;
+    }).join("\n");
   } catch (e) {
     console.error("[Memory] retrieval error:", e.message);
     return "";
@@ -1835,6 +1900,38 @@ app.delete("/api/reminders/:seniorId/clear-completed", seniorAuth, validateUUID(
     await supabase.from("reminders").delete().eq("senior_id", req.params.seniorId).eq("completed", true);
     res.json({ success: true });
   } catch (e) { console.error(`[Error] ${req.method} ${req.path}:`, e.message); res.status(500).json({ error: "Something went wrong. Please try again." }); }
+});
+
+// ── Memory management endpoints ──────────────────────────────────────────────
+
+// GET memories for a senior (family dashboard or admin)
+app.get("/api/memories/:seniorId", seniorAuth, validateUUID("seniorId"), async (req, res) => {
+  try {
+    const { data, error } = await supabase
+      .from("memories")
+      .select("id, category, memory_text, mention_count, last_mentioned, created_at")
+      .eq("senior_id", req.params.seniorId)
+      .order("category")
+      .order("last_mentioned", { ascending: false });
+    if (error) return res.status(500).json({ error: error.message });
+    res.json(data || []);
+  } catch (e) { console.error(`[Error] ${req.method} ${req.path}:`, e.message); res.status(500).json({ error: "Something went wrong." }); }
+});
+
+// DELETE a specific memory
+app.delete("/api/memories/:id", seniorAuth, validateUUID("id"), async (req, res) => {
+  try {
+    await supabase.from("memories").delete().eq("id", req.params.id);
+    res.json({ success: true });
+  } catch (e) { console.error(`[Error] ${req.method} ${req.path}:`, e.message); res.status(500).json({ error: "Something went wrong." }); }
+});
+
+// DELETE all memories for a senior (reset)
+app.delete("/api/memories/:seniorId/all", seniorAuth, validateUUID("seniorId"), async (req, res) => {
+  try {
+    await supabase.from("memories").delete().eq("senior_id", req.params.seniorId);
+    res.json({ success: true, message: "All memories cleared" });
+  } catch (e) { console.error(`[Error] ${req.method} ${req.path}:`, e.message); res.status(500).json({ error: "Something went wrong." }); }
 });
 
 // ── Google Calendar OAuth ─────────────────────────────────────────────────────
