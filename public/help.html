@@ -1,0 +1,323 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Help & Support - Sage Companion</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
+      background-color: #F1F5F9;
+      color: #0F172A;
+      line-height: 1.7;
+    }
+
+    header {
+      background: linear-gradient(135deg, #1E3A8A 0%, #2D4EAA 100%);
+      color: white;
+      padding: 2rem 1rem;
+    }
+
+    .header-content {
+      max-width: 700px;
+      margin: 0 auto;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .header-title {
+      font-size: 1.8rem;
+      font-weight: 800;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .back-link {
+      background: rgba(255,255,255,0.2);
+      color: white;
+      padding: 10px 18px;
+      border-radius: 12px;
+      text-decoration: none;
+      font-size: 16px;
+      font-weight: 600;
+      border: 2px solid rgba(255,255,255,0.3);
+      transition: background 0.15s;
+    }
+
+    .back-link:hover { background: rgba(255,255,255,0.3); }
+
+    .container {
+      max-width: 700px;
+      margin: 24px auto;
+      padding: 0 16px 48px;
+    }
+
+    .card {
+      background: white;
+      border-radius: 20px;
+      padding: 24px;
+      margin-bottom: 20px;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.06);
+      border: 1px solid #E2E8F0;
+    }
+
+    .card-title {
+      font-size: 1.3rem;
+      font-weight: 700;
+      margin-bottom: 16px;
+      color: #0F172A;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .faq-item {
+      border-bottom: 1px solid #E2E8F0;
+      padding: 16px 0;
+    }
+
+    .faq-item:last-child { border-bottom: none; }
+
+    .faq-q {
+      font-size: 18px;
+      font-weight: 700;
+      color: #1E3A8A;
+      cursor: pointer;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 12px;
+      -webkit-tap-highlight-color: transparent;
+    }
+
+    .faq-q::after {
+      content: "+";
+      font-size: 24px;
+      font-weight: 300;
+      color: #94A3B8;
+      flex-shrink: 0;
+      transition: transform 0.2s;
+    }
+
+    .faq-q.open::after {
+      content: "−";
+      color: #1E3A8A;
+    }
+
+    .faq-a {
+      display: none;
+      font-size: 16px;
+      color: #475569;
+      margin-top: 10px;
+      line-height: 1.7;
+      padding-right: 24px;
+    }
+
+    .faq-a.open { display: block; }
+
+    .step-list {
+      counter-reset: steps;
+      list-style: none;
+      padding: 0;
+    }
+
+    .step-list li {
+      counter-increment: steps;
+      padding: 14px 0 14px 48px;
+      position: relative;
+      font-size: 17px;
+      color: #334155;
+      border-bottom: 1px solid #F1F5F9;
+    }
+
+    .step-list li:last-child { border-bottom: none; }
+
+    .step-list li::before {
+      content: counter(steps);
+      position: absolute;
+      left: 0;
+      top: 14px;
+      width: 32px;
+      height: 32px;
+      background: #1E3A8A;
+      color: white;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 15px;
+      font-weight: 700;
+    }
+
+    .tip-box {
+      background: #F0FDF4;
+      border: 1.5px solid #BBF7D0;
+      border-radius: 14px;
+      padding: 16px 18px;
+      margin-top: 12px;
+      font-size: 16px;
+      color: #166534;
+      line-height: 1.6;
+    }
+
+    .contact-link {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      background: #1E3A8A;
+      color: white;
+      padding: 14px 24px;
+      border-radius: 14px;
+      text-decoration: none;
+      font-size: 17px;
+      font-weight: 700;
+      margin-top: 16px;
+      transition: opacity 0.15s;
+    }
+
+    .contact-link:hover { opacity: 0.9; }
+
+    @media (max-width: 480px) {
+      header { padding: 16px 12px; }
+      .header-title { font-size: 1.4rem; }
+      .back-link { padding: 8px 14px; font-size: 14px; }
+      .card { padding: 18px 16px; }
+      .faq-q { font-size: 16px; }
+    }
+  </style>
+</head>
+<body>
+
+<header>
+  <div class="header-content">
+    <div class="header-title">❓ Help & Support</div>
+    <a href="/elder" class="back-link">← Back</a>
+  </div>
+</header>
+
+<div class="container">
+
+  <!-- Getting Started -->
+  <div class="card">
+    <div class="card-title">🌿 Getting Started with Sage</div>
+    <ol class="step-list">
+      <li>Open Sage from your home screen or browser</li>
+      <li>Tap the <strong>Talk</strong> button and speak naturally — Sage will listen and respond</li>
+      <li>You can also type your message in the text box</li>
+      <li>Use the quick action buttons for Medications, Calendar, Doctor Visits, and Reminders</li>
+      <li>Sage remembers your conversations and learns about you over time</li>
+    </ol>
+    <div class="tip-box">
+      <strong>Tip:</strong> You can say things like "Remind me to call the dentist tomorrow" or "When is my next doctor appointment?" and Sage will handle it for you.
+    </div>
+  </div>
+
+  <!-- FAQ -->
+  <div class="card">
+    <div class="card-title">💬 Frequently Asked Questions</div>
+
+    <div class="faq-item">
+      <div class="faq-q" onclick="toggleFaq(this)">How do I talk to Sage?</div>
+      <div class="faq-a">Tap the big <strong>Tap to Talk</strong> button and speak naturally. Sage will listen, think about what you said, and respond with a friendly voice. You can also type in the text box below the talk button if you prefer.</div>
+    </div>
+
+    <div class="faq-item">
+      <div class="faq-q" onclick="toggleFaq(this)">How do I add my medications?</div>
+      <div class="faq-a">Tap <strong>My Medications</strong>, then either scan your medication label with the camera button or tap <strong>Add Medication Manually</strong>. You can set the name, dose, time, and how many times per day you take it.</div>
+    </div>
+
+    <div class="faq-item">
+      <div class="faq-q" onclick="toggleFaq(this)">How do medication reminders work?</div>
+      <div class="faq-a">After adding your medications, tap the <strong>Enable Reminders</strong> button on the Medications screen. You'll get a notification on your phone when it's time to take your medicine. You can mark it as taken right from the notification.</div>
+    </div>
+
+    <div class="faq-item">
+      <div class="faq-q" onclick="toggleFaq(this)">How do I add a doctor's appointment?</div>
+      <div class="faq-a">You can say to Sage: "I have a doctor's appointment on Thursday at 2 PM" and Sage will add it to your calendar. You can also tap <strong>My Calendar</strong> and add it manually. Sage will remind you 1 hour and 15 minutes before your appointment.</div>
+    </div>
+
+    <div class="faq-item">
+      <div class="faq-q" onclick="toggleFaq(this)">What is the Get Help button for?</div>
+      <div class="faq-a">The red <strong>Get Help</strong> button at the top is for emergencies. It can alert your family member and give you the option to call 911. Only use it when you need immediate help.</div>
+    </div>
+
+    <div class="faq-item">
+      <div class="faq-q" onclick="toggleFaq(this)">What is my Family Code?</div>
+      <div class="faq-a">Your Family Code is a special code that lets your family members connect to your Sage account. Share it with a trusted family member so they can check on your medications, appointments, and get emergency alerts. You can find it in <strong>Settings</strong>.</div>
+    </div>
+
+    <div class="faq-item">
+      <div class="faq-q" onclick="toggleFaq(this)">Can Sage give me medical advice?</div>
+      <div class="faq-a">No — Sage is a companion, not a doctor. Sage will never give medical advice, diagnose conditions, or recommend treatments. If you ask a health question, Sage will suggest you talk to your doctor and can even save the question for your next visit.</div>
+    </div>
+
+    <div class="faq-item">
+      <div class="faq-q" onclick="toggleFaq(this)">How do I add Sage to my home screen?</div>
+      <div class="faq-a">On iPhone: Open Sage in Safari, tap the <strong>Share</strong> button (the box with an arrow), then tap <strong>Add to Home Screen</strong>. On Android: Tap the three-dot menu in Chrome, then tap <strong>Add to Home Screen</strong>. This lets you open Sage like a regular app.</div>
+    </div>
+
+    <div class="faq-item">
+      <div class="faq-q" onclick="toggleFaq(this)">Is my information private?</div>
+      <div class="faq-a">Yes. Your conversations, medications, and health information are private and encrypted. Only you and your connected family members can see your information. We never sell or share your personal data. See our <a href="/privacy" style="color:#1E3A8A;font-weight:600;">Privacy Policy</a> for details.</div>
+    </div>
+
+    <div class="faq-item">
+      <div class="faq-q" onclick="toggleFaq(this)">I accidentally marked a medication as taken. Can I undo it?</div>
+      <div class="faq-a">Yes! On the Medications screen, tap the green <strong>Taken</strong> badge next to the medication you want to undo. It will be unmarked so you can take it at the right time.</div>
+    </div>
+  </div>
+
+  <!-- Troubleshooting -->
+  <div class="card">
+    <div class="card-title">🔧 Troubleshooting</div>
+
+    <div class="faq-item">
+      <div class="faq-q" onclick="toggleFaq(this)">Sage can't hear me when I tap Talk</div>
+      <div class="faq-a">Make sure your phone's microphone is turned on for your browser. On iPhone, go to <strong>Settings → Safari → Microphone</strong> and make sure it's allowed. Also check that your phone isn't on silent mode.</div>
+    </div>
+
+    <div class="faq-item">
+      <div class="faq-q" onclick="toggleFaq(this)">I'm not getting medication reminders</div>
+      <div class="faq-a">Make sure you tapped <strong>Enable Reminders</strong> on the Medications screen and allowed notifications when your phone asked. On iPhone, check <strong>Settings → Notifications → Safari</strong> (or your browser) and make sure notifications are turned on.</div>
+    </div>
+
+    <div class="faq-item">
+      <div class="faq-q" onclick="toggleFaq(this)">The app looks old or isn't showing my changes</div>
+      <div class="faq-a">Try closing the app completely and reopening it. If that doesn't work, clear your browser's saved data for this site. The app updates automatically — sometimes it just needs a fresh restart.</div>
+    </div>
+
+    <div class="faq-item">
+      <div class="faq-q" onclick="toggleFaq(this)">I forgot my password or family code</div>
+      <div class="faq-a">On the login screen, tap <strong>Forgot password?</strong> or <strong>Forgot family code?</strong> to get help recovering your account. If you're still having trouble, <a href="/contact" style="color:#1E3A8A;font-weight:600;">contact us</a> and we'll help you get back in.</div>
+    </div>
+  </div>
+
+  <!-- Still need help? -->
+  <div class="card" style="text-align:center;">
+    <div class="card-title" style="justify-content:center;">🤝 Still Need Help?</div>
+    <p style="font-size:17px;color:#475569;margin-bottom:8px;">We're here for you. Reach out anytime and we'll get back to you as soon as possible.</p>
+    <a href="/contact" class="contact-link">✉️ Contact Us</a>
+  </div>
+
+</div>
+
+<script>
+  function toggleFaq(el) {
+    const wasOpen = el.classList.contains("open");
+    // Close all
+    document.querySelectorAll(".faq-q").forEach(q => q.classList.remove("open"));
+    document.querySelectorAll(".faq-a").forEach(a => a.classList.remove("open"));
+    // Toggle clicked
+    if (!wasOpen) {
+      el.classList.add("open");
+      el.nextElementSibling.classList.add("open");
+    }
+  }
+</script>
+
+</body>
+</html>

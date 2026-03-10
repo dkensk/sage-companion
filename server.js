@@ -2734,6 +2734,40 @@ app.post("/api/push/test", seniorAuth, async (req, res) => {
   } catch (e) { console.error(`[Error] ${req.method} ${req.path}:`, e.message); res.status(500).json({ error: "Something went wrong. Please try again." }); }
 });
 
+// ── Contact form ────────────────────────────────────────────────────────────
+app.post("/api/contact", rateLimit("login"), async (req, res) => {
+  try {
+    const { name, email, topic, message } = req.body;
+    if (!name || !email || !message) return res.status(400).json({ error: "Name, email, and message are required" });
+
+    // Store in Supabase
+    await supabase.from("contact_messages").insert({
+      name, email, topic: topic || "general", message,
+    }).then(({ error }) => { if (error) console.error("[Contact] DB insert:", error.message); });
+
+    // Send email notification to admin
+    if (resend) {
+      resend.emails.send({
+        from: FROM_EMAIL,
+        to: process.env.ADMIN_EMAIL || "support@mysagecompanion.com",
+        replyTo: email,
+        subject: `[Sage Contact] ${topic || "General"} — from ${name}`,
+        html: `
+          <div style="font-family:-apple-system,sans-serif;max-width:560px;margin:0 auto;padding:24px;">
+            <h2 style="color:#1E3A8A;">New Contact Form Message</h2>
+            <p><strong>From:</strong> ${name} (${email})</p>
+            <p><strong>Topic:</strong> ${topic || "General"}</p>
+            <hr style="border:none;border-top:1px solid #E2E8F0;margin:16px 0;">
+            <p style="font-size:16px;line-height:1.6;white-space:pre-wrap;">${message}</p>
+          </div>
+        `,
+      }).catch(e => console.error("[Contact] Email send:", e.message));
+    }
+
+    res.json({ success: true });
+  } catch (e) { console.error(`[Error] ${req.method} ${req.path}:`, e.message); res.status(500).json({ error: "Something went wrong." }); }
+});
+
 // ─────────────────────────────────────────────────────────────────────────────
 // STATIC ROUTES
 // ─────────────────────────────────────────────────────────────────────────────
@@ -2744,6 +2778,8 @@ app.get("/calendar",       (req, res) => res.sendFile(path.join(__dirname, "publ
 app.get("/setup",          (req, res) => res.sendFile(path.join(__dirname, "public", "setup.html")));
 app.get("/admin",          (req, res) => res.sendFile(path.join(__dirname, "public", "admin.html")));
 app.get("/settings",       (req, res) => res.sendFile(path.join(__dirname, "public", "settings.html")));
+app.get("/help",           (req, res) => res.sendFile(path.join(__dirname, "public", "help.html")));
+app.get("/contact",        (req, res) => res.sendFile(path.join(__dirname, "public", "contact.html")));
 app.get("/terms",          (req, res) => res.sendFile(path.join(__dirname, "public", "terms.html")));
 app.get("/privacy",        (req, res) => res.sendFile(path.join(__dirname, "public", "privacy.html")));
 app.get("/reset-password", (req, res) => res.sendFile(path.join(__dirname, "public", "reset-password.html")));

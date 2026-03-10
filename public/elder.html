@@ -965,10 +965,16 @@
     </p>
   </div>
 
-  <!-- Settings & Sign Out — safe at bottom, away from emergency button -->
-  <div style="display:flex;align-items:center;justify-content:center;gap:24px;padding:32px 16px 48px;margin-top:12px;">
+  <!-- Footer links — safe at bottom, away from emergency button -->
+  <div style="display:flex;flex-wrap:wrap;align-items:center;justify-content:center;gap:14px;padding:32px 16px 16px;margin-top:12px;">
     <a href="/settings" style="color:var(--muted);font-size:15px;font-weight:600;text-decoration:none;padding:10px 16px;border-radius:10px;background:var(--bg2);border:1px solid var(--border);transition:background 0.15s;">⚙️ Settings</a>
+    <a href="/help" style="color:var(--muted);font-size:15px;font-weight:600;text-decoration:none;padding:10px 16px;border-radius:10px;background:var(--bg2);border:1px solid var(--border);transition:background 0.15s;">❓ Help</a>
+    <a href="/contact" style="color:var(--muted);font-size:15px;font-weight:600;text-decoration:none;padding:10px 16px;border-radius:10px;background:var(--bg2);border:1px solid var(--border);transition:background 0.15s;">✉️ Contact</a>
     <button onclick="seniorLogout()" style="color:var(--muted);font-size:15px;font-weight:600;text-decoration:none;padding:10px 16px;border-radius:10px;background:var(--bg2);border:1px solid var(--border);cursor:pointer;transition:background 0.15s;">Sign out</button>
+  </div>
+  <div style="text-align:center;padding:0 16px 48px;">
+    <a href="/terms" style="color:var(--muted);font-size:13px;text-decoration:none;margin-right:16px;">Terms</a>
+    <a href="/privacy" style="color:var(--muted);font-size:13px;text-decoration:none;">Privacy</a>
   </div>
 
 </div>
