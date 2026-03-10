@@ -1832,7 +1832,9 @@ app.get("/api/dashboard/:seniorId", familyAuth, validateUUID("seniorId"), async 
     ]);
 
     const takenToday = (logs || []).length;
-    const adherence  = (meds || []).length > 0 ? Math.round((takenToday / meds.length) * 100) : 0;
+    // Total expected doses = sum of each med's frequency (multi-dose meds count multiple times)
+    const totalExpectedDoses = (meds || []).reduce((sum, m) => sum + (m.frequency || 1), 0);
+    const adherence  = totalExpectedDoses > 0 ? Math.min(100, Math.round((takenToday / totalExpectedDoses) * 100)) : 0;
 
     res.json({
       senior: safeSenior(norm(senior)),
