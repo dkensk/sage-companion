@@ -548,6 +548,138 @@ async function checkMedicationReminders() {
   }
 }
 
+// ── Appointment reminder push notifications ──────────────────────────────────
+// Sends a reminder 1 hour before and 15 minutes before each appointment
+async function checkAppointmentReminders() {
+  if (!VAPID_PUBLIC || !VAPID_PRIVATE) return;
+  if (!process.env.SUPABASE_URL || process.env.SUPABASE_URL === "YOUR_SUPABASE_PROJECT_URL") return;
+
+  try {
+    const now = new Date();
+    const todayStr = now.toISOString().split("T")[0];
+
+    // Get today's appointments that have a time set
+    const { data: appts } = await supabase
+      .from("appointments")
+      .select("id, title, date, time, location, senior_id")
+      .eq("date", todayStr)
+      .not("time", "is", null);
+
+    if (!appts || !appts.length) return;
+
+    for (const appt of appts) {
+      // Parse appointment time (e.g. "2:00 PM" -> hours/minutes)
+      const timeMatch = (appt.time || "").match(/(\d{1,2}):(\d{2})\s*(AM|PM)/i);
+      if (!timeMatch) continue;
+      let apptHour = parseInt(timeMatch[1]);
+      const apptMin = parseInt(timeMatch[2]);
+      const period = timeMatch[3].toUpperCase();
+      if (period === "PM" && apptHour < 12) apptHour += 12;
+      if (period === "AM" && apptHour === 12) apptHour = 0;
+
+      const apptTime = new Date(now);
+      apptTime.setHours(apptHour, apptMin, 0, 0);
+      const diffMin = Math.round((apptTime - now) / 60000);
+
+      // Send at ~60 min before and ~15 min before (within 1-minute cron window)
+      const shouldNotify = (diffMin >= 59 && diffMin <= 61) || (diffMin >= 14 && diffMin <= 16);
+      if (!shouldNotify) continue;
+
+      const label = diffMin > 30 ? "in about 1 hour" : "in 15 minutes";
+      const locationStr = appt.location ? ` at ${appt.location}` : "";
+
+      const { data: subs } = await supabase
+        .from("push_subscriptions")
+        .select("id, subscription_json")
+        .eq("senior_id", appt.senior_id);
+
+      for (const sub of (subs || [])) {
+        try {
+          await webpush.sendNotification(
+            JSON.parse(sub.subscription_json),
+            JSON.stringify({
+              title: `📅 ${appt.title} — ${label}`,
+              body: `Your appointment is ${label}${locationStr}`,
+              icon: "/icons/icon-192.png",
+              badge: "/icons/badge-72.png",
+              tag: `appt-${appt.id}-${diffMin > 30 ? "60" : "15"}-${todayStr}`,
+            })
+          );
+          await supabase.from("push_subscriptions")
+            .update({ last_used: new Date().toISOString() })
+            .eq("id", sub.id);
+        } catch (e) {
+          if (e.statusCode === 410 || e.statusCode === 404) {
+            await supabase.from("push_subscriptions").delete().eq("id", sub.id);
+          }
+        }
+      }
+    }
+  } catch (e) {
+    console.error("Appointment reminder error:", e.message);
+  }
+}
+
+// ── Due reminder/to-do push notifications ────────────────────────────────────
+// Sends a notification when a reminder's due_date + due_time arrives
+async function checkDueReminders() {
+  if (!VAPID_PUBLIC || !VAPID_PRIVATE) return;
+  if (!process.env.SUPABASE_URL || process.env.SUPABASE_URL === "YOUR_SUPABASE_PROJECT_URL") return;
+
+  try {
+    const now = new Date();
+    const todayStr = now.toISOString().split("T")[0];
+    const currentTime = now.toLocaleTimeString("en-US", {
+      hour: "numeric", minute: "2-digit", hour12: true,
+    });
+
+    // Get uncompleted reminders due today
+    const { data: reminders } = await supabase
+      .from("reminders")
+      .select("id, text, due_date, due_time, senior_id")
+      .eq("completed", false)
+      .eq("due_date", todayStr);
+
+    if (!reminders || !reminders.length) return;
+
+    for (const rem of reminders) {
+      // If reminder has a due_time, only notify at that time
+      // If no due_time, notify once at 9:00 AM
+      const targetTime = rem.due_time || "9:00 AM";
+      if (targetTime !== currentTime) continue;
+
+      const { data: subs } = await supabase
+        .from("push_subscriptions")
+        .select("id, subscription_json")
+        .eq("senior_id", rem.senior_id);
+
+      for (const sub of (subs || [])) {
+        try {
+          await webpush.sendNotification(
+            JSON.parse(sub.subscription_json),
+            JSON.stringify({
+              title: "🔔 Reminder",
+              body: rem.text,
+              icon: "/icons/icon-192.png",
+              badge: "/icons/badge-72.png",
+              tag: `rem-${rem.id}-${todayStr}`,
+            })
+          );
+          await supabase.from("push_subscriptions")
+            .update({ last_used: new Date().toISOString() })
+            .eq("id", sub.id);
+        } catch (e) {
+          if (e.statusCode === 410 || e.statusCode === 404) {
+            await supabase.from("push_subscriptions").delete().eq("id", sub.id);
+          }
+        }
+      }
+    }
+  } catch (e) {
+    console.error("Due reminder check error:", e.message);
+  }
+}
+
 // ── Middleware ────────────────────────────────────────────────────────────────
 // Stripe webhooks need raw body — must be before express.json()
 app.post("/api/stripe/webhook", express.raw({ type: "application/json" }), async (req, res) => {
@@ -2979,12 +3111,18 @@ async function start() {
     console.log(`   💳 Stripe:        ${stripe ? "configured ✅" : "NOT configured ❌"}`);
     console.log("\n   Press Ctrl+C to stop\n");
 
-    // Start medication reminder cron — checks every minute
+    // Start push notification cron jobs — all check every minute
     if (VAPID_PUBLIC && VAPID_PRIVATE) {
       cron.schedule("* * * * *", checkMedicationReminders);
-      console.log("   💊 Medication reminders: active (checking every minute)\n");
+      cron.schedule("* * * * *", checkAppointmentReminders);
+      cron.schedule("* * * * *", checkDueReminders);
+      console.log("   💊 Medication reminders: active");
+      console.log("   📅 Appointment reminders: active (1hr + 15min before)");
+      console.log("   🔔 Due reminders: active\n");
     } else {
-      console.log("   💊 Medication reminders: disabled (VAPID keys not set)\n");
+      console.log("   💊 Medication reminders: disabled (VAPID keys not set)");
+      console.log("   📅 Appointment reminders: disabled");
+      console.log("   🔔 Due reminders: disabled\n");
     }
   });
 }
