@@ -1,29 +1,35 @@
 -- ─────────────────────────────────────────────────────────────────────────────
--- Sage Companion LLC — Supabase Database Schema
+-- Sage Companion LLC — Complete Supabase Database Schema
 -- Run this in: Supabase Dashboard → SQL Editor → New query → Run
+-- Safe to re-run (uses IF NOT EXISTS / ON CONFLICT throughout)
 -- ─────────────────────────────────────────────────────────────────────────────
+
+
+-- ═══════════════════════════════════════════════════════════════════════════════
+--  1. TABLES
+-- ═══════════════════════════════════════════════════════════════════════════════
 
 -- ── Seniors (user profiles) ───────────────────────────────────────────────────
 CREATE TABLE IF NOT EXISTS seniors (
-  id            UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  name          TEXT NOT NULL,
-  email         TEXT,
-  password_hash TEXT,
-  age           INTEGER,
-  family_code   TEXT UNIQUE NOT NULL,
-  conditions    TEXT[]   DEFAULT '{}',
+  id                  UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  name                TEXT NOT NULL,
+  email               TEXT,
+  password_hash       TEXT,
+  age                 INTEGER,
+  family_code         TEXT UNIQUE NOT NULL,
+  conditions          TEXT[]       DEFAULT '{}',
   google_tokens       JSONB,
-  preferences         JSONB    DEFAULT '{"voiceSpeed":"normal","theme":"default"}',
+  preferences         JSONB        DEFAULT '{"voiceSpeed":"normal","theme":"default"}',
   stripe_customer_id  TEXT,
-  subscription_status TEXT     DEFAULT 'none',
-  subscription_plan   TEXT     DEFAULT 'none',
+  subscription_status TEXT         DEFAULT 'none',
+  subscription_plan   TEXT         DEFAULT 'none',
   trial_ends_at       TIMESTAMPTZ,
   timezone            TEXT,
   location            TEXT,
   reset_token         TEXT,
   reset_expires       TIMESTAMPTZ,
-  created_at          TIMESTAMPTZ DEFAULT NOW(),
-  last_active         TIMESTAMPTZ DEFAULT NOW()
+  created_at          TIMESTAMPTZ  DEFAULT NOW(),
+  last_active         TIMESTAMPTZ  DEFAULT NOW()
 );
 
 -- ── Medications ───────────────────────────────────────────────────────────────
@@ -116,7 +122,7 @@ CREATE TABLE IF NOT EXISTS appointments (
   created_at      TIMESTAMPTZ DEFAULT NOW()
 );
 
--- ── Usage metrics (daily rollup per senior — powers CRM analytics) ────────────
+-- ── Usage metrics (daily rollup per senior — powers CRM analytics) ───────────
 CREATE TABLE IF NOT EXISTS usage_metrics (
   id                      UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   senior_id               UUID REFERENCES seniors(id) ON DELETE CASCADE,
@@ -130,24 +136,152 @@ CREATE TABLE IF NOT EXISTS usage_metrics (
   UNIQUE(senior_id, date)
 );
 
--- ── Indexes for performance ───────────────────────────────────────────────────
-CREATE INDEX IF NOT EXISTS idx_medications_senior      ON medications(senior_id);
-CREATE INDEX IF NOT EXISTS idx_med_log_senior          ON med_log(senior_id);
-CREATE INDEX IF NOT EXISTS idx_med_log_taken_at        ON med_log(taken_at);
-CREATE INDEX IF NOT EXISTS idx_activity_senior         ON activity(senior_id);
-CREATE INDEX IF NOT EXISTS idx_activity_timestamp      ON activity(timestamp);
-CREATE INDEX IF NOT EXISTS idx_alerts_senior           ON alerts(senior_id);
-CREATE INDEX IF NOT EXISTS idx_conversations_senior    ON conversations(senior_id);
-CREATE INDEX IF NOT EXISTS idx_conversations_timestamp ON conversations(timestamp);
-CREATE INDEX IF NOT EXISTS idx_doctor_questions_senior ON doctor_questions(senior_id);
-CREATE INDEX IF NOT EXISTS idx_doctor_visits_senior    ON doctor_visits(senior_id);
-CREATE INDEX IF NOT EXISTS idx_appointments_senior     ON appointments(senior_id);
-CREATE INDEX IF NOT EXISTS idx_appointments_date       ON appointments(date);
-CREATE INDEX IF NOT EXISTS idx_usage_senior            ON usage_metrics(senior_id);
-CREATE INDEX IF NOT EXISTS idx_usage_date              ON usage_metrics(date);
-CREATE INDEX IF NOT EXISTS idx_seniors_last_active     ON seniors(last_active);
+-- ── Push subscriptions (medication / appointment reminder notifications) ─────
+CREATE TABLE IF NOT EXISTS push_subscriptions (
+  id               UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  senior_id        UUID NOT NULL REFERENCES seniors(id) ON DELETE CASCADE,
+  subscription_json TEXT NOT NULL,
+  device_label     TEXT,
+  created_at       TIMESTAMPTZ DEFAULT NOW(),
+  last_used        TIMESTAMPTZ DEFAULT NOW()
+);
 
--- ── Atomic usage counter increment (called from server) ───────────────────────
+-- ── Reminder snooze log (track snoozed reminders to avoid re-sending) ────────
+CREATE TABLE IF NOT EXISTS reminder_snooze (
+  id            UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  senior_id     UUID NOT NULL REFERENCES seniors(id) ON DELETE CASCADE,
+  medication_id UUID NOT NULL REFERENCES medications(id) ON DELETE CASCADE,
+  snoozed_until TIMESTAMPTZ NOT NULL,
+  created_at    TIMESTAMPTZ DEFAULT NOW()
+);
+
+-- ── Senior tokens (session audit trail) ──────────────────────────────────────
+CREATE TABLE IF NOT EXISTS senior_tokens (
+  id         UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  senior_id  UUID NOT NULL REFERENCES seniors(id) ON DELETE CASCADE,
+  token_hash TEXT NOT NULL,
+  issued_at  TIMESTAMPTZ DEFAULT NOW(),
+  expires_at TIMESTAMPTZ NOT NULL,
+  revoked    BOOLEAN DEFAULT FALSE,
+  device     TEXT DEFAULT 'unknown'
+);
+
+-- ── Reminders / To-Do items ──────────────────────────────────────────────────
+CREATE TABLE IF NOT EXISTS reminders (
+  id          UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  senior_id   UUID NOT NULL REFERENCES seniors(id) ON DELETE CASCADE,
+  text        TEXT NOT NULL,
+  due_date    DATE,
+  due_time    TEXT,
+  completed   BOOLEAN DEFAULT FALSE,
+  source      TEXT DEFAULT 'manual',
+  created_at  TIMESTAMPTZ DEFAULT NOW()
+);
+
+-- ── Long-term memories ───────────────────────────────────────────────────────
+CREATE TABLE IF NOT EXISTS memories (
+  id             UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  senior_id      UUID REFERENCES seniors(id) ON DELETE CASCADE NOT NULL,
+  category       TEXT NOT NULL,  -- family, hobby, health, preference, life_event, concern, routine
+  memory_text    TEXT NOT NULL,
+  mention_count  INTEGER DEFAULT 1,
+  last_mentioned TIMESTAMPTZ DEFAULT NOW(),
+  created_at     TIMESTAMPTZ DEFAULT NOW()
+);
+
+-- ── Cost log (per-request API cost tracking) ─────────────────────────────────
+CREATE TABLE IF NOT EXISTS cost_log (
+  id            UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  senior_id     UUID REFERENCES seniors(id) ON DELETE CASCADE,
+  date          DATE NOT NULL DEFAULT CURRENT_DATE,
+  call_type     TEXT NOT NULL,       -- chat, memory_extraction, tts
+  model         TEXT DEFAULT 'unknown',
+  input_tokens  INTEGER DEFAULT 0,
+  output_tokens INTEGER DEFAULT 0,
+  tts_chars     INTEGER DEFAULT 0,
+  cost_usd      NUMERIC(12,6) DEFAULT 0,
+  created_at    TIMESTAMPTZ DEFAULT NOW()
+);
+
+-- ── Contact form messages ────────────────────────────────────────────────────
+CREATE TABLE IF NOT EXISTS contact_messages (
+  id         UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  name       TEXT NOT NULL,
+  email      TEXT NOT NULL,
+  topic      TEXT DEFAULT 'general',
+  message    TEXT NOT NULL,
+  read       BOOLEAN DEFAULT FALSE,
+  created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+
+-- ═══════════════════════════════════════════════════════════════════════════════
+--  2. INDEXES
+-- ═══════════════════════════════════════════════════════════════════════════════
+
+-- Seniors
+CREATE INDEX IF NOT EXISTS idx_seniors_last_active        ON seniors(last_active);
+
+-- Medications
+CREATE INDEX IF NOT EXISTS idx_medications_senior          ON medications(senior_id);
+
+-- Med log
+CREATE INDEX IF NOT EXISTS idx_med_log_senior              ON med_log(senior_id);
+CREATE INDEX IF NOT EXISTS idx_med_log_taken_at            ON med_log(taken_at);
+
+-- Activity
+CREATE INDEX IF NOT EXISTS idx_activity_senior             ON activity(senior_id);
+CREATE INDEX IF NOT EXISTS idx_activity_timestamp          ON activity(timestamp);
+
+-- Alerts
+CREATE INDEX IF NOT EXISTS idx_alerts_senior               ON alerts(senior_id);
+
+-- Conversations
+CREATE INDEX IF NOT EXISTS idx_conversations_senior        ON conversations(senior_id);
+CREATE INDEX IF NOT EXISTS idx_conversations_timestamp     ON conversations(timestamp);
+
+-- Doctor questions & visits
+CREATE INDEX IF NOT EXISTS idx_doctor_questions_senior     ON doctor_questions(senior_id);
+CREATE INDEX IF NOT EXISTS idx_doctor_visits_senior        ON doctor_visits(senior_id);
+
+-- Appointments
+CREATE INDEX IF NOT EXISTS idx_appointments_senior         ON appointments(senior_id);
+CREATE INDEX IF NOT EXISTS idx_appointments_date           ON appointments(date);
+
+-- Usage metrics
+CREATE INDEX IF NOT EXISTS idx_usage_senior                ON usage_metrics(senior_id);
+CREATE INDEX IF NOT EXISTS idx_usage_date                  ON usage_metrics(date);
+
+-- Push subscriptions
+CREATE INDEX IF NOT EXISTS idx_push_subscriptions_senior   ON push_subscriptions(senior_id);
+
+-- Reminder snooze
+CREATE INDEX IF NOT EXISTS idx_reminder_snooze_senior      ON reminder_snooze(senior_id);
+
+-- Senior tokens
+CREATE INDEX IF NOT EXISTS idx_senior_tokens_senior        ON senior_tokens(senior_id);
+CREATE INDEX IF NOT EXISTS idx_senior_tokens_hash          ON senior_tokens(token_hash);
+
+-- Reminders
+CREATE INDEX IF NOT EXISTS idx_reminders_senior            ON reminders(senior_id, completed);
+
+-- Memories
+CREATE INDEX IF NOT EXISTS idx_memories_senior             ON memories(senior_id, category, last_mentioned DESC);
+
+-- Cost log
+CREATE INDEX IF NOT EXISTS idx_cost_log_senior             ON cost_log(senior_id);
+CREATE INDEX IF NOT EXISTS idx_cost_log_date               ON cost_log(date);
+CREATE INDEX IF NOT EXISTS idx_cost_log_senior_date        ON cost_log(senior_id, date);
+
+-- Contact messages
+CREATE INDEX IF NOT EXISTS idx_contact_messages_created    ON contact_messages(created_at DESC);
+
+
+-- ═══════════════════════════════════════════════════════════════════════════════
+--  3. FUNCTIONS
+-- ═══════════════════════════════════════════════════════════════════════════════
+
+-- Atomic usage counter increment (called from server)
 CREATE OR REPLACE FUNCTION increment_usage(p_senior_id UUID, p_date DATE, p_field TEXT)
 RETURNS void AS $$
 BEGIN
@@ -162,7 +296,70 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql;
 
--- ── Demo senior (Margaret) — family code: FAMILY123 ───────────────────────────
+ALTER FUNCTION increment_usage(UUID, DATE, TEXT) SET search_path = public;
+
+
+-- ═══════════════════════════════════════════════════════════════════════════════
+--  4. ROW LEVEL SECURITY
+-- ═══════════════════════════════════════════════════════════════════════════════
+-- Enable RLS on all tables. The service_role key bypasses RLS, so the server
+-- continues to work. This blocks direct access via the anon/public key.
+
+ALTER TABLE seniors            ENABLE ROW LEVEL SECURITY;
+ALTER TABLE medications        ENABLE ROW LEVEL SECURITY;
+ALTER TABLE med_log            ENABLE ROW LEVEL SECURITY;
+ALTER TABLE activity           ENABLE ROW LEVEL SECURITY;
+ALTER TABLE alerts             ENABLE ROW LEVEL SECURITY;
+ALTER TABLE conversations      ENABLE ROW LEVEL SECURITY;
+ALTER TABLE doctor_questions   ENABLE ROW LEVEL SECURITY;
+ALTER TABLE doctor_visits      ENABLE ROW LEVEL SECURITY;
+ALTER TABLE appointments       ENABLE ROW LEVEL SECURITY;
+ALTER TABLE usage_metrics      ENABLE ROW LEVEL SECURITY;
+ALTER TABLE push_subscriptions ENABLE ROW LEVEL SECURITY;
+ALTER TABLE reminder_snooze    ENABLE ROW LEVEL SECURITY;
+ALTER TABLE senior_tokens      ENABLE ROW LEVEL SECURITY;
+ALTER TABLE reminders          ENABLE ROW LEVEL SECURITY;
+ALTER TABLE memories           ENABLE ROW LEVEL SECURITY;
+ALTER TABLE cost_log           ENABLE ROW LEVEL SECURITY;
+ALTER TABLE contact_messages   ENABLE ROW LEVEL SECURITY;
+
+-- Drop existing policies (safe to re-run)
+DO $$ DECLARE t TEXT;
+BEGIN
+  FOREACH t IN ARRAY ARRAY[
+    'seniors','medications','med_log','activity','alerts','conversations',
+    'doctor_questions','doctor_visits','appointments','usage_metrics',
+    'push_subscriptions','reminder_snooze','senior_tokens','reminders',
+    'memories','cost_log','contact_messages'
+  ] LOOP
+    EXECUTE format('DROP POLICY IF EXISTS "Deny public access" ON %I', t);
+  END LOOP;
+END $$;
+
+-- Restrictive policies: deny all access via anon/authenticated keys
+CREATE POLICY "Deny public access" ON seniors            FOR ALL USING (false);
+CREATE POLICY "Deny public access" ON medications        FOR ALL USING (false);
+CREATE POLICY "Deny public access" ON med_log            FOR ALL USING (false);
+CREATE POLICY "Deny public access" ON activity           FOR ALL USING (false);
+CREATE POLICY "Deny public access" ON alerts             FOR ALL USING (false);
+CREATE POLICY "Deny public access" ON conversations      FOR ALL USING (false);
+CREATE POLICY "Deny public access" ON doctor_questions   FOR ALL USING (false);
+CREATE POLICY "Deny public access" ON doctor_visits      FOR ALL USING (false);
+CREATE POLICY "Deny public access" ON appointments       FOR ALL USING (false);
+CREATE POLICY "Deny public access" ON usage_metrics      FOR ALL USING (false);
+CREATE POLICY "Deny public access" ON push_subscriptions FOR ALL USING (false);
+CREATE POLICY "Deny public access" ON reminder_snooze    FOR ALL USING (false);
+CREATE POLICY "Deny public access" ON senior_tokens      FOR ALL USING (false);
+CREATE POLICY "Deny public access" ON reminders          FOR ALL USING (false);
+CREATE POLICY "Deny public access" ON memories           FOR ALL USING (false);
+CREATE POLICY "Deny public access" ON cost_log           FOR ALL USING (false);
+CREATE POLICY "Deny public access" ON contact_messages   FOR ALL USING (false);
+
+
+-- ═══════════════════════════════════════════════════════════════════════════════
+--  5. DEMO DATA (Margaret — family code: FAMILY123)
+-- ═══════════════════════════════════════════════════════════════════════════════
+
 INSERT INTO seniors (id, name, age, family_code, conditions, preferences, last_active)
 VALUES (
   '00000000-0000-0000-0000-000000000001',
@@ -182,142 +379,3 @@ FROM (VALUES
 WHERE NOT EXISTS (
   SELECT 1 FROM medications WHERE senior_id = '00000000-0000-0000-0000-000000000001'
 );
-
--- ── Push Subscriptions (medication reminder notifications) ────────────────────
-CREATE TABLE IF NOT EXISTS push_subscriptions (
-  id               UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  senior_id        UUID NOT NULL REFERENCES seniors(id) ON DELETE CASCADE,
-  subscription_json TEXT NOT NULL,
-  device_label     TEXT,
-  created_at       TIMESTAMPTZ DEFAULT NOW(),
-  last_used        TIMESTAMPTZ DEFAULT NOW()
-);
-
-CREATE INDEX IF NOT EXISTS idx_push_subscriptions_senior ON push_subscriptions(senior_id);
-
--- ── Reminder Snooze Log (track snoozed reminders to avoid re-sending) ─────────
-CREATE TABLE IF NOT EXISTS reminder_snooze (
-  id            UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  senior_id     UUID NOT NULL REFERENCES seniors(id) ON DELETE CASCADE,
-  medication_id UUID NOT NULL REFERENCES medications(id) ON DELETE CASCADE,
-  snoozed_until TIMESTAMPTZ NOT NULL,
-  created_at    TIMESTAMPTZ DEFAULT NOW()
-);
-
-CREATE INDEX IF NOT EXISTS idx_reminder_snooze_senior ON reminder_snooze(senior_id);
-
--- ── Senior Tokens (session audit trail) ─────────────────────────────────────
-CREATE TABLE IF NOT EXISTS senior_tokens (
-  id         UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  senior_id  UUID NOT NULL REFERENCES seniors(id) ON DELETE CASCADE,
-  token_hash TEXT NOT NULL,
-  issued_at  TIMESTAMPTZ DEFAULT NOW(),
-  expires_at TIMESTAMPTZ NOT NULL,
-  revoked    BOOLEAN DEFAULT FALSE,
-  device     TEXT DEFAULT 'unknown'
-);
-
-CREATE INDEX IF NOT EXISTS idx_senior_tokens_senior ON senior_tokens(senior_id);
-CREATE INDEX IF NOT EXISTS idx_senior_tokens_hash   ON senior_tokens(token_hash);
-
--- ── Reminders / To-Do Items ─────────────────────────────────────────────────
-CREATE TABLE IF NOT EXISTS reminders (
-  id          UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  senior_id   UUID NOT NULL REFERENCES seniors(id) ON DELETE CASCADE,
-  text        TEXT NOT NULL,
-  due_date    DATE,
-  due_time    TEXT,
-  completed   BOOLEAN DEFAULT FALSE,
-  source      TEXT DEFAULT 'manual',
-  created_at  TIMESTAMPTZ DEFAULT NOW()
-);
-
-CREATE INDEX IF NOT EXISTS idx_reminders_senior ON reminders(senior_id, completed);
-
--- ── Migration: Multi-dose medication support ────────────────────────────────
--- Run these if upgrading an existing database:
-ALTER TABLE medications ADD COLUMN IF NOT EXISTS med_times TEXT;
-ALTER TABLE medications ADD COLUMN IF NOT EXISTS frequency INTEGER DEFAULT 1;
-ALTER TABLE med_log ADD COLUMN IF NOT EXISTS dose_time TEXT;
-ALTER TABLE seniors ADD COLUMN IF NOT EXISTS timezone TEXT;
-ALTER TABLE seniors ADD COLUMN IF NOT EXISTS location TEXT;
-
--- ── Row Level Security ──────────────────────────────────────────────────────
--- Enable RLS on all tables (service_role key bypasses RLS, so your server
--- continues to work. This blocks direct access via the anon/public key.)
-ALTER TABLE seniors ENABLE ROW LEVEL SECURITY;
-ALTER TABLE medications ENABLE ROW LEVEL SECURITY;
-ALTER TABLE med_log ENABLE ROW LEVEL SECURITY;
-ALTER TABLE activity ENABLE ROW LEVEL SECURITY;
-ALTER TABLE alerts ENABLE ROW LEVEL SECURITY;
-ALTER TABLE conversations ENABLE ROW LEVEL SECURITY;
-ALTER TABLE doctor_questions ENABLE ROW LEVEL SECURITY;
-ALTER TABLE doctor_visits ENABLE ROW LEVEL SECURITY;
-ALTER TABLE appointments ENABLE ROW LEVEL SECURITY;
-ALTER TABLE usage_metrics ENABLE ROW LEVEL SECURITY;
-ALTER TABLE push_subscriptions ENABLE ROW LEVEL SECURITY;
-ALTER TABLE reminder_snooze ENABLE ROW LEVEL SECURITY;
-ALTER TABLE reminders ENABLE ROW LEVEL SECURITY;
-
--- Restrictive policies: deny all access via anon/authenticated keys
-DROP POLICY IF EXISTS "Service role full access" ON seniors;
-DROP POLICY IF EXISTS "Service role full access" ON medications;
-DROP POLICY IF EXISTS "Service role full access" ON med_log;
-DROP POLICY IF EXISTS "Service role full access" ON activity;
-DROP POLICY IF EXISTS "Service role full access" ON alerts;
-DROP POLICY IF EXISTS "Service role full access" ON conversations;
-DROP POLICY IF EXISTS "Service role full access" ON doctor_questions;
-DROP POLICY IF EXISTS "Service role full access" ON doctor_visits;
-DROP POLICY IF EXISTS "Service role full access" ON appointments;
-DROP POLICY IF EXISTS "Service role full access" ON usage_metrics;
-DROP POLICY IF EXISTS "Service role full access" ON push_subscriptions;
-DROP POLICY IF EXISTS "Service role full access" ON reminder_snooze;
-DROP POLICY IF EXISTS "Service role full access" ON reminders;
-
-DROP POLICY IF EXISTS "Deny public access" ON seniors;
-DROP POLICY IF EXISTS "Deny public access" ON medications;
-DROP POLICY IF EXISTS "Deny public access" ON med_log;
-DROP POLICY IF EXISTS "Deny public access" ON activity;
-DROP POLICY IF EXISTS "Deny public access" ON alerts;
-DROP POLICY IF EXISTS "Deny public access" ON conversations;
-DROP POLICY IF EXISTS "Deny public access" ON doctor_questions;
-DROP POLICY IF EXISTS "Deny public access" ON doctor_visits;
-DROP POLICY IF EXISTS "Deny public access" ON appointments;
-DROP POLICY IF EXISTS "Deny public access" ON usage_metrics;
-DROP POLICY IF EXISTS "Deny public access" ON push_subscriptions;
-DROP POLICY IF EXISTS "Deny public access" ON reminder_snooze;
-DROP POLICY IF EXISTS "Deny public access" ON reminders;
-
-CREATE POLICY "Deny public access" ON seniors FOR ALL USING (false);
-CREATE POLICY "Deny public access" ON medications FOR ALL USING (false);
-CREATE POLICY "Deny public access" ON med_log FOR ALL USING (false);
-CREATE POLICY "Deny public access" ON activity FOR ALL USING (false);
-CREATE POLICY "Deny public access" ON alerts FOR ALL USING (false);
-CREATE POLICY "Deny public access" ON conversations FOR ALL USING (false);
-CREATE POLICY "Deny public access" ON doctor_questions FOR ALL USING (false);
-CREATE POLICY "Deny public access" ON doctor_visits FOR ALL USING (false);
-CREATE POLICY "Deny public access" ON appointments FOR ALL USING (false);
-CREATE POLICY "Deny public access" ON usage_metrics FOR ALL USING (false);
-CREATE POLICY "Deny public access" ON push_subscriptions FOR ALL USING (false);
-CREATE POLICY "Deny public access" ON reminder_snooze FOR ALL USING (false);
-CREATE POLICY "Deny public access" ON reminders FOR ALL USING (false);
-
--- ── Long-term memories ──────────────────────────────────────────────────────
-CREATE TABLE IF NOT EXISTS memories (
-  id             UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  senior_id      UUID REFERENCES seniors(id) ON DELETE CASCADE NOT NULL,
-  category       TEXT NOT NULL,  -- family, hobby, health, preference, life_event, concern, routine
-  memory_text    TEXT NOT NULL,
-  mention_count  INTEGER DEFAULT 1,
-  last_mentioned TIMESTAMPTZ DEFAULT NOW(),
-  created_at     TIMESTAMPTZ DEFAULT NOW()
-);
-CREATE INDEX IF NOT EXISTS idx_memories_senior ON memories(senior_id, category, last_mentioned DESC);
-ALTER TABLE memories ENABLE ROW LEVEL SECURITY;
-CREATE POLICY "Deny public access" ON memories FOR ALL USING (false);
-
--- Migration: ALTER TABLE — run once in Supabase SQL editor if table doesn't exist yet
--- The CREATE TABLE IF NOT EXISTS above handles fresh installs.
-
--- Fix function search path warning
-ALTER FUNCTION increment_usage(UUID, DATE, TEXT) SET search_path = public;
