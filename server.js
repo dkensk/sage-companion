@@ -683,7 +683,25 @@ app.get("/api/medications/:seniorId", seniorAuth, validateUUID("seniorId"), asyn
     const { data: meds } = await supabase.from("medications").select("*")
       .eq("senior_id", req.params.seniorId).eq("active", true);
 
-    const todayStart = new Date(); todayStart.setHours(0, 0, 0, 0);
+    // Use user's timezone to determine "today" (server runs in UTC)
+    const tz = req.query.tz || req.query.timezone;
+    let todayStart;
+    if (tz) {
+      try {
+        const nowInTz = new Date().toLocaleDateString("en-CA", { timeZone: tz }); // "YYYY-MM-DD"
+        todayStart = new Date(`${nowInTz}T00:00:00`);
+        // Convert local midnight back to UTC for DB query
+        const parts = new Intl.DateTimeFormat("en-US", { timeZone: tz, hour: "numeric", hour12: false, timeZoneName: "shortOffset" }).formatToParts(todayStart);
+        // Simpler: calculate offset by comparing local midnight with UTC
+        const localMidnightStr = `${nowInTz}T00:00:00`;
+        const utcNow = new Date();
+        const localNow = new Date(utcNow.toLocaleString("en-US", { timeZone: tz }));
+        const offsetMs = localNow.getTime() - utcNow.getTime();
+        todayStart = new Date(new Date(localMidnightStr).getTime() - offsetMs);
+      } catch { todayStart = new Date(); todayStart.setHours(0, 0, 0, 0); }
+    } else {
+      todayStart = new Date(); todayStart.setHours(0, 0, 0, 0);
+    }
     const { data: logs } = await supabase.from("med_log").select("medication_id, dose_time")
       .eq("senior_id", req.params.seniorId)
       .gte("taken_at", todayStart.toISOString());
@@ -735,6 +753,26 @@ app.post("/api/medications/:id/taken", seniorAuth, validateUUID("id"), async (re
     });
     await trackUsage(med.senior_id, "medications_taken");
     res.json({ success: true, message: `${med.name} marked as taken` });
+  } catch (e) { console.error(`[Error] ${req.method} ${req.path}:`, e.message); res.status(500).json({ error: "Something went wrong. Please try again." }); }
+});
+
+app.post("/api/medications/:id/untake", seniorAuth, validateUUID("id"), async (req, res) => {
+  try {
+    const { doseTime } = req.body || {};
+    const { data: med } = await supabase.from("medications").select("*")
+      .eq("id", req.params.id).single();
+    if (!med) return res.status(404).json({ error: "Medication not found" });
+
+    const todayStart = new Date(); todayStart.setHours(0, 0, 0, 0);
+    // Delete the most recent log entry for this med+dose today
+    const { data: logs } = await supabase.from("med_log")
+      .select("id").eq("medication_id", med.id).eq("dose_time", doseTime || med.time || null)
+      .gte("taken_at", todayStart.toISOString())
+      .order("taken_at", { ascending: false }).limit(1);
+    if (logs && logs.length > 0) {
+      await supabase.from("med_log").delete().eq("id", logs[0].id);
+    }
+    res.json({ success: true, message: `${med.name} unmarked` });
   } catch (e) { console.error(`[Error] ${req.method} ${req.path}:`, e.message); res.status(500).json({ error: "Something went wrong. Please try again." }); }
 });
 
@@ -872,8 +910,23 @@ app.post("/api/chat", seniorAuth, suspendCheck, rateLimit("chat"), async (req, r
     const effectiveSeniorId = seniorId || DEMO_SENIOR_ID;
 
     // ── Parallel DB queries (saves ~300-500ms vs sequential) ──────────────────
-    const todayStart = new Date(); todayStart.setHours(0, 0, 0, 0);
-    const todayStr = todayStart.toISOString().slice(0, 10); // "YYYY-MM-DD"
+    // Use client timezone for "today" boundaries (server runs in UTC)
+    let todayStart;
+    if (timezone) {
+      try {
+        const nowInTz = new Date().toLocaleDateString("en-CA", { timeZone: timezone });
+        const localMidnightStr = `${nowInTz}T00:00:00`;
+        const utcNow = new Date();
+        const localNow = new Date(utcNow.toLocaleString("en-US", { timeZone: timezone }));
+        const offsetMs = localNow.getTime() - utcNow.getTime();
+        todayStart = new Date(new Date(localMidnightStr).getTime() - offsetMs);
+      } catch { todayStart = new Date(); todayStart.setHours(0, 0, 0, 0); }
+    } else {
+      todayStart = new Date(); todayStart.setHours(0, 0, 0, 0);
+    }
+    const todayStr = timezone
+      ? new Date().toLocaleDateString("en-CA", { timeZone: timezone })
+      : todayStart.toISOString().slice(0, 10);
     const tomorrowStr = new Date(todayStart.getTime() + 86400000).toISOString().slice(0, 10);
     const twoWeeksStr = new Date(todayStart.getTime() + 14 * 86400000).toISOString().slice(0, 10);
     const [seniorRes, medsRes, logsRes, historyRes, todayApptsRes, upcomingApptsRes, remindersRes, memorySummary] = await Promise.all([
@@ -902,13 +955,43 @@ app.post("/api/chat", seniorAuth, suspendCheck, rateLimit("chat"), async (req, r
     const effectiveLocation = location || senior?.location || null;
 
     const meds = medsRes.data;
+    // Parse current hour from clientTime (e.g. "02:30 PM" -> 14) to determine which dose is relevant
+    let currentHour = new Date().getHours();
+    if (clientTime) {
+      try {
+        const match = clientTime.match(/(\d{1,2}):(\d{2})\s*(AM|PM)/i);
+        if (match) {
+          let h = parseInt(match[1]);
+          const period = match[3].toUpperCase();
+          if (period === "PM" && h < 12) h += 12;
+          if (period === "AM" && h === 12) h = 0;
+          currentHour = h;
+        }
+      } catch {}
+    }
+    function parseTimeHour(t) {
+      const m = (t || "").match(/(\d{1,2}):(\d{2})\s*(AM|PM)/i);
+      if (!m) return 8;
+      let h = parseInt(m[1]);
+      if (m[3].toUpperCase() === "PM" && h < 12) h += 12;
+      if (m[3].toUpperCase() === "AM" && h === 12) h = 0;
+      return h;
+    }
     const medSummary = (meds || []).map(m => {
       let times;
       try { times = m.med_times ? JSON.parse(m.med_times) : null; } catch { times = null; }
       if (!times || !Array.isArray(times) || times.length === 0) times = m.time ? [m.time] : [];
       const takenTimes = (logsRes.data || []).filter(l => l.medication_id === m.id).map(l => l.dose_time);
       const takenSet = new Set(takenTimes);
-      const doseStatus = times.map(t => `${t}: ${takenSet.has(t) ? "taken" : "NOT YET TAKEN"}`).join(", ");
+      // Only show doses that are due (within 2 hours past or any time future)
+      const doseStatus = times.map(t => {
+        const doseHour = parseTimeHour(t);
+        const isPast = doseHour < currentHour - 2; // more than 2 hours ago
+        const taken = takenSet.has(t);
+        if (taken) return `${t}: taken`;
+        if (isPast) return `${t}: MISSED`;
+        return `${t}: NOT YET TAKEN`;
+      }).join(", ");
       return `- ${m.name} ${m.dose || ""}${m.with_food ? " (with food)" : ""} [${times.length}x daily]: ${doseStatus}`;
     }).join("\n");
     const recentHistory = (historyRes.data || []).reverse();
@@ -953,7 +1036,7 @@ app.post("/api/chat", seniorAuth, suspendCheck, rateLimit("chat"), async (req, r
     // Fetch weather if location provided and message is weather-related OR it's the first message (daily check-in)
     let weatherInfo = null;
     const isFirstMessage = recentHistory.length === 0;
-    const weatherKeywords = /weather|temperature|outside|warm|cold|rain|sunny|snow|hot|humid|chill|wind|storm|rain|degrees|forecast|jacket|coat|umbrella|dress.*(for|today|tomorrow)|what.*like out|how.*out(side)?|should i bring|do i need a/i;
+    const weatherKeywords = /weather|temperature|outside|warm|cold|rain|sunny|snow|hot|humid|chill|wind|storm|degrees|forecast|jacket|coat|umbrella|dress.*(for|today|tomorrow)|what.*like out|how.*out(side)?|should i bring|do i need a/i;
     if (effectiveLocation && (weatherKeywords.test(message) || isFirstMessage)) {
       try {
         weatherInfo = await new Promise((resolve) => {
@@ -973,7 +1056,7 @@ app.post("/api/chat", seniorAuth, suspendCheck, rateLimit("chat"), async (req, r
       { role: "user", content: message },
     ];
 
-    const systemPrompt = `You are Sage, a warm, caring, and supportive AI companion for ${seniorName}, a ${senior?.age || ""}year-old.
+    const systemPrompt = `You are Sage, a warm, caring, and supportive AI companion for ${seniorName}, a ${senior?.age || ""} year-old.
 
 CRITICAL — VOICE RESPONSE FORMAT:
 Your responses are read aloud by a voice assistant. Follow these rules strictly:
@@ -1023,8 +1106,9 @@ When ${seniorName} asks you to remind them of something, add something to their 
 4. You can output BOTH an APPOINTMENT tag and a REMINDER tag in the same response if appropriate.
 5. The tag is machine-parsed and NEVER read aloud.
 
-Today's medication status:
+Today's medication status (doses marked MISSED are past due, NOT YET TAKEN are upcoming or current):
 ${medSummary || "No medications scheduled today"}
+IMPORTANT: Only ask about doses that are "NOT YET TAKEN" or "MISSED" — never ask about doses that are not due yet. For multi-dose medications, only mention the current or next upcoming dose, not future doses that are hours away.
 
 ${scheduleSummary ? `SCHEDULE & REMINDERS:\n${scheduleSummary}` : "No appointments or reminders scheduled."}
 
@@ -1746,6 +1830,13 @@ app.delete("/api/reminders/:id", seniorAuth, validateUUID("id"), async (req, res
   } catch (e) { console.error(`[Error] ${req.method} ${req.path}:`, e.message); res.status(500).json({ error: "Something went wrong. Please try again." }); }
 });
 
+app.delete("/api/reminders/:seniorId/clear-completed", seniorAuth, validateUUID("seniorId"), async (req, res) => {
+  try {
+    await supabase.from("reminders").delete().eq("senior_id", req.params.seniorId).eq("completed", true);
+    res.json({ success: true });
+  } catch (e) { console.error(`[Error] ${req.method} ${req.path}:`, e.message); res.status(500).json({ error: "Something went wrong. Please try again." }); }
+});
+
 // ── Google Calendar OAuth ─────────────────────────────────────────────────────
 function getGoogleClient() {
   return new google.auth.OAuth2(
@@ -2152,6 +2243,7 @@ app.delete("/api/admin/users/:id", adminAuth, async (req, res) => {
 
     // Delete all related data in order (foreign key dependencies)
     const tables = [
+      "push_subscriptions", "usage_metrics", "memories",
       "conversations", "med_log", "medications", "doctor_questions",
       "doctor_visits", "appointments", "reminders", "activity", "alerts",
     ];
