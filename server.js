@@ -892,10 +892,10 @@ app.post("/api/chat", seniorAuth, suspendCheck, rateLimit("chat"), async (req, r
 
     // Persist user timezone and location for future sessions (non-blocking)
     if (timezone && senior && timezone !== senior.timezone) {
-      supabase.from("seniors").update({ timezone }).eq("id", effectiveSeniorId).then(({ error }) => { if (error) console.error("[Chat] timezone save:", error.message); });
+      supabase.from("seniors").update({ timezone }).eq("id", effectiveSeniorId).then(({ error }) => { if (error) console.error("[Chat] timezone save:", error.message); }).catch(e => console.error("[Chat] timezone save failed:", e.message));
     }
     if (location && senior && location !== senior.location) {
-      supabase.from("seniors").update({ location }).eq("id", effectiveSeniorId).then(({ error }) => { if (error) console.error("[Chat] location save:", error.message); });
+      supabase.from("seniors").update({ location }).eq("id", effectiveSeniorId).then(({ error }) => { if (error) console.error("[Chat] location save:", error.message); }).catch(e => console.error("[Chat] location save failed:", e.message));
     }
 
     // Fall back to stored location if client didn't send one (e.g. geolocation not yet resolved)
@@ -1141,7 +1141,7 @@ Never invent facts not listed above. If something contradicts a memory, ask gent
             }).select().single();
             if (appt) {
               savedAppointment = { id: appt.id, title: apptData.title, date: apptData.date, time: apptData.time || null, location: apptData.location || null };
-              supabase.from("activity").insert({ senior_id: effectiveSeniorId, type: "appointment_added", description: `Voice appointment: ${apptData.title} on ${apptData.date}`, timestamp: new Date().toISOString() }).then(() => {});
+              supabase.from("activity").insert({ senior_id: effectiveSeniorId, type: "appointment_added", description: `Voice appointment: ${apptData.title} on ${apptData.date}`, timestamp: new Date().toISOString() }).then(() => {}).catch(e => console.error("[Chat] activity insert failed:", e.message));
               trackUsage(effectiveSeniorId, "appointments_added").catch(() => {});
             }
           }
@@ -1162,9 +1162,9 @@ Never invent facts not listed above. If something contradicts a memory, ask gent
             if (rem) {
               savedReminder = { id: rem.id, text: remData.text, date: remData.date || null, time: remData.time || null };
               if (remData.date) {
-                supabase.from("appointments").insert({ senior_id: effectiveSeniorId, title: remData.text, date: remData.date, time: remData.time || null, notes: "From reminders", source: "reminder" }).then(() => {});
+                supabase.from("appointments").insert({ senior_id: effectiveSeniorId, title: remData.text, date: remData.date, time: remData.time || null, notes: "From reminders", source: "reminder" }).then(() => {}).catch(e => console.error("[Chat] reminder-to-appointment insert failed:", e.message));
               }
-              supabase.from("activity").insert({ senior_id: effectiveSeniorId, type: "reminder_added", description: `Voice reminder: "${remData.text.slice(0, 60)}"`, timestamp: new Date().toISOString() }).then(() => {});
+              supabase.from("activity").insert({ senior_id: effectiveSeniorId, type: "reminder_added", description: `Voice reminder: "${remData.text.slice(0, 60)}"`, timestamp: new Date().toISOString() }).then(() => {}).catch(e => console.error("[Chat] activity insert failed:", e.message));
             }
           }
         } catch (e) { console.error("Reminder parse error:", e.message); }
@@ -1274,7 +1274,7 @@ app.post("/api/tts", seniorAuth, rateLimit("tts"), async (req, res) => {
   const voice = (process.env.TTS_VOICE || "coral").trim();
   const cleanText = text.slice(0, 4096); // OpenAI max is 4096 chars
 
-  console.log(`TTS request: voice=${voice}, text length=${cleanText.length}`);
+  console.log(`[TTS] Request: voice=${voice}, text length=${cleanText.length}`);
 
 
   try {
@@ -1310,7 +1310,7 @@ app.post("/api/tts", seniorAuth, rateLimit("tts"), async (req, res) => {
           let errBody = "";
           ttsRes.on("data", d => errBody += d);
           ttsRes.on("end", () => {
-            console.error(`OpenAI TTS ${ttsRes.statusCode}: ${errBody.slice(0, 300)}`);
+            console.error(`[TTS] OpenAI error ${ttsRes.statusCode}: ${errBody.slice(0, 300)}`);
             reject(new Error(`OpenAI TTS ${ttsRes.statusCode}: ${errBody.slice(0, 150)}`));
           });
         }
@@ -1325,7 +1325,7 @@ app.post("/api/tts", seniorAuth, rateLimit("tts"), async (req, res) => {
     res.setHeader("Cache-Control", "no-cache");
     audioStream.pipe(res);
   } catch (e) {
-    console.error("TTS failed:", e.message);
+    console.error("[TTS] Failed:", e.message);
     res.status(502).json({ error: "Voice synthesis failed. Please try again." });
   }
 });
@@ -1379,7 +1379,7 @@ app.post("/api/transcribe", rateLimit("api"), upload.single("audio"), seniorAuth
 
     res.json({ text: whisperRes.text || "" });
   } catch (e) {
-    console.error("Transcribe error:", e.message);
+    console.error("[Transcribe] Error:", e.message);
     res.status(502).json({ error: "Transcription failed" });
   }
 });
@@ -1899,7 +1899,7 @@ app.post("/api/google/sync/:seniorId", anyAuth, validateUUID("seniorId"), async 
     const { data: all } = await supabase.from("appointments").select("*").eq("senior_id", seniorId).order("date", { ascending: true });
     res.json({ success: true, pulled, pushed, appointments: normArr(all) });
   } catch (e) {
-    console.error("Google sync error:", e.message);
+    console.error("[GoogleSync] Error:", e.message);
     res.status(500).json({ error: "Something went wrong. Please try again." });
   }
 });

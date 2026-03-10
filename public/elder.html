@@ -1872,7 +1872,7 @@
     try {
       if (!ttsAudioCtx) {
         ttsAudioCtx = new (window.AudioContext || window.webkitAudioContext)();
-        console.log("[audio] AudioContext created, state:", ttsAudioCtx.state);
+        console.log("[TTS] AudioContext created, state:", ttsAudioCtx.state);
       }
 
       // CRITICAL for Safari: resume() MUST be called synchronously in the gesture handler
@@ -1887,8 +1887,8 @@
       src.buffer = buf;
       src.connect(ttsAudioCtx.destination);
       src.start(0);
-      console.log("[audio] AudioContext unlock attempt, state:", ttsAudioCtx.state);
-    } catch(e) { console.warn("[audio] AudioContext unlock failed:", e); }
+      console.log("[TTS] AudioContext unlock attempt, state:", ttsAudioCtx.state);
+    } catch(e) { console.warn("[TTS] AudioContext unlock failed:", e); }
 
     // 2. Also unlock HTMLAudioElement as a backup
     try {
@@ -1956,10 +1956,10 @@
             source.start(0);
             currentSource = source;
             currentAudio = "webapi";
-            console.log("[tts] Playing bundled audio via WebAudio, duration:", audioBuf.duration.toFixed(1), "s");
+            console.log("[TTS] Playing bundled audio via WebAudio, duration:", audioBuf.duration.toFixed(1), "s");
             return;
           }
-        } catch (e) { console.warn("[tts] WebAudio decode failed:", e.message); }
+        } catch (e) { console.warn("[TTS] WebAudio decode failed:", e.message); }
       }
 
       // Fallback: HTMLAudioElement
@@ -1970,9 +1970,9 @@
       audio.onerror = () => { URL.revokeObjectURL(url); setSpeakingIndicator(false); };
       await audio.play();
       currentAudio = "htmlaudio";
-      console.log("[tts] Playing bundled audio via HTMLAudio");
+      console.log("[TTS] Playing bundled audio via HTMLAudio");
     } catch (e) {
-      console.warn("[tts] playBase64Audio failed:", e.message);
+      console.warn("[TTS] playBase64Audio failed:", e.message);
       setSpeakingIndicator(false);
     }
   }
@@ -1996,7 +1996,7 @@
 
     // ── Strategy 1: OpenAI TTS via server → Web Audio API ───────────────────
     try {
-      console.log("[tts] Fetching OpenAI TTS audio… (gen:", myGeneration, ")");
+      console.log("[TTS] Fetching OpenAI TTS audio… (gen:", myGeneration, ")");
       const controller = new AbortController();
       const timeout = setTimeout(() => controller.abort(), 8000);
 
@@ -2009,13 +2009,13 @@
       clearTimeout(timeout);
 
       // Check if a newer speak() call has fired while we were fetching
-      if (isStale()) { console.log("[tts] Discarding stale TTS response (gen:", myGeneration, ")"); return; }
+      if (isStale()) { console.log("[TTS] Discarding stale TTS response (gen:", myGeneration, ")"); return; }
 
       if (res.ok) {
         const arrayBuf = await res.arrayBuffer();
-        console.log("[tts] Got", arrayBuf.byteLength, "bytes from server");
+        console.log("[TTS] Got", arrayBuf.byteLength, "bytes from server");
 
-        if (isStale()) { console.log("[tts] Discarding stale TTS audio (gen:", myGeneration, ")"); return; }
+        if (isStale()) { console.log("[TTS] Discarding stale TTS audio (gen:", myGeneration, ")"); return; }
 
         if (arrayBuf.byteLength > 0) {
           // Try Web Audio API first (works best on mobile)
@@ -2035,15 +2035,15 @@
                     setTimeout(resolve, 500); // give up after 500ms
                   });
                 }
-                console.log("[tts] AudioContext after resume, state:", ttsAudioCtx.state);
+                console.log("[TTS] AudioContext after resume, state:", ttsAudioCtx.state);
               }
 
-              if (isStale()) { console.log("[tts] Discarding stale TTS before decode (gen:", myGeneration, ")"); return; }
+              if (isStale()) { console.log("[TTS] Discarding stale TTS before decode (gen:", myGeneration, ")"); return; }
 
               const audioBuf = await ttsAudioCtx.decodeAudioData(arrayBuf.slice(0)); // slice to copy
-              console.log("[tts] WebAudio decoded, duration:", audioBuf.duration.toFixed(1), "s");
+              console.log("[TTS] WebAudio decoded, duration:", audioBuf.duration.toFixed(1), "s");
 
-              if (isStale()) { console.log("[tts] Discarding stale decoded audio (gen:", myGeneration, ")"); return; }
+              if (isStale()) { console.log("[TTS] Discarding stale decoded audio (gen:", myGeneration, ")"); return; }
 
               if (ttsAudioCtx.state === "running") {
                 const source = ttsAudioCtx.createBufferSource();
@@ -2053,13 +2053,13 @@
                 source.start(0);
                 currentSource = source;
                 currentAudio = "webapi";
-                console.log("[tts] Playing via WebAudio API (gen:", myGeneration, ")");
+                console.log("[TTS] Playing via WebAudio API (gen:", myGeneration, ")");
                 return;
               } else {
-                console.warn("[tts] AudioContext still", ttsAudioCtx.state, "after resume — trying HTMLAudio");
+                console.warn("[TTS] AudioContext still", ttsAudioCtx.state, "after resume — trying HTMLAudio");
               }
             } catch (decodeErr) {
-              console.warn("[tts] WebAudio failed:", decodeErr.message, "— trying HTMLAudio…");
+              console.warn("[TTS] WebAudio failed:", decodeErr.message, "— trying HTMLAudio…");
             }
           }
 
@@ -2072,28 +2072,28 @@
             const url  = URL.createObjectURL(blob);
             const audio = new Audio(url);
             audio.onended = () => { URL.revokeObjectURL(url); currentAudio = null; setSpeakingIndicator(false); };
-            audio.onerror = () => { URL.revokeObjectURL(url); console.warn("[tts] HTMLAudio playback error"); speakBrowser(clean); };
+            audio.onerror = () => { URL.revokeObjectURL(url); console.warn("[TTS] HTMLAudio playback error"); speakBrowser(clean); };
             await audio.play();
             currentAudio = "htmlaudio";
-            console.log("[tts] Playing via HTMLAudioElement (gen:", myGeneration, ")");
+            console.log("[TTS] Playing via HTMLAudioElement (gen:", myGeneration, ")");
             return;
           } catch (audioErr) {
-            console.warn("[tts] HTMLAudio failed:", audioErr.message, "— falling back to browser voice");
+            console.warn("[TTS] HTMLAudio failed:", audioErr.message, "— falling back to browser voice");
           }
         } else {
-          console.warn("[tts] Server returned 200 but empty body");
+          console.warn("[TTS] Server returned 200 but empty body");
         }
       } else {
         const errText = await res.text().catch(() => "");
-        console.warn("[tts] Server error:", res.status, errText.slice(0, 100));
+        console.warn("[TTS] Server error:", res.status, errText.slice(0, 100));
       }
     } catch (e) {
-      console.warn("[tts] TTS fetch failed:", e.message);
+      console.warn("[TTS] TTS fetch failed:", e.message);
     }
 
     // ── Strategy 2: Browser speech synthesis (always available, no network) ──
     if (isStale()) return; // don't fall back to robot voice if a newer call is in progress
-    console.log("[tts] Falling back to browser voice (gen:", myGeneration, ")");
+    console.log("[TTS] Falling back to browser voice (gen:", myGeneration, ")");
     speakBrowser(clean);
   }
 
@@ -2130,7 +2130,7 @@
 
     // Guard: if OpenAI TTS audio is already playing, don't layer browser voice on top
     if (currentAudio === "webapi" || currentAudio === "htmlaudio") {
-      console.log("[tts] Skipping browser voice — OpenAI TTS already playing");
+      console.log("[TTS] Skipping browser voice — OpenAI TTS already playing");
       return;
     }
 
@@ -2148,7 +2148,7 @@
       utter.pitch = 1.0;
       utter.volume = 1.0;
       utter.onend = () => { currentAudio = null; setSpeakingIndicator(false); };
-      utter.onerror = (e) => { console.warn("[tts] Browser speech error:", e.error); currentAudio = null; setSpeakingIndicator(false); };
+      utter.onerror = (e) => { console.warn("[TTS] Browser speech error:", e.error); currentAudio = null; setSpeakingIndicator(false); };
 
       const en = voices.filter(v => v.lang.startsWith("en"));
       // Priority: Premium → Enhanced → well-known named → non-Google en-US → any English
@@ -2163,7 +2163,7 @@
 
       if (pick) {
         utter.voice = pick;
-        console.log("[tts] Browser voice selected:", pick.name);
+        console.log("[TTS] Browser voice selected:", pick.name);
       }
 
       currentAudio = "browser"; // track that browser speech is active

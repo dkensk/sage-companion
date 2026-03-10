@@ -561,7 +561,7 @@
 
     recognition.onerror = (e) => {
       if (e.error === "no-speech") return; // silently ignore
-      console.error("Recognition error:", e.error);
+      console.error("[DoctorVisit] Recognition error:", e.error);
     };
 
     recognition.onend = () => {
