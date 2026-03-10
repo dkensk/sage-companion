@@ -725,8 +725,6 @@
     <button onclick="showEmergencyModal()" class="help-btn">🆘 Get Help</button>
     <div class="header-actions">
       <div class="header-time" id="headerTime"></div>
-      <a href="/settings" class="hdr-btn">Settings</a>
-      <button onclick="seniorLogout()" class="hdr-btn">Sign out</button>
     </div>
   </div>
 </header>
@@ -951,6 +949,12 @@
     <p style="color:var(--muted);font-size:14px;margin-top:10px;line-height:1.4;">
       Tip: You can also say "Remind me to..." while talking to Sage!
     </p>
+  </div>
+
+  <!-- Settings & Sign Out — safe at bottom, away from emergency button -->
+  <div style="display:flex;align-items:center;justify-content:center;gap:24px;padding:32px 16px 48px;margin-top:12px;">
+    <a href="/settings" style="color:var(--muted);font-size:15px;font-weight:600;text-decoration:none;padding:10px 16px;border-radius:10px;background:var(--bg2);border:1px solid var(--border);transition:background 0.15s;">⚙️ Settings</a>
+    <button onclick="seniorLogout()" style="color:var(--muted);font-size:15px;font-weight:600;text-decoration:none;padding:10px 16px;border-radius:10px;background:var(--bg2);border:1px solid var(--border);cursor:pointer;transition:background 0.15s;">Sign out</button>
   </div>
 
 </div>
