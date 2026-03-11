@@ -977,7 +977,7 @@ app.get("/api/senior/:id", seniorAuth, validateUUID("id"), async (req, res) => {
     const { data, error } = await supabase.from("seniors").select("*")
       .eq("id", req.params.id).single();
     if (error || !data) return res.status(404).json({ error: "Senior not found" });
-    res.json(norm(data));
+    res.json(safeSenior(norm(data)));
   } catch (e) { console.error(`[Error] ${req.method} ${req.path}:`, e.message); res.status(500).json({ error: "Something went wrong. Please try again." }); }
 });
 
@@ -2464,7 +2464,7 @@ app.post("/api/seniors", rateLimit("login"), async (req, res) => {
 
     // Issue a senior token so the user is logged in immediately after setup
     const token = makeSeniorToken(senior.id);
-    console.log(`✅ New user: ${name} | Family code: ${familyCode}`);
+    console.log(`[Auth] ✅ New user registered: ${name}`);
 
     // Admin notification for new signup
     await supabase.from("alerts").insert({
@@ -2489,7 +2489,7 @@ app.post("/api/seniors", rateLimit("login"), async (req, res) => {
 app.post("/api/admin/login", rateLimit("login"), (req, res) => {
   const { password } = req.body;
   const expected = process.env.ADMIN_PASSWORD || "admin123";
-  console.log(`[Admin] Login attempt — password length: ${password?.length || 0}, expected length: ${expected.length}, match: ${password === expected}`);
+  console.log(`[Admin] Login attempt — match: ${password === expected}`);
   if (!password || password !== expected) {
     return res.status(401).json({ error: "Wrong password" });
   }
@@ -2736,7 +2736,7 @@ app.post("/api/senior/login", rateLimit("login"), async (req, res) => {
     }
 
     const token = makeSeniorToken(senior.id);
-    console.log(`✅ Senior login: ${senior.name} (${senior.id})`);
+    console.log(`[Auth] Senior login: ${senior.name} (${senior.id})`);
     res.json({ token, senior: safeSenior(norm(senior)), expiresInDays: SENIOR_TOKEN_DAYS });
   } catch (e) { console.error(`[Error] ${req.method} ${req.path}:`, e.message); res.status(500).json({ error: "Something went wrong. Please try again." }); }
 });
@@ -2756,7 +2756,7 @@ app.post("/api/family/login", rateLimit("login"), async (req, res) => {
     if (!senior) return res.status(401).json({ error: "Invalid family code" });
 
     const token = makeFamilyToken(senior.id);
-    console.log(`✅ Family login for: ${senior.name}`);
+    console.log(`[Auth] Family login: ${senior.name}`);
     res.json({ token, senior: safeSenior(norm(senior)), expiresInDays: FAMILY_TOKEN_DAYS });
   } catch (e) { console.error(`[Error] ${req.method} ${req.path}:`, e.message); res.status(500).json({ error: "Something went wrong. Please try again." }); }
 });
