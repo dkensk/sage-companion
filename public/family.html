@@ -401,6 +401,45 @@
     }
     .toggle-form-btn:hover { border-color: var(--teal); color: var(--teal); }
 
+    /* ── SCAN MEDICATION ──────────────────────────────────── */
+    .scan-btn {
+      display: flex; align-items: center; justify-content: center; gap: 10px;
+      width: 100%; background: var(--bg); border: 2px dashed var(--border);
+      border-radius: var(--radius-sm); padding: 14px 16px; font-size: 14px;
+      font-weight: 700; color: var(--navy); cursor: pointer;
+      transition: border-color 0.15s, background 0.15s; margin-top: 14px;
+    }
+    .scan-btn:hover { border-color: var(--teal); color: var(--teal); }
+    .scan-result {
+      display: none; margin-top: 14px; background: #F0FDF4;
+      border: 1.5px solid #BBF7D0; border-radius: var(--radius-sm); padding: 18px;
+    }
+    .scan-result.open { display: block; }
+    .scan-result .form-row input, .scan-result .form-row select {
+      flex: 1; border: 2px solid var(--border); border-radius: var(--radius-sm);
+      padding: 11px 13px; font-size: 14px; outline: none; color: var(--text); background: white;
+    }
+    .scan-result .form-row input:focus, .scan-result .form-row select:focus { border-color: var(--navy); }
+    .scan-save-btn {
+      flex: 1; background: var(--teal); color: white; border: none;
+      border-radius: var(--radius-sm); padding: 12px; font-size: 14px;
+      font-weight: 700; cursor: pointer;
+    }
+    .scan-cancel-btn {
+      flex: 1; background: var(--bg); color: var(--muted); border: 2px solid var(--border);
+      border-radius: var(--radius-sm); padding: 12px; font-size: 14px;
+      font-weight: 600; cursor: pointer;
+    }
+
+    /* ── DELETE MED BUTTON ────────────────────────────────── */
+    .med-delete-btn {
+      background: none; border: 1.5px solid #FCA5A5; color: #DC2626;
+      border-radius: 8px; padding: 6px 12px; font-size: 12px; font-weight: 700;
+      cursor: pointer; transition: background 0.15s, color 0.15s; flex-shrink: 0;
+    }
+    .med-delete-btn:hover { background: #FEE2E2; }
+    .med-actions { display: flex; align-items: center; gap: 8px; flex-shrink: 0; }
+
     /* ── TOAST ──────────────────────────────────────────────── */
     #toast {
       position: fixed;
@@ -646,11 +685,42 @@
           <div class="table-toolbar"><div class="table-title">💊 Current Medications</div></div>
           <div class="table-body">
             <div id="medList"><div class="table-empty">Loading...</div></div>
-            <button class="toggle-form-btn" onclick="toggleAddMed()">+ Add medication</button>
+
+            <!-- Scan medication label -->
+            <label for="medScanInput" class="scan-btn" id="medScanBtn">
+              <span style="font-size:20px;">📷</span>
+              <span id="medScanLabel">Scan Medication Label</span>
+            </label>
+            <input type="file" id="medScanInput" accept="image/*" capture="environment" style="display:none;" onchange="handleMedScan(this)" />
+
+            <!-- Add manually button -->
+            <button class="toggle-form-btn" onclick="toggleAddMed()">+ Add Medication Manually</button>
+
+            <!-- Manual add form -->
             <div class="add-med-form" id="addMedForm">
               <div class="form-row"><input type="text" id="medName" placeholder="Medication name" /><input type="text" id="medDosage" placeholder="Dose (e.g. 10mg)" /></div>
               <div class="form-row"><input type="time" id="medTime1" value="08:00" /><input type="time" id="medTime2" placeholder="2nd time (optional)" /></div>
               <div class="form-row"><select id="medFood"><option value="0">No food required</option><option value="1">Take with food</option></select><button class="add-btn" onclick="addMedication()">Add</button></div>
+            </div>
+
+            <!-- Scan result / confirmation form -->
+            <div class="scan-result" id="scanResult">
+              <div id="scanFormTitle" style="font-size:15px; font-weight:700; color:var(--teal); margin-bottom:14px;">✓ Medication found — confirm details:</div>
+              <div class="form-row"><input type="text" id="scanName" placeholder="Medication name" /><input type="text" id="scanDose" placeholder="Dose (e.g. 10mg)" /></div>
+              <div class="form-row">
+                <select id="scanFrequency" onchange="updateScanTimes()">
+                  <option value="1">Once daily</option>
+                  <option value="2">Twice daily</option>
+                  <option value="3">Three times daily</option>
+                </select>
+                <select id="scanWithFood"><option value="0">No food required</option><option value="1">Take with food</option></select>
+              </div>
+              <div class="form-row"><div id="scanTimesInputs" style="display:flex;flex-wrap:wrap;gap:8px;flex:1;"><input class="scan-time-input" type="text" placeholder="e.g. 8:00 AM" style="flex:1;min-width:100px;border:2px solid var(--border);border-radius:var(--radius-sm);padding:11px 13px;font-size:14px;color:var(--text);outline:none;background:white;" /></div></div>
+              <div id="scanDirections" style="font-size:13px;color:var(--muted);font-style:italic;line-height:1.5;padding:2px 0;margin-bottom:10px;"></div>
+              <div class="form-row" style="margin-bottom:0;">
+                <button class="scan-save-btn" onclick="saveScanResult()">Save Medication</button>
+                <button class="scan-cancel-btn" onclick="cancelScan()">Cancel</button>
+              </div>
             </div>
           </div>
         </div>
@@ -833,7 +903,8 @@
       var m = meds[i];
       html += '<div class="med-row"><div class="med-info"><div class="med-name">' + escHtml(m.name) + '</div>';
       html += '<div class="med-detail">' + (m.dose ? escHtml(m.dose) + ' &middot; ' : '') + escHtml(m.time || '') + (m.withFood ? ' &middot; with food' : '') + '</div></div>';
-      html += '<span class="badge-pill ' + (m.takenToday ? 'badge-taken' : 'badge-pending') + '">' + (m.takenToday ? '✓ Taken' : '⏳ Pending') + '</span></div>';
+      html += '<div class="med-actions"><span class="badge-pill ' + (m.takenToday ? 'badge-taken' : 'badge-pending') + '">' + (m.takenToday ? '✓ Taken' : '⏳ Pending') + '</span>';
+      html += '<button class="med-delete-btn" onclick="deleteMed(\'' + m.id + '\', \'' + escHtml(m.name).replace(/'/g, "\\'") + '\')">Delete</button></div></div>';
     }
     el.innerHTML = html;
   }
@@ -910,6 +981,119 @@
     document.getElementById("addMedForm").classList.remove("open");
     showToast(name + " added");
     await loadDashboard();
+  }
+
+  // ── Medication Scan ───────────────────────────────────────────────────
+  async function handleMedScan(input) {
+    if (!input.files || !input.files[0]) return;
+    var file = input.files[0];
+    var label = document.getElementById("medScanLabel");
+    var btn = document.getElementById("medScanBtn");
+    label.textContent = "Reading label…";
+    btn.style.borderColor = "var(--navy)";
+    btn.style.background = "#EEF4FF";
+
+    var formData = new FormData();
+    formData.append("image", file);
+
+    try {
+      var res = await familyApiCall("/api/medications/scan", { method: "POST", body: formData });
+      if (!res.ok) {
+        var errData = await res.json().catch(function() { return {}; });
+        showToast(errData.error || "Couldn't read the label. Try a clearer photo.");
+        resetScanBtn(); return;
+      }
+      var data = await res.json();
+      if (!data.name) { showToast("Couldn't read the label. Try a clearer photo."); resetScanBtn(); return; }
+
+      document.getElementById("scanName").value = data.name || "";
+      document.getElementById("scanDose").value = data.dose || "";
+      document.getElementById("scanWithFood").value = data.withFood ? "1" : "0";
+      var freq = data.frequency || 1;
+      var times = Array.isArray(data.times) ? data.times : (data.time ? [data.time] : ["8:00 AM"]);
+      document.getElementById("scanFrequency").value = String(Math.min(freq, 3));
+      updateScanTimes(times);
+      var dir = document.getElementById("scanDirections");
+      dir.textContent = data.directions ? "Directions: " + data.directions : "";
+      document.getElementById("scanResult").classList.add("open");
+      document.getElementById("scanResult").scrollIntoView({ behavior: "smooth" });
+      showToast("✓ Found: " + data.name);
+    } catch (e) {
+      console.error("[MedScan] Error:", e);
+      showToast("Scan failed — check connection and try again.");
+    }
+    resetScanBtn();
+    input.value = "";
+  }
+
+  function resetScanBtn() {
+    document.getElementById("medScanLabel").textContent = "Scan Medication Label";
+    var btn = document.getElementById("medScanBtn");
+    btn.style.borderColor = "";
+    btn.style.background = "";
+  }
+
+  function updateScanTimes(prefill) {
+    var freq = parseInt(document.getElementById("scanFrequency").value) || 1;
+    var container = document.getElementById("scanTimesInputs");
+    var defaults = [["8:00 AM"], ["8:00 AM","8:00 PM"], ["8:00 AM","2:00 PM","9:00 PM"]];
+    var existing = prefill || defaults[freq - 1] || defaults[0];
+    var html = "";
+    for (var i = 0; i < freq; i++) {
+      var val = existing[i] || defaults[freq - 1][i] || "";
+      html += '<input class="scan-time-input" type="text" value="' + val + '" placeholder="e.g. 8:00 AM" style="flex:1;min-width:100px;border:2px solid var(--border);border-radius:var(--radius-sm);padding:11px 13px;font-size:14px;color:var(--text);outline:none;background:white;" />';
+    }
+    container.innerHTML = html;
+  }
+
+  function cancelScan() {
+    document.getElementById("scanResult").classList.remove("open");
+    document.getElementById("scanName").value = "";
+    document.getElementById("scanDose").value = "";
+    document.getElementById("scanFrequency").value = "1";
+    document.getElementById("scanWithFood").value = "0";
+    updateScanTimes();
+    document.getElementById("scanDirections").textContent = "";
+  }
+
+  async function saveScanResult() {
+    var name = document.getElementById("scanName").value.trim();
+    var dose = document.getElementById("scanDose").value.trim();
+    var frequency = parseInt(document.getElementById("scanFrequency").value) || 1;
+    var timeInputs = document.querySelectorAll("#scanTimesInputs .scan-time-input");
+    var medTimes = Array.from(timeInputs).map(function(i) { return i.value.trim(); }).filter(function(t) { return t; });
+    var withFood = document.getElementById("scanWithFood").value === "1";
+    if (!name) { showToast("Please enter the medication name."); return; }
+    if (medTimes.length === 0) medTimes.push("8:00 AM");
+
+    try {
+      var res = await familyApiCall("/api/medications", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ seniorId: seniorId, name: name, dose: dose, time: medTimes[0], medTimes: medTimes, frequency: frequency, withFood: withFood })
+      });
+      if (!res.ok) { showToast("Couldn't save medication — try again."); return; }
+      cancelScan();
+      showToast("✓ " + name + " added!");
+      await loadDashboard();
+    } catch (e) {
+      console.error("[Meds] Save error:", e);
+      showToast("Connection error — try again.");
+    }
+  }
+
+  // ── Delete Medication ──────────────────────────────────────────────────
+  async function deleteMed(medId, medName) {
+    if (!confirm("Delete " + medName + "? This cannot be undone.")) return;
+    try {
+      var res = await familyApiCall("/api/medications/" + medId, { method: "DELETE" });
+      if (!res.ok) { showToast("Couldn't delete — try again."); return; }
+      showToast("✓ " + medName + " deleted");
+      await loadDashboard();
+    } catch (e) {
+      console.error("[Meds] Delete error:", e);
+      showToast("Connection error — try again.");
+    }
   }
 
   function showTab(name, navEl, mobEl) {

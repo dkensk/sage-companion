@@ -1033,7 +1033,7 @@ app.get("/api/medications/scan/status", adminAuth, (req, res) => {
 });
 
 // POST /api/medications/scan — Claude Vision reads a medication bottle label
-app.post("/api/medications/scan", rateLimit("upload"), upload.single("image"), seniorAuth, async (req, res) => {
+app.post("/api/medications/scan", rateLimit("upload"), upload.single("image"), anyAuth, async (req, res) => {
   try {
     if (!req.file) return res.status(400).json({ error: "No image provided" });
     const b64  = req.file.buffer.toString("base64");
@@ -1116,7 +1116,7 @@ app.put("/api/medications/:id", seniorAuth, validateUUID("id"), async (req, res)
   } catch (e) { console.error(`[Error] ${req.method} ${req.path}:`, e.message); res.status(500).json({ error: "Something went wrong. Please try again." }); }
 });
 
-app.delete("/api/medications/:id", seniorAuth, validateUUID("id"), async (req, res) => {
+app.delete("/api/medications/:id", anyAuth, validateUUID("id"), async (req, res) => {
   try {
     await supabase.from("medications").update({ active: false }).eq("id", req.params.id);
     res.json({ success: true });
