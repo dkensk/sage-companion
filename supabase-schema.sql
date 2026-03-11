@@ -34,16 +34,21 @@ CREATE TABLE IF NOT EXISTS seniors (
 
 -- ── Medications ───────────────────────────────────────────────────────────────
 CREATE TABLE IF NOT EXISTS medications (
-  id         UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  senior_id  UUID REFERENCES seniors(id) ON DELETE CASCADE,
-  name       TEXT    NOT NULL,
-  dose       TEXT,
-  time       TEXT,
-  med_times  TEXT,
-  frequency  INTEGER DEFAULT 1,
-  with_food  BOOLEAN DEFAULT FALSE,
-  active     BOOLEAN DEFAULT TRUE,
-  created_at TIMESTAMPTZ DEFAULT NOW()
+  id              UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  senior_id       UUID REFERENCES seniors(id) ON DELETE CASCADE,
+  name            TEXT    NOT NULL,
+  dose            TEXT,
+  time            TEXT,
+  med_times       TEXT,
+  frequency       INTEGER DEFAULT 1,
+  with_food       BOOLEAN DEFAULT FALSE,
+  active          BOOLEAN DEFAULT TRUE,
+  refills_remaining INTEGER,
+  days_supply     INTEGER,
+  last_filled     DATE,
+  next_refill     DATE,
+  prescriber      TEXT,
+  created_at      TIMESTAMPTZ DEFAULT NOW()
 );
 
 -- ── Medication log ────────────────────────────────────────────────────────────
@@ -357,7 +362,19 @@ CREATE POLICY "Deny public access" ON contact_messages   FOR ALL USING (false);
 
 
 -- ═══════════════════════════════════════════════════════════════════════════════
---  5. DEMO DATA (Margaret — family code: FAMILY123)
+--  5a. MIGRATIONS (safe to re-run — adds columns if missing)
+-- ═══════════════════════════════════════════════════════════════════════════════
+
+DO $$ BEGIN
+  ALTER TABLE medications ADD COLUMN IF NOT EXISTS refills_remaining INTEGER;
+  ALTER TABLE medications ADD COLUMN IF NOT EXISTS days_supply       INTEGER;
+  ALTER TABLE medications ADD COLUMN IF NOT EXISTS last_filled       DATE;
+  ALTER TABLE medications ADD COLUMN IF NOT EXISTS next_refill       DATE;
+  ALTER TABLE medications ADD COLUMN IF NOT EXISTS prescriber        TEXT;
+END $$;
+
+-- ═══════════════════════════════════════════════════════════════════════════════
+--  5b. DEMO DATA (Margaret — family code: FAMILY123)
 -- ═══════════════════════════════════════════════════════════════════════════════
 
 INSERT INTO seniors (id, name, age, family_code, conditions, preferences, last_active)

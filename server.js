@@ -548,6 +548,92 @@ async function checkMedicationReminders() {
   }
 }
 
+// ── Prescription refill reminder (runs daily at 9 AM via cron) ────────────────
+async function checkRefillReminders() {
+  if (!VAPID_PUBLIC || !VAPID_PRIVATE) return;
+  if (!process.env.SUPABASE_URL || process.env.SUPABASE_URL === "YOUR_SUPABASE_PROJECT_URL") return;
+
+  try {
+    const today = new Date().toISOString().split("T")[0];
+    // Find meds with next_refill within the next 7 days or overdue
+    const sevenDaysOut = new Date();
+    sevenDaysOut.setDate(sevenDaysOut.getDate() + 7);
+    const cutoff = sevenDaysOut.toISOString().split("T")[0];
+
+    const { data: meds } = await supabase
+      .from("medications")
+      .select("id, name, dose, senior_id, next_refill, refills_remaining")
+      .eq("active", true)
+      .not("next_refill", "is", null)
+      .lte("next_refill", cutoff);
+
+    if (!meds || !meds.length) return;
+
+    for (const med of meds) {
+      const daysUntil = Math.ceil((new Date(med.next_refill) - new Date(today)) / (1000*60*60*24));
+
+      // Only notify at specific intervals: overdue, today, 3 days, 7 days
+      if (daysUntil !== 0 && daysUntil !== 3 && daysUntil !== 7 && daysUntil >= 0) continue;
+
+      const tag = `refill-${med.id}-${today}`;
+
+      // Check if we already sent this alert today
+      const { count } = await supabase
+        .from("activity")
+        .select("*", { count: "exact", head: true })
+        .eq("senior_id", med.senior_id)
+        .eq("type", "refill_reminder")
+        .gte("timestamp", today + "T00:00:00.000Z")
+        .ilike("description", `%${med.name}%`);
+
+      if (count > 0) continue;
+
+      let body;
+      if (daysUntil < 0) body = `${med.name}${med.dose ? " (" + med.dose + ")" : ""} refill is overdue!${med.refills_remaining != null ? " " + med.refills_remaining + " refills remaining." : ""}`;
+      else if (daysUntil === 0) body = `${med.name}${med.dose ? " (" + med.dose + ")" : ""} needs to be refilled today.${med.refills_remaining != null ? " " + med.refills_remaining + " refills remaining." : ""}`;
+      else body = `${med.name}${med.dose ? " (" + med.dose + ")" : ""} refill due in ${daysUntil} days.${med.refills_remaining != null ? " " + med.refills_remaining + " refills remaining." : ""}`;
+
+      // Log activity
+      await supabase.from("activity").insert({
+        senior_id: med.senior_id, type: "refill_reminder",
+        description: `Prescription refill reminder: ${body}`,
+        timestamp: new Date().toISOString(),
+      });
+
+      // Create alert for family dashboard
+      await supabase.from("alerts").insert({
+        senior_id: med.senior_id, type: "refill",
+        message: body, resolved: false,
+      });
+
+      // Send push notification
+      const { data: subs } = await supabase
+        .from("push_subscriptions")
+        .select("id, subscription_json")
+        .eq("senior_id", med.senior_id);
+
+      for (const sub of (subs || [])) {
+        try {
+          await webpush.sendNotification(
+            JSON.parse(sub.subscription_json),
+            JSON.stringify({
+              title: "💊 Prescription Refill Reminder",
+              body, icon: "/icons/icon-192.png",
+              badge: "/icons/badge-72.png", tag,
+            })
+          );
+        } catch (e) {
+          if (e.statusCode === 410 || e.statusCode === 404) {
+            await supabase.from("push_subscriptions").delete().eq("id", sub.id);
+          }
+        }
+      }
+    }
+  } catch (e) {
+    console.error("[RefillReminder] Error:", e.message);
+  }
+}
+
 // ── Appointment reminder push notifications ──────────────────────────────────
 // Sends a reminder 1 hour before and 15 minutes before each appointment
 async function checkAppointmentReminders() {
@@ -1056,7 +1142,9 @@ Fields:
 - "withFood": true if label says "take with food" or "take with meals" (boolean, default false)
 - "directions": the full directions text as written (string or null)
 - "prescriber": doctor name if visible on label (string or null)
-- "refills": number of refills remaining as a number (number or null)` }
+- "refills": number of refills remaining as a number (number or null)
+- "daysSupply": number of days the prescription supply lasts, e.g. "30 day supply" → 30, "QTY 90" with once daily → 90 (number or null)
+- "lastFilled": the date the prescription was filled/dispensed if visible, in YYYY-MM-DD format (string or null)` }
       ]}],
     });
 
@@ -1076,7 +1164,7 @@ Fields:
 // POST /api/medications — add medication (family or scan)
 app.post("/api/medications", anyAuth, rateLimit("api"), async (req, res) => {
   try {
-    const { seniorId, name, dose, time, withFood, medTimes, frequency } = req.body;
+    const { seniorId, name, dose, time, withFood, medTimes, frequency, refills, daysSupply, lastFilled, prescriber } = req.body;
     if (!seniorId || !name) return res.status(400).json({ error: "seniorId and name required" });
 
     // Build med_times array: prefer explicit medTimes, else wrap single time
@@ -1085,10 +1173,23 @@ app.post("/api/medications", anyAuth, rateLimit("api"), async (req, res) => {
     if (timesArr.length === 0) timesArr = ["8:00 AM"];
     const freq = frequency || timesArr.length || 1;
 
+    // Compute next_refill from last_filled + days_supply
+    let nextRefill = null;
+    if (lastFilled && daysSupply) {
+      const d = new Date(lastFilled);
+      d.setDate(d.getDate() + parseInt(daysSupply));
+      nextRefill = d.toISOString().split("T")[0];
+    }
+
     const { data: med } = await supabase.from("medications").insert({
       senior_id: seniorId, name, dose: dose || null,
       time: timesArr[0], med_times: JSON.stringify(timesArr),
       frequency: freq, with_food: !!withFood, active: true,
+      refills_remaining: refills != null ? parseInt(refills) : null,
+      days_supply: daysSupply ? parseInt(daysSupply) : null,
+      last_filled: lastFilled || null,
+      next_refill: nextRefill,
+      prescriber: prescriber || null,
     }).select().single();
 
     await supabase.from("activity").insert({
@@ -1102,15 +1203,28 @@ app.post("/api/medications", anyAuth, rateLimit("api"), async (req, res) => {
 
 app.put("/api/medications/:id", seniorAuth, validateUUID("id"), async (req, res) => {
   try {
-    const { name, dose, medTimes, frequency, withFood } = req.body;
+    const { name, dose, medTimes, frequency, withFood, refills, daysSupply, lastFilled, prescriber } = req.body;
     if (!name || !name.trim()) return res.status(400).json({ error: "Medication name is required" });
     let timesArr = Array.isArray(medTimes) ? medTimes.filter(t => t && t.trim()) : [];
     if (timesArr.length === 0) timesArr = ["8:00 AM"];
     const freq = frequency || timesArr.length || 1;
+
+    let nextRefill = null;
+    if (lastFilled && daysSupply) {
+      const d = new Date(lastFilled);
+      d.setDate(d.getDate() + parseInt(daysSupply));
+      nextRefill = d.toISOString().split("T")[0];
+    }
+
     await supabase.from("medications").update({
       name: name.trim(), dose: dose || null, time: timesArr[0],
       med_times: JSON.stringify(timesArr), frequency: freq,
       with_food: !!withFood,
+      refills_remaining: refills != null ? parseInt(refills) : null,
+      days_supply: daysSupply ? parseInt(daysSupply) : null,
+      last_filled: lastFilled || null,
+      next_refill: nextRefill,
+      prescriber: prescriber || null,
     }).eq("id", req.params.id);
     res.json({ success: true });
   } catch (e) { console.error(`[Error] ${req.method} ${req.path}:`, e.message); res.status(500).json({ error: "Something went wrong. Please try again." }); }
@@ -3160,9 +3274,11 @@ async function start() {
       cron.schedule("* * * * *", checkMedicationReminders);
       cron.schedule("* * * * *", checkAppointmentReminders);
       cron.schedule("* * * * *", checkDueReminders);
+      cron.schedule("0 9 * * *", checkRefillReminders); // daily at 9 AM
       console.log("   💊 Medication reminders: active");
       console.log("   📅 Appointment reminders: active (1hr + 15min before)");
-      console.log("   🔔 Due reminders: active\n");
+      console.log("   🔔 Due reminders: active");
+      console.log("   💊 Refill reminders: active (daily at 9 AM)\n");
     } else {
       console.log("   💊 Medication reminders: disabled (VAPID keys not set)");
       console.log("   📅 Appointment reminders: disabled");

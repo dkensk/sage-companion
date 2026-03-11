@@ -884,6 +884,28 @@
             Take with food
           </label>
         </div>
+        <!-- Prescription renewal fields -->
+        <div style="margin-top:6px;">
+          <label style="font-size:14px;font-weight:700;color:var(--muted);display:block;margin-bottom:4px;">PRESCRIPTION DETAILS (optional)</label>
+          <div style="display:flex;gap:10px;flex-wrap:wrap;">
+            <div style="flex:1;min-width:100px;">
+              <label style="font-size:12px;color:var(--muted);display:block;margin-bottom:2px;">Refills left</label>
+              <input id="scanRefills" type="number" min="0" placeholder="e.g. 3" style="width:100%;border:2px solid var(--border);border-radius:10px;padding:12px 14px;font-size:17px;color:var(--text);outline:none;background:white;" />
+            </div>
+            <div style="flex:1;min-width:100px;">
+              <label style="font-size:12px;color:var(--muted);display:block;margin-bottom:2px;">Days supply</label>
+              <input id="scanDaysSupply" type="number" min="1" placeholder="e.g. 30" style="width:100%;border:2px solid var(--border);border-radius:10px;padding:12px 14px;font-size:17px;color:var(--text);outline:none;background:white;" />
+            </div>
+            <div style="flex:1;min-width:130px;">
+              <label style="font-size:12px;color:var(--muted);display:block;margin-bottom:2px;">Last filled</label>
+              <input id="scanLastFilled" type="date" style="width:100%;border:2px solid var(--border);border-radius:10px;padding:12px 14px;font-size:17px;color:var(--text);outline:none;background:white;" />
+            </div>
+          </div>
+          <div style="margin-top:8px;">
+            <label style="font-size:12px;color:var(--muted);display:block;margin-bottom:2px;">Prescriber</label>
+            <input id="scanPrescriber" type="text" placeholder="Dr. name (optional)" style="width:100%;border:2px solid var(--border);border-radius:10px;padding:12px 14px;font-size:16px;color:var(--text);outline:none;background:white;" />
+          </div>
+        </div>
       </div>
       <div style="display:flex;gap:10px;">
         <button onclick="saveMedForm()" id="medFormSaveBtn" style="
@@ -1362,9 +1384,20 @@
         const allTaken = doses.every(d => d.taken);
         const timeStr = doses.map(d => d.time).join(", ");
         const freqLabel = doses.length > 1 ? ` (${doses.length}x daily)` : "";
-        const medData = { id: m._id, name: m.name, dose: m.dose || "", times: doses.map(d => d.time), frequency: doses.length, withFood: !!m.withFood };
+        const medData = { id: m._id, name: m.name, dose: m.dose || "", times: doses.map(d => d.time), frequency: doses.length, withFood: !!m.withFood, refillsRemaining: m.refillsRemaining, daysSupply: m.daysSupply, lastFilled: m.lastFilled, prescriber: m.prescriber };
         const medB64 = btoa(JSON.stringify(medData));
         const safeName = (m.name || "").replace(/'/g, "\\'").replace(/"/g, "&quot;");
+
+        // Refill status line
+        let refillInfo = "";
+        if (m.nextRefill) {
+          const daysUntil = Math.ceil((new Date(m.nextRefill) - new Date()) / (1000*60*60*24));
+          if (daysUntil < 0) refillInfo = `<div style="font-size:13px;color:#DC2626;font-weight:600;margin-top:3px;">⚠️ Refill overdue (${m.refillsRemaining != null ? m.refillsRemaining + " refills left" : "check refills"})</div>`;
+          else if (daysUntil <= 7) refillInfo = `<div style="font-size:13px;color:#D97706;font-weight:600;margin-top:3px;">🔔 Refill in ${daysUntil} day${daysUntil !== 1 ? "s" : ""}${m.refillsRemaining != null ? " · " + m.refillsRemaining + " refills left" : ""}</div>`;
+          else refillInfo = `<div style="font-size:12px;color:var(--muted);margin-top:2px;">Refill: ${new Date(m.nextRefill).toLocaleDateString()}${m.refillsRemaining != null ? " · " + m.refillsRemaining + " refills" : ""}</div>`;
+        } else if (m.refillsRemaining != null) {
+          refillInfo = `<div style="font-size:12px;color:var(--muted);margin-top:2px;">${m.refillsRemaining} refill${m.refillsRemaining !== 1 ? "s" : ""} remaining</div>`;
+        }
 
         // Per-dose buttons for multi-dose meds (taken badges are tappable to undo)
         let doseButtons = "";
@@ -1389,7 +1422,8 @@
           <div style="display:flex;justify-content:space-between;align-items:center;">
             <div style="flex:1;">
               <div class="med-name">${m.name}</div>
-              <div class="med-detail">${m.dose ? m.dose + " · " : ""}${timeStr}${freqLabel}${m.withFood ? " · with food" : ""}</div>
+              <div class="med-detail">${m.dose ? m.dose + " · " : ""}${timeStr}${freqLabel}${m.withFood ? " · with food" : ""}${m.prescriber ? " · Dr. " + m.prescriber : ""}</div>
+              ${refillInfo}
             </div>
             <div style="display:flex;gap:6px;align-items:center;flex-shrink:0;">
               <button onclick="editMed(JSON.parse(atob('${medB64}')))" style="background:none;border:none;font-size:18px;cursor:pointer;padding:6px;opacity:0.5;" title="Edit">✏️</button>
@@ -2657,6 +2691,12 @@
       const dir = document.getElementById("scanDirections");
       dir.textContent = data.directions ? "Directions: " + data.directions : "";
 
+      // Populate prescription refill fields from OCR
+      document.getElementById("scanRefills").value = data.refills != null ? data.refills : "";
+      document.getElementById("scanDaysSupply").value = data.daysSupply || "";
+      document.getElementById("scanLastFilled").value = data.lastFilled || "";
+      document.getElementById("scanPrescriber").value = data.prescriber || "";
+
       document.getElementById("medScanResult").style.display = "block";
       document.getElementById("medScanResult").scrollIntoView({ behavior: "smooth" });
 
@@ -2713,6 +2753,10 @@
     document.getElementById("scanFrequency").value = String(med.frequency || med.times?.length || 1);
     document.getElementById("scanWithFood").checked = !!med.withFood;
     updateScanTimeInputs(med.times || []);
+    document.getElementById("scanRefills").value = med.refillsRemaining != null ? med.refillsRemaining : "";
+    document.getElementById("scanDaysSupply").value = med.daysSupply || "";
+    document.getElementById("scanLastFilled").value = med.lastFilled || "";
+    document.getElementById("scanPrescriber").value = med.prescriber || "";
     document.getElementById("medScanResult").style.display = "block";
     document.getElementById("medScanResult").scrollIntoView({ behavior: "smooth" });
   }
@@ -2740,24 +2784,33 @@
     const timeInputs = document.querySelectorAll("#scanTimesInputs .scan-time-input");
     const medTimes = Array.from(timeInputs).map(i => i.value.trim()).filter(t => t);
     const withFood = document.getElementById("scanWithFood").checked;
+    const refills = document.getElementById("scanRefills").value;
+    const daysSupply = document.getElementById("scanDaysSupply").value;
+    const lastFilled = document.getElementById("scanLastFilled").value;
+    const prescriber = document.getElementById("scanPrescriber").value.trim();
     if (!name) { showToast("Please enter the medication name."); return; }
     if (medTimes.length === 0) medTimes.push("8:00 AM");
+
+    const rxFields = {
+      refills: refills !== "" ? parseInt(refills) : null,
+      daysSupply: daysSupply ? parseInt(daysSupply) : null,
+      lastFilled: lastFilled || null,
+      prescriber: prescriber || null,
+    };
 
     try {
       let res;
       if (editId) {
-        // Update existing
         res = await apiCall(`/api/medications/${editId}`, {
           method: "PUT",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ name, dose, medTimes, frequency, withFood }),
+          body: JSON.stringify({ name, dose, medTimes, frequency, withFood, ...rxFields }),
         });
       } else {
-        // Add new
         res = await apiCall("/api/medications", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ seniorId: SENIOR_ID, name, dose, time: medTimes[0], medTimes, frequency, withFood }),
+          body: JSON.stringify({ seniorId: SENIOR_ID, name, dose, time: medTimes[0], medTimes, frequency, withFood, ...rxFields }),
         });
       }
       if (!res.ok) {
@@ -2789,6 +2842,10 @@
     document.getElementById("scanWithFood").checked = false;
     updateScanTimeInputs();
     document.getElementById("scanDirections").textContent = "";
+    document.getElementById("scanRefills").value = "";
+    document.getElementById("scanDaysSupply").value = "";
+    document.getElementById("scanLastFilled").value = "";
+    document.getElementById("scanPrescriber").value = "";
     document.getElementById("medFormTitle").textContent = "✓ Medication found — confirm details:";
     document.getElementById("medFormSaveBtn").textContent = "Save to My Medications";
   }
