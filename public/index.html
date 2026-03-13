@@ -796,8 +796,10 @@
       to   { opacity: 1; transform: translateY(0); }
     }
 
-    .reveal { opacity: 0; transform: translateY(28px); transition: opacity 0.65s var(--ease), transform 0.65s var(--ease); }
+    .reveal { opacity: 0.001; transform: translateY(28px); transition: opacity 0.65s var(--ease), transform 0.65s var(--ease); }
     .reveal.visible { opacity: 1; transform: translateY(0); }
+    /* Force iOS Safari to pre-load images inside hidden reveal containers */
+    .reveal img { -webkit-transform: translateZ(0); }
     .reveal-delay-1 { transition-delay: 0.1s; }
     .reveal-delay-2 { transition-delay: 0.2s; }
     .reveal-delay-3 { transition-delay: 0.3s; }
@@ -1240,6 +1242,7 @@
   }
 
   // Scroll reveal
+  const revealEls = document.querySelectorAll(".reveal");
   const observer = new IntersectionObserver(entries => {
     entries.forEach(e => {
       if (e.isIntersecting) {
@@ -1247,9 +1250,16 @@
         observer.unobserve(e.target);
       }
     });
-  }, { threshold: 0.12 });
+  }, { threshold: 0.08 }); // lower threshold for iOS viewport quirks
 
-  document.querySelectorAll(".reveal").forEach(el => observer.observe(el));
+  revealEls.forEach(el => observer.observe(el));
+
+  // iOS Safari fallback: if IntersectionObserver fails to fire, force reveals visible
+  setTimeout(() => {
+    revealEls.forEach(el => {
+      if (!el.classList.contains("visible")) el.classList.add("visible");
+    });
+  }, 3000);
 
 </script>
 </body>

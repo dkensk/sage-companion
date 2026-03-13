@@ -464,43 +464,74 @@ function validateUUID(...paramNames) {
 }
 
 // ── Medication reminder cron (runs every minute) ──────────────────────────────
+// IMPORTANT: Server runs in UTC. Medication times are stored in the user's local
+// timezone (e.g. "8:00 AM" means 8 AM in their zone). We must convert "now" to
+// each user's timezone before comparing, otherwise reminders fire at UTC times.
 async function checkMedicationReminders() {
   if (!VAPID_PUBLIC || !VAPID_PRIVATE) return; // Push not configured
   if (!process.env.SUPABASE_URL || process.env.SUPABASE_URL === "YOUR_SUPABASE_PROJECT_URL") return;
 
   try {
-    const now         = new Date();
-    const currentTime = now.toLocaleTimeString("en-US", {
-      hour: "numeric", minute: "2-digit", hour12: true,
-    }); // e.g. "8:00 AM"
+    const now = new Date();
 
-    // Get ALL active medications (we need to check med_times arrays too)
+    // Get ALL active medications with their senior's timezone
     const { data: allMeds } = await supabase
       .from("medications")
-      .select("id, name, dose, senior_id, time, med_times")
+      .select("id, name, dose, senior_id, time, med_times, seniors!inner(timezone)")
       .eq("active", true);
 
     if (!allMeds || !allMeds.length) return;
 
-    // Filter to meds that have currentTime in their schedule
-    const dueMeds = [];
+    // Group meds by senior_id so we compute each user's local time once
+    const bySenior = {};
     for (const med of allMeds) {
-      let times;
-      try { times = med.med_times ? JSON.parse(med.med_times) : null; } catch { times = null; }
-      if (!times || !Array.isArray(times) || times.length === 0) {
-        times = med.time ? [med.time] : [];
+      if (!bySenior[med.senior_id]) bySenior[med.senior_id] = { tz: med.seniors?.timezone, meds: [] };
+      bySenior[med.senior_id].meds.push(med);
+    }
+
+    const dueMeds = [];
+    for (const [seniorId, group] of Object.entries(bySenior)) {
+      // Compute current time in the user's timezone (fall back to America/New_York)
+      const tz = group.tz || "America/New_York";
+      let localTime;
+      try {
+        localTime = now.toLocaleTimeString("en-US", {
+          hour: "numeric", minute: "2-digit", hour12: true, timeZone: tz,
+        }); // e.g. "8:00 AM"
+      } catch {
+        localTime = now.toLocaleTimeString("en-US", {
+          hour: "numeric", minute: "2-digit", hour12: true, timeZone: "America/New_York",
+        });
       }
-      if (times.includes(currentTime)) {
-        dueMeds.push({ ...med, doseTime: currentTime });
+
+      for (const med of group.meds) {
+        let times;
+        try { times = med.med_times ? JSON.parse(med.med_times) : null; } catch { times = null; }
+        if (!times || !Array.isArray(times) || times.length === 0) {
+          times = med.time ? [med.time] : [];
+        }
+        if (times.includes(localTime)) {
+          dueMeds.push({ ...med, doseTime: localTime, tz });
+        }
       }
     }
 
     if (!dueMeds.length) return;
 
-    const today      = now.toISOString().split("T")[0];
-    const todayStart = today + "T00:00:00.000Z";
-
     for (const med of dueMeds) {
+      // Compute "today" start in the user's timezone for the taken-check
+      let todayStart;
+      try {
+        const todayLocal = now.toLocaleDateString("en-CA", { timeZone: med.tz }); // "YYYY-MM-DD"
+        const localNow = new Date(now.toLocaleString("en-US", { timeZone: med.tz }));
+        const offsetMs = localNow.getTime() - now.getTime();
+        todayStart = new Date(new Date(`${todayLocal}T00:00:00`).getTime() - offsetMs).toISOString();
+      } catch {
+        todayStart = now.toISOString().split("T")[0] + "T00:00:00.000Z";
+      }
+
+      const todayTag = now.toLocaleDateString("en-CA", { timeZone: med.tz || "America/New_York" });
+
       // Skip if this specific dose_time already taken today
       const { count: taken } = await supabase
         .from("med_log")
@@ -527,7 +558,7 @@ async function checkMedicationReminders() {
               body:         `It's time to take ${med.name}${med.dose ? " (" + med.dose + ")" : ""} — ${med.doseTime} dose`,
               icon:         "/icons/icon-192.png",
               badge:        "/icons/badge-72.png",
-              tag:          `med-${med.id}-${med.doseTime.replace(/\s/g,"")}-${today}`,
+              tag:          `med-${med.id}-${med.doseTime.replace(/\s/g,"")}-${todayTag}`,
               medicationId: med.id,
               seniorId:     med.senior_id,
               doseTime:     med.doseTime,
@@ -544,7 +575,7 @@ async function checkMedicationReminders() {
       }
     }
   } catch (e) {
-    console.error("Reminder check error:", e.message);
+    console.error("[MedReminder] Check error:", e.message);
   }
 }
 
@@ -642,18 +673,30 @@ async function checkAppointmentReminders() {
 
   try {
     const now = new Date();
-    const todayStr = now.toISOString().split("T")[0];
 
-    // Get today's appointments that have a time set
+    // Get upcoming appointments with a time set, joined with senior timezone
+    // Check both today and tomorrow (UTC) to cover timezone edge cases
+    const utcToday = now.toISOString().split("T")[0];
+    const tomorrow = new Date(now); tomorrow.setDate(tomorrow.getDate() + 1);
+    const utcTomorrow = tomorrow.toISOString().split("T")[0];
+    const yesterday = new Date(now); yesterday.setDate(yesterday.getDate() - 1);
+    const utcYesterday = yesterday.toISOString().split("T")[0];
+
     const { data: appts } = await supabase
       .from("appointments")
-      .select("id, title, date, time, location, senior_id")
-      .eq("date", todayStr)
+      .select("id, title, date, time, location, senior_id, seniors!inner(timezone)")
+      .in("date", [utcYesterday, utcToday, utcTomorrow])
       .not("time", "is", null);
 
     if (!appts || !appts.length) return;
 
     for (const appt of appts) {
+      const tz = appt.seniors?.timezone || "America/New_York";
+
+      // Check if this appointment is actually today in the user's timezone
+      const localToday = now.toLocaleDateString("en-CA", { timeZone: tz });
+      if (appt.date !== localToday) continue;
+
       // Parse appointment time (e.g. "2:00 PM" -> hours/minutes)
       const timeMatch = (appt.time || "").match(/(\d{1,2}):(\d{2})\s*(AM|PM)/i);
       if (!timeMatch) continue;
@@ -663,9 +706,12 @@ async function checkAppointmentReminders() {
       if (period === "PM" && apptHour < 12) apptHour += 12;
       if (period === "AM" && apptHour === 12) apptHour = 0;
 
-      const apptTime = new Date(now);
-      apptTime.setHours(apptHour, apptMin, 0, 0);
-      const diffMin = Math.round((apptTime - now) / 60000);
+      // Build the appointment time in the user's timezone, then compare with "now"
+      // Get the current local time components in user's tz
+      const localNow = new Date(now.toLocaleString("en-US", { timeZone: tz }));
+      const apptTimeLocal = new Date(localNow);
+      apptTimeLocal.setHours(apptHour, apptMin, 0, 0);
+      const diffMin = Math.round((apptTimeLocal - localNow) / 60000);
 
       // Send at ~60 min before and ~15 min before (within 1-minute cron window)
       const shouldNotify = (diffMin >= 59 && diffMin <= 61) || (diffMin >= 14 && diffMin <= 16);
@@ -688,7 +734,7 @@ async function checkAppointmentReminders() {
               body: `Your appointment is ${label}${locationStr}`,
               icon: "/icons/icon-192.png",
               badge: "/icons/badge-72.png",
-              tag: `appt-${appt.id}-${diffMin > 30 ? "60" : "15"}-${todayStr}`,
+              tag: `appt-${appt.id}-${diffMin > 30 ? "60" : "15"}-${localToday}`,
             })
           );
           await supabase.from("push_subscriptions")
@@ -702,7 +748,7 @@ async function checkAppointmentReminders() {
       }
     }
   } catch (e) {
-    console.error("Appointment reminder error:", e.message);
+    console.error("[ApptReminder] Check error:", e.message);
   }
 }
 
@@ -714,25 +760,40 @@ async function checkDueReminders() {
 
   try {
     const now = new Date();
-    const todayStr = now.toISOString().split("T")[0];
-    const currentTime = now.toLocaleTimeString("en-US", {
-      hour: "numeric", minute: "2-digit", hour12: true,
-    });
+    // Fetch a wide date range to cover timezone edge cases, then filter locally
+    const utcToday = now.toISOString().split("T")[0];
+    const tomorrow = new Date(now); tomorrow.setDate(tomorrow.getDate() + 1);
+    const yesterday = new Date(now); yesterday.setDate(yesterday.getDate() - 1);
 
-    // Get uncompleted reminders due today
     const { data: reminders } = await supabase
       .from("reminders")
-      .select("id, text, due_date, due_time, senior_id")
+      .select("id, text, due_date, due_time, senior_id, seniors!inner(timezone)")
       .eq("completed", false)
-      .eq("due_date", todayStr);
+      .in("due_date", [yesterday.toISOString().split("T")[0], utcToday, tomorrow.toISOString().split("T")[0]]);
 
     if (!reminders || !reminders.length) return;
 
     for (const rem of reminders) {
+      const tz = rem.seniors?.timezone || "America/New_York";
+
+      // Check if this reminder is due today in the user's timezone
+      let localToday, localTime;
+      try {
+        localToday = now.toLocaleDateString("en-CA", { timeZone: tz });
+        localTime = now.toLocaleTimeString("en-US", {
+          hour: "numeric", minute: "2-digit", hour12: true, timeZone: tz,
+        });
+      } catch {
+        localToday = utcToday;
+        localTime = now.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit", hour12: true });
+      }
+
+      if (rem.due_date !== localToday) continue;
+
       // If reminder has a due_time, only notify at that time
       // If no due_time, notify once at 9:00 AM
       const targetTime = rem.due_time || "9:00 AM";
-      if (targetTime !== currentTime) continue;
+      if (targetTime !== localTime) continue;
 
       const { data: subs } = await supabase
         .from("push_subscriptions")
@@ -748,7 +809,7 @@ async function checkDueReminders() {
               body: rem.text,
               icon: "/icons/icon-192.png",
               badge: "/icons/badge-72.png",
-              tag: `rem-${rem.id}-${todayStr}`,
+              tag: `rem-${rem.id}-${localToday}`,
             })
           );
           await supabase.from("push_subscriptions")
@@ -762,7 +823,7 @@ async function checkDueReminders() {
       }
     }
   } catch (e) {
-    console.error("Due reminder check error:", e.message);
+    console.error("[DueReminder] Check error:", e.message);
   }
 }
 
@@ -1592,7 +1653,7 @@ Never invent facts not listed above. If something contradicts a memory, ask gent
               trackUsage(effectiveSeniorId, "appointments_added").catch(() => {});
             }
           }
-        } catch (e) { console.error("Appointment parse error:", e.message); }
+        } catch (e) { console.error("[Chat] Appointment parse error:", e.message); }
       })());
     }
 
@@ -1614,7 +1675,7 @@ Never invent facts not listed above. If something contradicts a memory, ask gent
               supabase.from("activity").insert({ senior_id: effectiveSeniorId, type: "reminder_added", description: `Voice reminder: "${remData.text.slice(0, 60)}"`, timestamp: new Date().toISOString() }).then(() => {}).catch(e => console.error("[Chat] activity insert failed:", e.message));
             }
           }
-        } catch (e) { console.error("Reminder parse error:", e.message); }
+        } catch (e) { console.error("[Chat] Reminder parse error:", e.message); }
       })());
     }
 
@@ -1646,7 +1707,7 @@ Never invent facts not listed above. If something contradicts a memory, ask gent
       .then(() => console.log("[Memory] extraction completed for:", message.slice(0, 40)))
       .catch(e => console.error("[Memory] bg extract:", e.message));
   } catch (e) {
-    console.error("Chat error:", e.message, e.stack);
+    console.error("[Chat] Error:", e.message, e.stack);
     const status = e?.status || e?.statusCode || 0;
     if (status === 529 || (e.message && e.message.includes("overloaded"))) {
       res.status(503).json({ error: "Sage is taking a quick breather — the AI service is busy right now. Please try again in a moment!", errorType: "overloaded" });
@@ -1669,7 +1730,7 @@ app.get("/api/tts/status", adminAuth, (req, res) => {
   res.json({
     configured: !isPlaceholder,
     provider: "openai",
-    voice: process.env.TTS_VOICE || "nova",
+    voice: process.env.TTS_VOICE || "coral",
     issue: isPlaceholder ? "OPENAI_API_KEY is missing or still a placeholder" : null,
   });
 });
@@ -1714,7 +1775,7 @@ app.post("/api/tts", seniorAuth, rateLimit("tts"), async (req, res) => {
 
   const apiKey = (process.env.OPENAI_API_KEY || "").trim();
   if (!apiKey || apiKey.startsWith("YOUR_") || apiKey.length < 20) {
-    console.warn("TTS: OPENAI_API_KEY not set or placeholder");
+    console.warn("[TTS] OPENAI_API_KEY not set or placeholder");
     return res.status(503).json({ error: "OpenAI TTS not configured — add OPENAI_API_KEY to Railway Variables" });
   }
 
