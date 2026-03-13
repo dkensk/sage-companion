@@ -1391,10 +1391,13 @@
         // Refill status line
         let refillInfo = "";
         if (m.nextRefill) {
-          const daysUntil = Math.ceil((new Date(m.nextRefill) - new Date()) / (1000*60*60*24));
+          const [ry,rmo,rd] = m.nextRefill.split("-").map(Number);
+          const refillDate = new Date(ry, rmo-1, rd);
+          const todayLocal = new Date(); todayLocal.setHours(0,0,0,0);
+          const daysUntil = Math.round((refillDate - todayLocal) / (1000*60*60*24));
           if (daysUntil < 0) refillInfo = `<div style="font-size:13px;color:#DC2626;font-weight:600;margin-top:3px;">⚠️ Refill overdue (${m.refillsRemaining != null ? m.refillsRemaining + " refills left" : "check refills"})</div>`;
           else if (daysUntil <= 7) refillInfo = `<div style="font-size:13px;color:#D97706;font-weight:600;margin-top:3px;">🔔 Refill in ${daysUntil} day${daysUntil !== 1 ? "s" : ""}${m.refillsRemaining != null ? " · " + m.refillsRemaining + " refills left" : ""}</div>`;
-          else refillInfo = `<div style="font-size:12px;color:var(--muted);margin-top:2px;">Refill: ${new Date(m.nextRefill).toLocaleDateString()}${m.refillsRemaining != null ? " · " + m.refillsRemaining + " refills" : ""}</div>`;
+          else refillInfo = `<div style="font-size:12px;color:var(--muted);margin-top:2px;">Refill: ${refillDate.toLocaleDateString()}${m.refillsRemaining != null ? " · " + m.refillsRemaining + " refills" : ""}</div>`;
         } else if (m.refillsRemaining != null) {
           refillInfo = `<div style="font-size:12px;color:var(--muted);margin-top:2px;">${m.refillsRemaining} refill${m.refillsRemaining !== 1 ? "s" : ""} remaining</div>`;
         }
@@ -1506,7 +1509,8 @@
     const el = document.getElementById("chatArea");
     const card = document.createElement("div");
     card.style.cssText = "background:linear-gradient(135deg,#e8f5e9,#f1f8e9);border-radius:16px;padding:16px 18px;margin:8px 0 4px;border:1px solid #c8e6c9;max-width:340px;";
-    const dateObj = new Date(appt.date + "T12:00:00");
+    const [y, mo, d] = appt.date.split("-").map(Number);
+    const dateObj = new Date(y, mo - 1, d);
     const dateStr = dateObj.toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric" });
     const timeStr = appt.time ? ` at ${appt.time}` : "";
     const locStr  = appt.location ? `<div style="color:#555;font-size:15px;margin-top:4px;">${escHtml(appt.location)}</div>` : "";
@@ -1524,7 +1528,7 @@
     const el = document.getElementById("chatArea");
     const card = document.createElement("div");
     card.style.cssText = "background:linear-gradient(135deg,#FFFBEB,#FEF3C7);border-radius:16px;padding:16px 18px;margin:8px 0 4px;border:1px solid #FDE68A;max-width:340px;";
-    const dateStr = rem.date ? new Date(rem.date + "T12:00:00").toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric" }) + (rem.time ? ` at ${rem.time}` : "") : "No date";
+    const dateStr = rem.date ? (() => { const [y,mo,d] = rem.date.split("-").map(Number); return new Date(y,mo-1,d).toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric" }); })() + (rem.time ? ` at ${rem.time}` : "") : "No date";
     card.innerHTML = `
       <div style="font-size:14px;font-weight:600;color:#92400E;text-transform:uppercase;letter-spacing:0.5px;margin-bottom:6px;">Added to Reminders</div>
       <div style="font-size:18px;font-weight:600;color:#78350F;">${escHtml(rem.text)}</div>
@@ -2370,7 +2374,7 @@
       }
 
       let html = active.map(r => {
-        const dateStr = r.due_date ? ` <span style="color:var(--muted);font-size:15px;">· ${new Date(r.due_date + "T12:00:00").toLocaleDateString("en-US", { month: "short", day: "numeric" })}${r.due_time ? " " + r.due_time : ""}</span>` : "";
+        const dateStr = r.due_date ? (() => { const [y,mo,d] = r.due_date.split("-").map(Number); return ` <span style="color:var(--muted);font-size:15px;">· ${new Date(y,mo-1,d).toLocaleDateString("en-US", { month: "short", day: "numeric" })}${r.due_time ? " " + r.due_time : ""}</span>`; })() : "";
         return `
           <div style="display:flex;align-items:flex-start;gap:12px;padding:12px 0;border-bottom:1px solid var(--border);">
             <button onclick="completeReminder('${r.id}')" style="background:none;border:2px solid var(--border);border-radius:8px;width:32px;height:32px;cursor:pointer;flex-shrink:0;margin-top:2px;-webkit-tap-highlight-color:transparent;" title="Mark done"></button>

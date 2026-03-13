@@ -102,6 +102,42 @@ function toCamel(obj) {
 const norm    = toCamel;
 const normArr = (rows) => (rows || []).map(toCamel);
 
+// ── Timezone helpers ───────────────────────────────────────────────────────────
+// Get "today" string (YYYY-MM-DD) in a given IANA timezone
+function todayInTz(tz) {
+  try { return new Date().toLocaleDateString("en-CA", { timeZone: tz }); }
+  catch { return new Date().toISOString().split("T")[0]; }
+}
+// Get local midnight as a UTC Date for a given timezone (for DB queries)
+function midnightUtc(tz) {
+  try {
+    const localDate = todayInTz(tz);
+    const utcNow = new Date();
+    const localNow = new Date(utcNow.toLocaleString("en-US", { timeZone: tz }));
+    const offsetMs = localNow.getTime() - utcNow.getTime();
+    return new Date(new Date(`${localDate}T00:00:00`).getTime() - offsetMs);
+  } catch { const d = new Date(); d.setHours(0, 0, 0, 0); return d; }
+}
+// Get current time string (e.g. "8:00 AM") in a given timezone
+function currentTimeInTz(tz) {
+  try {
+    return new Date().toLocaleTimeString("en-US", {
+      hour: "numeric", minute: "2-digit", hour12: true, timeZone: tz,
+    });
+  } catch {
+    return new Date().toLocaleTimeString("en-US", {
+      hour: "numeric", minute: "2-digit", hour12: true,
+    });
+  }
+}
+// Look up a senior's timezone from DB (cached per request via simple lookup)
+async function getSeniorTz(seniorId) {
+  try {
+    const { data } = await supabase.from("seniors").select("timezone").eq("id", seniorId).single();
+    return data?.timezone || "America/New_York";
+  } catch { return "America/New_York"; }
+}
+
 // Update last_active and increment daily usage counter
 async function trackUsage(seniorId, field) {
   try {
@@ -109,10 +145,10 @@ async function trackUsage(seniorId, field) {
       .update({ last_active: new Date().toISOString() })
       .eq("id", seniorId);
     if (field) {
-      const today = new Date().toISOString().split("T")[0];
+      const tz = await getSeniorTz(seniorId);
       await supabase.rpc("increment_usage", {
         p_senior_id: seniorId,
-        p_date: today,
+        p_date: todayInTz(tz),
         p_field: field,
       });
     }
@@ -143,10 +179,10 @@ async function logCost(seniorId, callType, model, inputTokens, outputTokens, tts
       const ttsPricing = TTS_PRICING[ttsModel] || TTS_PRICING["gpt-4o-mini-tts"];
       cost += (ttsChars * ttsPricing) / 1_000_000;
     }
-    const today = new Date().toISOString().split("T")[0];
+    const tz = await getSeniorTz(seniorId);
     await supabase.from("cost_log").insert({
       senior_id: seniorId,
-      date: today,
+      date: todayInTz(tz),
       call_type: callType,
       model: model || "unknown",
       input_tokens: inputTokens || 0,
@@ -579,83 +615,102 @@ async function checkMedicationReminders() {
   }
 }
 
-// ── Prescription refill reminder (runs daily at 9 AM via cron) ────────────────
+// ── Prescription refill reminder (runs hourly — fires at ~9 AM per user's tz) ─
 async function checkRefillReminders() {
   if (!VAPID_PUBLIC || !VAPID_PRIVATE) return;
   if (!process.env.SUPABASE_URL || process.env.SUPABASE_URL === "YOUR_SUPABASE_PROJECT_URL") return;
 
   try {
-    const today = new Date().toISOString().split("T")[0];
-    // Find meds with next_refill within the next 7 days or overdue
-    const sevenDaysOut = new Date();
-    sevenDaysOut.setDate(sevenDaysOut.getDate() + 7);
-    const cutoff = sevenDaysOut.toISOString().split("T")[0];
-
+    // Fetch all meds with a next_refill set, joined with senior timezone
     const { data: meds } = await supabase
       .from("medications")
-      .select("id, name, dose, senior_id, next_refill, refills_remaining")
+      .select("id, name, dose, senior_id, next_refill, refills_remaining, seniors!inner(timezone)")
       .eq("active", true)
-      .not("next_refill", "is", null)
-      .lte("next_refill", cutoff);
+      .not("next_refill", "is", null);
 
     if (!meds || !meds.length) return;
 
+    // Group by senior to process per-user timezone once
+    const bySenior = {};
     for (const med of meds) {
-      const daysUntil = Math.ceil((new Date(med.next_refill) - new Date(today)) / (1000*60*60*24));
+      if (!bySenior[med.senior_id]) bySenior[med.senior_id] = { tz: med.seniors?.timezone || "America/New_York", meds: [] };
+      bySenior[med.senior_id].meds.push(med);
+    }
 
-      // Only notify at specific intervals: overdue, today, 3 days, 7 days
-      if (daysUntil !== 0 && daysUntil !== 3 && daysUntil !== 7 && daysUntil >= 0) continue;
+    for (const [seniorId, { tz, meds: seniorMeds }] of Object.entries(bySenior)) {
+      // Only fire at 9 AM in user's local timezone (±30 min window for hourly cron)
+      let localHour;
+      try {
+        localHour = parseInt(new Date().toLocaleTimeString("en-US", { hour: "numeric", hour12: false, timeZone: tz }));
+      } catch { localHour = new Date().getUTCHours(); }
+      if (localHour !== 9) continue;
 
-      const tag = `refill-${med.id}-${today}`;
+      const today = todayInTz(tz);
+      // Compute cutoff 7 days from user's today
+      const cutoffDate = new Date(today + "T00:00:00");
+      cutoffDate.setDate(cutoffDate.getDate() + 7);
+      const cutoff = cutoffDate.toISOString().split("T")[0];
 
-      // Check if we already sent this alert today
-      const { count } = await supabase
-        .from("activity")
-        .select("*", { count: "exact", head: true })
-        .eq("senior_id", med.senior_id)
-        .eq("type", "refill_reminder")
-        .gte("timestamp", today + "T00:00:00.000Z")
-        .ilike("description", `%${med.name}%`);
+      for (const med of seniorMeds) {
+        if (med.next_refill > cutoff) continue; // beyond 7-day window
 
-      if (count > 0) continue;
+        const daysUntil = Math.ceil((new Date(med.next_refill + "T00:00:00") - new Date(today + "T00:00:00")) / (1000*60*60*24));
 
-      let body;
-      if (daysUntil < 0) body = `${med.name}${med.dose ? " (" + med.dose + ")" : ""} refill is overdue!${med.refills_remaining != null ? " " + med.refills_remaining + " refills remaining." : ""}`;
-      else if (daysUntil === 0) body = `${med.name}${med.dose ? " (" + med.dose + ")" : ""} needs to be refilled today.${med.refills_remaining != null ? " " + med.refills_remaining + " refills remaining." : ""}`;
-      else body = `${med.name}${med.dose ? " (" + med.dose + ")" : ""} refill due in ${daysUntil} days.${med.refills_remaining != null ? " " + med.refills_remaining + " refills remaining." : ""}`;
+        // Only notify at specific intervals: overdue, today, 3 days, 7 days
+        if (daysUntil !== 0 && daysUntil !== 3 && daysUntil !== 7 && daysUntil >= 0) continue;
 
-      // Log activity
-      await supabase.from("activity").insert({
-        senior_id: med.senior_id, type: "refill_reminder",
-        description: `Prescription refill reminder: ${body}`,
-        timestamp: new Date().toISOString(),
-      });
+        const tag = `refill-${med.id}-${today}`;
 
-      // Create alert for family dashboard
-      await supabase.from("alerts").insert({
-        senior_id: med.senior_id, type: "refill",
-        message: body, resolved: false,
-      });
+        // Check if we already sent this alert today (use user's local midnight in UTC)
+        const dayStartUtc = midnightUtc(tz).toISOString();
+        const { count } = await supabase
+          .from("activity")
+          .select("*", { count: "exact", head: true })
+          .eq("senior_id", seniorId)
+          .eq("type", "refill_reminder")
+          .gte("timestamp", dayStartUtc)
+          .ilike("description", `%${med.name}%`);
 
-      // Send push notification
-      const { data: subs } = await supabase
-        .from("push_subscriptions")
-        .select("id, subscription_json")
-        .eq("senior_id", med.senior_id);
+        if (count > 0) continue;
 
-      for (const sub of (subs || [])) {
-        try {
-          await webpush.sendNotification(
-            JSON.parse(sub.subscription_json),
-            JSON.stringify({
-              title: "💊 Prescription Refill Reminder",
-              body, icon: "/icons/icon-192.png",
-              badge: "/icons/badge-72.png", tag,
-            })
-          );
-        } catch (e) {
-          if (e.statusCode === 410 || e.statusCode === 404) {
-            await supabase.from("push_subscriptions").delete().eq("id", sub.id);
+        let body;
+        if (daysUntil < 0) body = `${med.name}${med.dose ? " (" + med.dose + ")" : ""} refill is overdue!${med.refills_remaining != null ? " " + med.refills_remaining + " refills remaining." : ""}`;
+        else if (daysUntil === 0) body = `${med.name}${med.dose ? " (" + med.dose + ")" : ""} needs to be refilled today.${med.refills_remaining != null ? " " + med.refills_remaining + " refills remaining." : ""}`;
+        else body = `${med.name}${med.dose ? " (" + med.dose + ")" : ""} refill due in ${daysUntil} days.${med.refills_remaining != null ? " " + med.refills_remaining + " refills remaining." : ""}`;
+
+        // Log activity
+        await supabase.from("activity").insert({
+          senior_id: seniorId, type: "refill_reminder",
+          description: `Prescription refill reminder: ${body}`,
+          timestamp: new Date().toISOString(),
+        });
+
+        // Create alert for family dashboard
+        await supabase.from("alerts").insert({
+          senior_id: seniorId, type: "refill",
+          message: body, resolved: false,
+        });
+
+        // Send push notification
+        const { data: subs } = await supabase
+          .from("push_subscriptions")
+          .select("id, subscription_json")
+          .eq("senior_id", seniorId);
+
+        for (const sub of (subs || [])) {
+          try {
+            await webpush.sendNotification(
+              JSON.parse(sub.subscription_json),
+              JSON.stringify({
+                title: "💊 Prescription Refill Reminder",
+                body, icon: "/icons/icon-192.png",
+                badge: "/icons/badge-72.png", tag,
+              })
+            );
+          } catch (e) {
+            if (e.statusCode === 410 || e.statusCode === 404) {
+              await supabase.from("push_subscriptions").delete().eq("id", sub.id);
+            }
           }
         }
       }
@@ -1077,24 +1132,8 @@ app.get("/api/medications/:seniorId", seniorAuth, validateUUID("seniorId"), asyn
       .eq("senior_id", req.params.seniorId).eq("active", true);
 
     // Use user's timezone to determine "today" (server runs in UTC)
-    const tz = req.query.tz || req.query.timezone;
-    let todayStart;
-    if (tz) {
-      try {
-        const nowInTz = new Date().toLocaleDateString("en-CA", { timeZone: tz }); // "YYYY-MM-DD"
-        todayStart = new Date(`${nowInTz}T00:00:00`);
-        // Convert local midnight back to UTC for DB query
-        const parts = new Intl.DateTimeFormat("en-US", { timeZone: tz, hour: "numeric", hour12: false, timeZoneName: "shortOffset" }).formatToParts(todayStart);
-        // Simpler: calculate offset by comparing local midnight with UTC
-        const localMidnightStr = `${nowInTz}T00:00:00`;
-        const utcNow = new Date();
-        const localNow = new Date(utcNow.toLocaleString("en-US", { timeZone: tz }));
-        const offsetMs = localNow.getTime() - utcNow.getTime();
-        todayStart = new Date(new Date(localMidnightStr).getTime() - offsetMs);
-      } catch { todayStart = new Date(); todayStart.setHours(0, 0, 0, 0); }
-    } else {
-      todayStart = new Date(); todayStart.setHours(0, 0, 0, 0);
-    }
+    const tz = req.query.tz || req.query.timezone || await getSeniorTz(req.params.seniorId);
+    const todayStart = midnightUtc(tz);
     const { data: logs } = await supabase.from("med_log").select("medication_id, dose_time")
       .eq("senior_id", req.params.seniorId)
       .gte("taken_at", todayStart.toISOString());
@@ -1156,7 +1195,8 @@ app.post("/api/medications/:id/untake", seniorAuth, validateUUID("id"), async (r
       .eq("id", req.params.id).single();
     if (!med) return res.status(404).json({ error: "Medication not found" });
 
-    const todayStart = new Date(); todayStart.setHours(0, 0, 0, 0);
+    const tz = await getSeniorTz(med.senior_id);
+    const todayStart = midnightUtc(tz);
     // Delete the most recent log entry for this med+dose today
     const { data: logs } = await supabase.from("med_log")
       .select("id").eq("medication_id", med.id).eq("dose_time", doseTime || med.time || null)
@@ -1332,22 +1372,9 @@ app.post("/api/chat", seniorAuth, suspendCheck, rateLimit("chat"), async (req, r
 
     // ── Parallel DB queries (saves ~300-500ms vs sequential) ──────────────────
     // Use client timezone for "today" boundaries (server runs in UTC)
-    let todayStart;
-    if (timezone) {
-      try {
-        const nowInTz = new Date().toLocaleDateString("en-CA", { timeZone: timezone });
-        const localMidnightStr = `${nowInTz}T00:00:00`;
-        const utcNow = new Date();
-        const localNow = new Date(utcNow.toLocaleString("en-US", { timeZone: timezone }));
-        const offsetMs = localNow.getTime() - utcNow.getTime();
-        todayStart = new Date(new Date(localMidnightStr).getTime() - offsetMs);
-      } catch { todayStart = new Date(); todayStart.setHours(0, 0, 0, 0); }
-    } else {
-      todayStart = new Date(); todayStart.setHours(0, 0, 0, 0);
-    }
-    const todayStr = timezone
-      ? new Date().toLocaleDateString("en-CA", { timeZone: timezone })
-      : todayStart.toISOString().slice(0, 10);
+    const effectiveTz = timezone || await getSeniorTz(effectiveSeniorId);
+    const todayStart = midnightUtc(effectiveTz);
+    const todayStr = todayInTz(effectiveTz);
     const tomorrowStr = new Date(todayStart.getTime() + 86400000).toISOString().slice(0, 10);
     const twoWeeksStr = new Date(todayStart.getTime() + 14 * 86400000).toISOString().slice(0, 10);
     const [seniorRes, medsRes, logsRes, historyRes, todayApptsRes, upcomingApptsRes, remindersRes, memorySummary] = await Promise.all([
@@ -1991,7 +2018,8 @@ app.get("/api/dashboard/:seniorId", familyAuth, validateUUID("seniorId"), async 
     const { data: senior } = await supabase.from("seniors").select("*").eq("id", seniorId).single();
     if (!senior) return res.status(404).json({ error: "Senior not found" });
 
-    const todayStart = new Date(); todayStart.setHours(0, 0, 0, 0);
+    const tz = senior.timezone || "America/New_York";
+    const todayStart = midnightUtc(tz);
     const [
       { data: meds },
       { data: logs },
@@ -2093,7 +2121,8 @@ app.post("/api/appointments/parse", seniorAuth, async (req, res) => {
   try {
     const { text } = req.body;
     if (!text) return res.status(400).json({ error: "text required" });
-    const today = new Date().toLocaleDateString("en-US", { weekday: "long", year: "numeric", month: "long", day: "numeric" });
+    const tz = req.body.timezone || await getSeniorTz(req.seniorId);
+    const today = new Date().toLocaleDateString("en-US", { weekday: "long", year: "numeric", month: "long", day: "numeric", timeZone: tz });
     const response = await anthropic.messages.create({
       model: "claude-haiku-4-5-20251001", max_tokens: 300,
       messages: [{ role: "user", content: `Today is ${today}. Parse this appointment into JSON. Return ONLY valid JSON.\n\nInput: "${text}"\n\nReturn: { "title": string, "date": "YYYY-MM-DD", "time": "2:00 PM or null", "location": string or null, "notes": string or null }` }],
@@ -2109,7 +2138,8 @@ app.post("/api/appointments/ocr", rateLimit("upload"), upload.single("image"), s
     if (!req.file) return res.status(400).json({ error: "No image provided" });
     const b64  = req.file.buffer.toString("base64");
     const mime = req.file.mimetype;
-    const today = new Date().toLocaleDateString("en-US", { year: "numeric", month: "long" });
+    const tz = req.body?.timezone || await getSeniorTz(req.seniorId);
+    const today = new Date().toLocaleDateString("en-US", { year: "numeric", month: "long", timeZone: tz });
     const response = await anthropic.messages.create({
       model: "claude-sonnet-4-5-20250929", max_tokens: 1500,
       messages: [{ role: "user", content: [
@@ -3335,7 +3365,7 @@ async function start() {
       cron.schedule("* * * * *", checkMedicationReminders);
       cron.schedule("* * * * *", checkAppointmentReminders);
       cron.schedule("* * * * *", checkDueReminders);
-      cron.schedule("0 9 * * *", checkRefillReminders); // daily at 9 AM
+      cron.schedule("0 * * * *", checkRefillReminders); // hourly — fires at 9 AM per user's timezone
       console.log("   💊 Medication reminders: active");
       console.log("   📅 Appointment reminders: active (1hr + 15min before)");
       console.log("   🔔 Due reminders: active");

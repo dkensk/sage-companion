@@ -910,10 +910,13 @@
       // Refill status
       var refillLine = "";
       if (m.nextRefill) {
-        var daysUntil = Math.ceil((new Date(m.nextRefill) - new Date()) / (1000*60*60*24));
+        var rp = m.nextRefill.split("-");
+        var refillDate = new Date(+rp[0], +rp[1]-1, +rp[2]);
+        var todayLocal = new Date(); todayLocal.setHours(0,0,0,0);
+        var daysUntil = Math.round((refillDate - todayLocal) / (1000*60*60*24));
         if (daysUntil < 0) refillLine = '<div style="font-size:12px;color:#DC2626;font-weight:600;margin-top:2px;">⚠️ Refill overdue' + (m.refillsRemaining != null ? ' · ' + m.refillsRemaining + ' refills left' : '') + '</div>';
         else if (daysUntil <= 7) refillLine = '<div style="font-size:12px;color:#D97706;font-weight:600;margin-top:2px;">🔔 Refill in ' + daysUntil + ' day' + (daysUntil !== 1 ? 's' : '') + (m.refillsRemaining != null ? ' · ' + m.refillsRemaining + ' refills left' : '') + '</div>';
-        else refillLine = '<div style="font-size:11px;color:var(--muted);margin-top:2px;">Refill: ' + new Date(m.nextRefill).toLocaleDateString() + (m.refillsRemaining != null ? ' · ' + m.refillsRemaining + ' refills' : '') + '</div>';
+        else refillLine = '<div style="font-size:11px;color:var(--muted);margin-top:2px;">Refill: ' + refillDate.toLocaleDateString() + (m.refillsRemaining != null ? ' · ' + m.refillsRemaining + ' refills' : '') + '</div>';
       } else if (m.refillsRemaining != null) {
         refillLine = '<div style="font-size:11px;color:var(--muted);margin-top:2px;">' + m.refillsRemaining + ' refill' + (m.refillsRemaining !== 1 ? 's' : '') + ' remaining</div>';
       }
@@ -1187,7 +1190,7 @@
       }
 
       var html = active.map(function(r) {
-        var dateStr = r.due_date ? new Date(r.due_date + "T12:00:00").toLocaleDateString("en-US", { month: "short", day: "numeric" }) : "";
+        var dateStr = r.due_date ? (function() { var p = r.due_date.split("-"); return new Date(+p[0], +p[1]-1, +p[2]).toLocaleDateString("en-US", { month: "short", day: "numeric" }); })() : "";
         var timeStr = r.due_time ? " " + r.due_time : "";
         return '<div class="table-row">' +
           '<div style="flex:1;"><strong>' + escHtml(r.text) + '</strong>' +
@@ -1220,7 +1223,8 @@
       appts.forEach(function(a) { var d = a.date || "Unknown"; if (!groups[d]) groups[d] = []; groups[d].push(a); });
       var html = "";
       Object.keys(groups).sort().forEach(function(dateKey) {
-        var apptDate = new Date(dateKey + "T00:00:00");
+        var dp = dateKey.split("-");
+        var apptDate = new Date(+dp[0], +dp[1]-1, +dp[2]);
         var isToday = apptDate.toDateString() === today.toDateString();
         var isPast = apptDate < today;
         var label = isToday ? "Today" : apptDate.toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric" });
