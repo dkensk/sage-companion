@@ -987,7 +987,7 @@ const RATE_LIMITS = {
 
 function rateLimit(category = "api") {
   return (req, res, next) => {
-    const ip = req.ip || req.connection.remoteAddress || "unknown";
+    const ip = req.ip || req.socket?.remoteAddress || "unknown";
     const key = `${category}:${ip}`;
     const limit = RATE_LIMITS[category] || RATE_LIMITS.api;
     const now = Date.now();
@@ -1813,7 +1813,6 @@ app.post("/api/tts", seniorAuth, rateLimit("tts"), async (req, res) => {
 
   console.log(`[TTS] Request: voice=${voice}, text length=${cleanText.length}`);
 
-
   try {
     const audioStream = await new Promise((resolve, reject) => {
       const ttsModel = (process.env.TTS_MODEL || "gpt-4o-mini-tts").trim();
@@ -1891,7 +1890,7 @@ app.post("/api/transcribe", rateLimit("api"), upload.single("audio"), seniorAuth
 
     const body = Buffer.concat(parts.map(p => typeof p === "string" ? Buffer.from(p) : p));
 
-      const whisperRes = await new Promise((resolve, reject) => {
+    const whisperRes = await new Promise((resolve, reject) => {
       const wreq = https.request({
         hostname: "api.openai.com",
         path: "/v1/audio/transcriptions",
