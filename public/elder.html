@@ -1344,17 +1344,13 @@
               clientTime: new Date().toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit" }),
               timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
               location: userLocation,
-              includeTTS: true,
+              includeTTS: false,
             })
           });
           const greetData = await greetRes.json();
           if (greetData.reply) {
             addBubble("assistant", greetData.reply);
-            if (greetData.audioBase64 && audioUnlocked) {
-              playBase64Audio(greetData.audioBase64);
-            } else if (audioUnlocked) {
-              speak(greetData.reply);
-            }
+            // Never auto-play voice on greeting — wait for user gesture
           }
         } catch {
           // Fallback if API fails

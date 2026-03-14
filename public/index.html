@@ -805,6 +805,57 @@
     .reveal-delay-3 { transition-delay: 0.3s; }
     .reveal-delay-4 { transition-delay: 0.4s; }
 
+    /* ── APP PREVIEW ───────────────────────────────────────────────── */
+    .app-preview {
+      padding: 64px 24px 72px;
+      background: linear-gradient(180deg, var(--bg) 0%, var(--bg2) 100%);
+      text-align: center;
+    }
+    .app-preview-label {
+      font-size: 13px;
+      font-weight: 700;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      color: var(--teal);
+      margin-bottom: 12px;
+    }
+    .app-preview-heading {
+      font-size: clamp(24px, 4vw, 36px);
+      font-weight: 800;
+      color: var(--navy-dark);
+      margin-bottom: 16px;
+      line-height: 1.2;
+    }
+    .app-preview-sub {
+      font-size: 17px;
+      color: var(--muted);
+      max-width: 520px;
+      margin: 0 auto 40px;
+      line-height: 1.6;
+    }
+    .app-preview-phone {
+      position: relative;
+      display: inline-block;
+      max-width: 300px;
+      width: 100%;
+      border-radius: 36px;
+      overflow: hidden;
+      box-shadow: 0 20px 60px rgba(15,23,42,0.18), 0 8px 24px rgba(15,23,42,0.10);
+      border: 6px solid #1a1a1a;
+      background: #1a1a1a;
+    }
+    .app-preview-phone img {
+      display: block;
+      width: 100%;
+      height: auto;
+      border-radius: 30px;
+    }
+    @media (max-width: 560px) {
+      .app-preview { padding: 48px 20px 56px; }
+      .app-preview-phone { max-width: 260px; border-width: 5px; border-radius: 32px; }
+      .app-preview-phone img { border-radius: 27px; }
+    }
+
     /* ── RESPONSIVE ─────────────────────────────────────────────────── */
     @media (max-width: 1000px) {
       .hero { padding: 80px 32px 64px; }
@@ -936,6 +987,16 @@
       />
     </div>
 
+  </div>
+</section>
+
+<!-- ── APP PREVIEW ─────────────────────────────────────────────────── -->
+<section class="app-preview">
+  <div class="app-preview-label reveal">See It In Action</div>
+  <h2 class="app-preview-heading reveal">Meet Sage — your loved one's daily companion</h2>
+  <p class="app-preview-sub reveal">A simple, friendly interface designed for seniors. Just tap to talk, manage medications, and stay connected — all in one place.</p>
+  <div class="app-preview-phone reveal">
+    <img src="/images/sage-app-screenshot.png" alt="Sage Companion app interface showing voice chat, medications, calendar, and doctor visit features" loading="lazy" />
   </div>
 </section>
 

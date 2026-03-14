@@ -19,3 +19,9 @@
 ## Auth Middleware
 - `seniorAuth` only accepts `x-senior-token`; `anyAuth` accepts both senior and family tokens
 - Shared endpoints (scan, delete) that family page needs must use `anyAuth`
+
+## Auto-Greeting Voice
+- Auto-greeting on app open must NEVER play voice — set `includeTTS: false` and skip all speak/playBase64Audio calls
+- Only play voice after an explicit user gesture (tap Talk, send message)
+- `audioUnlocked` guard isn't sufficient — some browsers allow `speechSynthesis.speak()` without a gesture
+- The greeting should be text-only; user can tap to interact and voice activates from that point
