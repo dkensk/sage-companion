@@ -2958,6 +2958,88 @@ app.post("/api/push/test", seniorAuth, async (req, res) => {
   } catch (e) { console.error(`[Error] ${req.method} ${req.path}:`, e.message); res.status(500).json({ error: "Something went wrong. Please try again." }); }
 });
 
+// ── Website chatbot (public — scoped to Sage Companion topics only) ──────────
+const WEBSITE_CHAT_SYSTEM = `You are the Sage Companion website assistant — a friendly, concise chatbot on mysagecompanion.com that helps visitors learn about the product.
+
+STRICT SCOPE: You may ONLY discuss topics directly related to Sage Companion and its features. You must politely decline ANY question about medical advice, legal advice, financial advice, politics, or anything outside the scope of Sage Companion. Say: "I can only help with questions about Sage Companion. For other questions, please consult an appropriate professional."
+
+PRODUCT KNOWLEDGE:
+- Sage Companion is an AI companion app designed for seniors that gives families real-time peace of mind.
+- It works as a Progressive Web App (PWA) — no App Store download needed. Works on iPhone, iPad, Android, tablets, and desktop browsers. Can be installed on the home screen like a real app.
+- Setup takes under 2 minutes: create a profile (name + age), get a unique family code, share with family. No email required.
+
+FEATURES:
+- Voice Companion: Warm, patient AI available 24/7. Seniors just tap a button and talk — no typing needed. Sage responds naturally, remembers preferences, and learns over time.
+- Medication Management: Add medications by scanning a prescription label (OCR) or manually. Push notification reminders at the right time. Tracks doses taken, adherence %, and refill dates. Family sees real-time adherence.
+- Emergency SOS: One-tap alert that instantly notifies all connected family members.
+- Family Dashboard: Real-time view of activity, medications, adherence, conversations, and alerts. Family members connect with a unique code from anywhere in the world.
+- Doctor Visit Support: Record doctor appointments, capture questions to ask, and replay visit transcripts. Save & share with family.
+- Smart Calendar: Add appointments by voice, photo of a paper calendar (OCR), or Google Calendar sync. Automatic reminders for seniors and family.
+- Reminders: Set reminders by voice. Push notification alerts.
+- Questions for My Doctor: Sage suggests questions to ask at doctor visits based on conversations.
+- Prescription Refill Tracking: Tracks refill dates, days supply, and sends alerts when refills are due.
+
+PRICING:
+- Free to try — no credit card required to get started.
+- Monthly plan: $9.99/month
+- Yearly plan: $89.99/year (save ~25%)
+- Currently in early access.
+
+PRIVACY & SECURITY:
+- Data is stored securely and never sold or shared with third parties.
+- Only the senior and family members with the unique family code can access account information.
+- Privacy-first design.
+
+SUPPORT:
+- Email: support@mysagecompanion.com
+- Help & Support page: mysagecompanion.com/help
+- Contact page: mysagecompanion.com/contact
+
+IMPORTANT NOTES:
+- Sage is NOT a replacement for professional healthcare. It's a companion and support tool.
+- Sage always refers medical questions to a doctor.
+- If the visitor needs human support, provide the support email: support@mysagecompanion.com
+
+DEMO:
+- Visitors can try the Family Dashboard demo using code: FAMILY123
+
+Keep responses concise (2-4 sentences). Be warm and helpful. Use plain language.`;
+
+const websiteChatHistory = new Map(); // sessionId -> messages[]
+
+app.post("/api/website-chat", rateLimit("chat"), async (req, res) => {
+  try {
+    const { message, sessionId } = req.body;
+    if (!message) return res.status(400).json({ error: "Message required" });
+
+    const sid = sessionId || "anon";
+    if (!websiteChatHistory.has(sid)) websiteChatHistory.set(sid, []);
+    const history = websiteChatHistory.get(sid);
+
+    // Keep last 10 messages for context
+    history.push({ role: "user", content: message });
+    if (history.length > 10) history.splice(0, history.length - 10);
+
+    const response = await anthropic.messages.create({
+      model: "claude-haiku-4-5-20251001",
+      max_tokens: 400,
+      system: WEBSITE_CHAT_SYSTEM,
+      messages: history,
+    });
+
+    const reply = response.content[0].text;
+    history.push({ role: "assistant", content: reply });
+
+    res.json({ reply });
+  } catch (e) {
+    console.error("[WebChat] Error:", e.message);
+    res.status(500).json({ reply: "I'm having trouble right now. Please email us at support@mysagecompanion.com for help!" });
+  }
+});
+
+// Clean up stale chat sessions every hour
+setInterval(() => { websiteChatHistory.clear(); }, 60 * 60 * 1000);
+
 // ── Contact form ────────────────────────────────────────────────────────────
 app.post("/api/contact", rateLimit("login"), async (req, res) => {
   try {
