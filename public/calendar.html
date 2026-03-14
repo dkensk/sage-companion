@@ -681,8 +681,11 @@
       if (data.success) {
         showToast(`Synced! ${data.pulled} new from Google, ${data.pushed} sent to Google`);
         renderAppointments(data.appointments);
+      } else if (data.reconnect) {
+        showToast("Google Calendar session expired — reconnecting...");
+        setTimeout(() => { window.location.href = `/api/google/auth?seniorId=${SENIOR_ID}`; }, 1500);
       } else {
-        showToast("Sync failed — please try again.");
+        showToast(data.error || "Sync failed — please try again.");
       }
     } catch(e) {
       showToast("Sync error — please try again.");

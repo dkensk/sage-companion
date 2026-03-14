@@ -2196,6 +2196,26 @@ app.get("/api/calendar/:seniorId/feed.ics", validateUUID("seniorId"), async (req
     }
 
     const lines = (appts || []).map(a => {
+      if (!a.time) {
+        // All-day event — use VALUE=DATE format
+        const dateVal = a.date.replace(/-/g, "");
+        // All-day events need end date = start date + 1 day for iCal spec
+        const nextDay = new Date(a.date + "T00:00:00");
+        nextDay.setDate(nextDay.getDate() + 1);
+        const endVal = nextDay.toISOString().split("T")[0].replace(/-/g, "");
+        return [
+          "BEGIN:VEVENT",
+          `UID:${a.id}@sage-companion`,
+          `DTSTAMP:${new Date().toISOString().replace(/[-:.]/g, "").slice(0, 15)}Z`,
+          `DTSTART;VALUE=DATE:${dateVal}`,
+          `DTEND;VALUE=DATE:${endVal}`,
+          `SUMMARY:${(a.title || "").replace(/[\r\n]/g, " ")}`,
+          a.location ? `LOCATION:${a.location.replace(/[\r\n]/g, " ")}` : null,
+          a.notes ? `DESCRIPTION:${a.notes.replace(/[\r\n]/g, "\\n")}` : null,
+          "END:VEVENT"
+        ].filter(Boolean).join("\r\n");
+      }
+      // Timed event — use TZID parameter so Apple Calendar knows the timezone
       const time = parseTime(a.time);
       const startStr = fmtLocal(a.date, time);
       const endH = time.hours + 1;
@@ -2204,8 +2224,8 @@ app.get("/api/calendar/:seniorId/feed.ics", validateUUID("seniorId"), async (req
         "BEGIN:VEVENT",
         `UID:${a.id}@sage-companion`,
         `DTSTAMP:${new Date().toISOString().replace(/[-:.]/g, "").slice(0, 15)}Z`,
-        `DTSTART:${startStr}`,
-        `DTEND:${endStr}`,
+        `DTSTART;TZID=${feedTz}:${startStr}`,
+        `DTEND;TZID=${feedTz}:${endStr}`,
         `SUMMARY:${(a.title || "").replace(/[\r\n]/g, " ")}`,
         a.location ? `LOCATION:${a.location.replace(/[\r\n]/g, " ")}` : null,
         a.notes ? `DESCRIPTION:${a.notes.replace(/[\r\n]/g, "\\n")}` : null,
@@ -2327,15 +2347,21 @@ app.delete("/api/memories/:seniorId/all", seniorAuth, validateUUID("seniorId"), 
 });
 
 // ── Google Calendar OAuth ─────────────────────────────────────────────────────
+function isGoogleConfigured() {
+  const id = (process.env.GOOGLE_CLIENT_ID || "").trim();
+  const secret = (process.env.GOOGLE_CLIENT_SECRET || "").trim();
+  return id && !id.startsWith("YOUR_") && secret && !secret.startsWith("YOUR_");
+}
+
 function getGoogleClient() {
   return new google.auth.OAuth2(
     process.env.GOOGLE_CLIENT_ID, process.env.GOOGLE_CLIENT_SECRET,
-    process.env.GOOGLE_REDIRECT_URI || "http://localhost:3000/api/google/callback"
+    process.env.GOOGLE_REDIRECT_URI || `${process.env.BASE_URL || "http://localhost:3000"}/api/google/callback`
   );
 }
 
 app.get("/api/google/auth", (req, res) => {
-  if (!process.env.GOOGLE_CLIENT_ID) return res.status(503).send("Google Calendar not configured.");
+  if (!isGoogleConfigured()) return res.status(503).send("Google Calendar not configured.");
   const client = getGoogleClient();
   const url = client.generateAuthUrl({
     access_type: "offline", prompt: "consent",
@@ -2358,12 +2384,13 @@ app.get("/api/google/callback", async (req, res) => {
 app.get("/api/google/status/:seniorId", anyAuth, validateUUID("seniorId"), async (req, res) => {
   try {
     const { data } = await supabase.from("seniors").select("google_tokens").eq("id", req.params.seniorId).single();
-    res.json({ connected: !!(data?.google_tokens), configured: !!process.env.GOOGLE_CLIENT_ID });
+    res.json({ connected: !!(data?.google_tokens), configured: isGoogleConfigured() });
   } catch (e) { console.error(`[Error] ${req.method} ${req.path}:`, e.message); res.status(500).json({ error: "Something went wrong. Please try again." }); }
 });
 
 app.post("/api/google/sync/:seniorId", anyAuth, validateUUID("seniorId"), async (req, res) => {
   try {
+    if (!isGoogleConfigured()) return res.status(503).json({ error: "Google Calendar not configured on this server." });
     const { seniorId } = req.params;
     const userTz = req.body?.timezone || "America/New_York";
     console.log("[GoogleSync] timezone from client:", userTz);
@@ -2480,6 +2507,12 @@ app.post("/api/google/sync/:seniorId", anyAuth, validateUUID("seniorId"), async 
     res.json({ success: true, pulled, pushed, appointments: normArr(all) });
   } catch (e) {
     console.error("[GoogleSync] Error:", e.message);
+    // If token is invalid/expired, clear it so user can reconnect
+    if (e.message?.includes("invalid_grant") || e.message?.includes("Token has been expired") || e.code === 401) {
+      const { seniorId } = req.params;
+      await supabase.from("seniors").update({ google_tokens: null }).eq("id", seniorId);
+      return res.status(401).json({ error: "Google Calendar session expired. Please reconnect.", reconnect: true });
+    }
     res.status(500).json({ error: "Something went wrong. Please try again." });
   }
 });
