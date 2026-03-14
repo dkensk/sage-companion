@@ -2837,11 +2837,29 @@ app.post("/api/family/login", rateLimit("login"), async (req, res) => {
     const { familyCode } = req.body;
     if (!familyCode) return res.status(400).json({ error: "Family code required" });
 
-    const { data: senior } = await supabase
+    let { data: senior } = await supabase
       .from("seniors")
       .select("*")
       .eq("family_code", familyCode.trim().toUpperCase())
       .single();
+
+    // Auto-seed demo account if FAMILY123 doesn't exist yet
+    if (!senior && familyCode.trim().toUpperCase() === "FAMILY123") {
+      console.log("[Demo] Seeding demo senior Margaret for FAMILY123");
+      const { data: created } = await supabase.from("seniors").insert({
+        name: "Margaret", age: 78, family_code: "FAMILY123",
+        timezone: "America/New_York",
+      }).select().single();
+      if (created) {
+        senior = created;
+        // Add sample medications for demo
+        await supabase.from("medications").insert([
+          { senior_id: senior.id, name: "Lisinopril", dose: "10mg", frequency: 1, times: ["8:00 AM"], active: true },
+          { senior_id: senior.id, name: "Metformin", dose: "500mg", frequency: 2, times: ["8:00 AM", "6:00 PM"], active: true },
+          { senior_id: senior.id, name: "Vitamin D", dose: "1000 IU", frequency: 1, times: ["9:00 AM"], active: true },
+        ]);
+      }
+    }
 
     if (!senior) return res.status(401).json({ error: "Invalid family code" });
 
