@@ -850,8 +850,8 @@
     }
     .app-preview-phone {
       position: relative;
-      max-width: 240px;
-      width: 100%;
+      width: 240px;
+      height: 520px;
       border-radius: 32px;
       overflow: hidden;
       box-shadow: 0 20px 60px rgba(15,23,42,0.18), 0 8px 24px rgba(15,23,42,0.10);
@@ -861,7 +861,9 @@
     .app-preview-phone img {
       display: block;
       width: 100%;
-      height: auto;
+      height: 100%;
+      object-fit: cover;
+      object-position: top center;
       border-radius: 27px;
     }
     .app-preview-caption {
@@ -872,14 +874,14 @@
     }
     @media (max-width: 860px) {
       .app-preview-gallery { gap: 20px; }
-      .app-preview-phone { max-width: 200px; border-width: 4px; border-radius: 28px; }
+      .app-preview-phone { width: 200px; height: 434px; border-width: 4px; border-radius: 28px; }
       .app-preview-phone img { border-radius: 24px; }
     }
     @media (max-width: 560px) {
       .app-preview { padding: 48px 16px 56px; }
       .app-preview-gallery { gap: 16px; }
       .app-preview-item { width: calc(50% - 8px); }
-      .app-preview-phone { max-width: 100%; border-width: 4px; border-radius: 24px; }
+      .app-preview-phone { width: 100%; height: auto; aspect-ratio: 0.46; border-width: 4px; border-radius: 24px; }
       .app-preview-phone img { border-radius: 20px; }
       .app-preview-caption { font-size: 12px; }
     }
