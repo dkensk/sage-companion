@@ -1,0 +1,85 @@
+<svg viewBox="0 0 600 400" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="featBg" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#F0F9F8;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#E8F2FE;stop-opacity:1" />
+    </linearGradient>
+    <linearGradient id="featSkin" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" style="stop-color:#F4D6C8;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#E8C4B0;stop-opacity:1" />
+    </linearGradient>
+    <radialGradient id="featHair" cx="40%" cy="40%">
+      <stop offset="0%" style="stop-color:#D4A574;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#B8935F;stop-opacity:1" />
+    </radialGradient>
+  </defs>
+
+  <rect width="600" height="400" fill="url(#featBg)"/>
+
+  <!-- Decorative shapes -->
+  <circle cx="550" cy="50" r="55" fill="#14B8A6" opacity="0.12"/>
+  <rect x="20" y="300" width="150" height="150" rx="20" fill="#1E3A8A" opacity="0.05"/>
+
+  <!-- Senior woman (sitting with laptop) -->
+  <g transform="translate(120, 100)">
+    <!-- Hair -->
+    <ellipse cx="40" cy="28" rx="35" ry="40" fill="url(#featHair)"/>
+    <!-- Head -->
+    <circle cx="40" cy="52" r="25" fill="url(#featSkin)"/>
+    <!-- Ears -->
+    <ellipse cx="15" cy="52" rx="8" ry="12" fill="url(#featSkin)"/>
+    <ellipse cx="65" cy="52" rx="8" ry="12" fill="url(#featSkin)"/>
+    <!-- Eyes (focused) -->
+    <circle cx="31" cy="48" r="2.8" fill="#1E3A8A"/>
+    <circle cx="49" cy="48" r="2.8" fill="#1E3A8A"/>
+    <!-- Slight smile -->
+    <path d="M 35 57 Q 40 59 45 57" stroke="#B8935F" stroke-width="1.8" fill="none" stroke-linecap="round"/>
+    <!-- Body -->
+    <ellipse cx="40" cy="115" rx="48" ry="58" fill="#14B8A6" opacity="0.8"/>
+    <!-- Left arm resting -->
+    <rect x="-10" y="95" width="18" height="55" rx="9" fill="url(#featSkin)" transform="rotate(-35 -1 95)"/>
+    <!-- Right arm on laptop -->
+    <rect x="88" y="100" width="18" height="50" rx="9" fill="url(#featSkin)" transform="rotate(25 97 100)"/>
+    <!-- Hands -->
+    <circle cx="5" cy="135" r="11" fill="url(#featSkin)"/>
+    <circle cx="110" cy="115" r="11" fill="url(#featSkin)"/>
+    <!-- Legs -->
+    <rect x="25" y="180" width="13" height="40" rx="6.5" fill="#444"/>
+    <rect x="52" y="180" width="13" height="40" rx="6.5" fill="#444"/>
+  </g>
+
+  <!-- Laptop -->
+  <g transform="translate(220, 140)">
+    <!-- Screen base -->
+    <rect x="0" y="0" width="140" height="85" rx="8" fill="#1E3A8A" opacity="0.85"/>
+    <!-- Screen -->
+    <rect x="5" y="5" width="130" height="60" rx="4" fill="#60A5FA"/>
+    <!-- Content on screen (simplified) -->
+    <circle cx="35" cy="22" r="8" fill="#FFF" opacity="0.8"/>
+    <rect x="50" y="18" width="70" height="4" rx="2" fill="#FFF" opacity="0.8"/>
+    <rect x="50" y="26" width="50" height="3" rx="1.5" fill="#FFF" opacity="0.6"/>
+    <line x1="10" y1="45" x2="130" y2="45" stroke="#FFF" stroke-width="1" opacity="0.5"/>
+    <rect x="15" y="50" width="20" height="8" rx="2" fill="#10B981" opacity="0.7"/>
+    <rect x="42" y="50" width="60" height="8" rx="2" fill="#FFF" opacity="0.5"/>
+    <!-- Keyboard base -->
+    <rect x="0" y="68" width="140" height="10" rx="4" fill="#0F172A"/>
+    <!-- Keys pattern -->
+    <rect x="5" y="72" width="8" height="4" fill="#1E293B" opacity="0.7"/>
+    <rect x="16" y="72" width="8" height="4" fill="#1E293B" opacity="0.7"/>
+    <rect x="27" y="72" width="8" height="4" fill="#1E293B" opacity="0.7"/>
+    <rect x="120" y="72" width="8" height="4" fill="#1E293B" opacity="0.7"/>
+  </g>
+
+  <!-- Decorative elements showing warmth -->
+  <path d="M 320 280 C 320 275 324 270 328 270 C 331 270 334 273 336 270 C 338 273 341 270 344 270 C 348 270 352 275 352 280 C 352 288 340 298 336 300 C 332 298 320 288 320 280" fill="#14B8A6" opacity="0.5"/>
+
+  <!-- Light glow around user -->
+  <ellipse cx="180" cy="200" rx="120" ry="100" fill="#FFF9E6" opacity="0.25"/>
+
+  <!-- Tech indicator (shows connectivity) -->
+  <g transform="translate(480, 80)">
+    <circle cx="0" cy="0" r="4" fill="#10B981" opacity="0.8"/>
+    <circle cx="0" cy="0" r="8" fill="#10B981" opacity="0.5"/>
+    <circle cx="0" cy="0" r="12" fill="#10B981" opacity="0.2"/>
+  </g>
+</svg>

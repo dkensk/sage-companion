@@ -1,0 +1,114 @@
+<svg viewBox="0 0 800 600" xmlns="http://www.w3.org/2000/svg">
+  <!-- Soft gradient background -->
+  <defs>
+    <linearGradient id="bgGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#F0F9F8;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#E0F2FE;stop-opacity:1" />
+    </linearGradient>
+    <linearGradient id="skinGradient" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" style="stop-color:#F4D6C8;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#E8C4B0;stop-opacity:1" />
+    </linearGradient>
+    <radialGradient id="hairGradient1" cx="40%" cy="40%">
+      <stop offset="0%" style="stop-color:#D4A574;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#B8935F;stop-opacity:1" />
+    </radialGradient>
+    <radialGradient id="hairGradient2" cx="40%" cy="40%">
+      <stop offset="0%" style="stop-color:#8B7355;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#6B5645;stop-opacity:1" />
+    </radialGradient>
+    <radialGradient id="hairGradient3" cx="40%" cy="40%">
+      <stop offset="0%" style="stop-color:#C4A9A0;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#A89080;stop-opacity:1" />
+    </radialGradient>
+  </defs>
+
+  <!-- Background -->
+  <rect width="800" height="600" fill="url(#bgGradient)"/>
+
+  <!-- Decorative circles -->
+  <circle cx="700" cy="80" r="60" fill="#14B8A6" opacity="0.15"/>
+  <circle cx="100" cy="500" r="80" fill="#1E3A8A" opacity="0.1"/>
+
+  <!-- Grandmother (left, sitting) -->
+  <g transform="translate(150, 200)">
+    <!-- Hair -->
+    <ellipse cx="40" cy="30" rx="35" ry="40" fill="url(#hairGradient1)"/>
+    <!-- Head -->
+    <circle cx="40" cy="50" r="25" fill="url(#skinGradient)"/>
+    <!-- Ears -->
+    <ellipse cx="15" cy="50" rx="8" ry="12" fill="url(#skinGradient)"/>
+    <ellipse cx="65" cy="50" rx="8" ry="12" fill="url(#skinGradient)"/>
+    <!-- Face features -->
+    <circle cx="32" cy="45" r="3" fill="#1E3A8A"/>
+    <circle cx="48" cy="45" r="3" fill="#1E3A8A"/>
+    <!-- Smile -->
+    <path d="M 35 55 Q 40 58 45 55" stroke="#B8935F" stroke-width="2" fill="none" stroke-linecap="round"/>
+    <!-- Body -->
+    <ellipse cx="40" cy="110" rx="45" ry="55" fill="#14B8A6" opacity="0.8"/>
+    <!-- Arms -->
+    <ellipse cx="0" cy="90" rx="15" ry="45" fill="url(#skinGradient)" transform="rotate(-25 0 90)"/>
+    <ellipse cx="80" cy="95" rx="15" ry="45" fill="url(#skinGradient)" transform="rotate(20 80 95)"/>
+    <!-- Hands -->
+    <circle cx="-15" cy="130" r="12" fill="url(#skinGradient)"/>
+    <circle cx="95" cy="140" r="12" fill="url(#skinGradient)"/>
+    <!-- Legs -->
+    <ellipse cx="25" cy="180" rx="12" ry="35" fill="#555"/>
+    <ellipse cx="55" cy="180" rx="12" ry="35" fill="#555"/>
+  </g>
+
+  <!-- Grandfather (center-right) -->
+  <g transform="translate(420, 180)">
+    <!-- Hair -->
+    <ellipse cx="40" cy="28" rx="32" ry="38" fill="url(#hairGradient2)"/>
+    <!-- Head -->
+    <circle cx="40" cy="50" r="26" fill="url(#skinGradient)"/>
+    <!-- Ears -->
+    <ellipse cx="14" cy="50" rx="8" ry="12" fill="url(#skinGradient)"/>
+    <ellipse cx="66" cy="50" rx="8" ry="12" fill="url(#skinGradient)"/>
+    <!-- Face features -->
+    <circle cx="31" cy="46" r="3" fill="#1E3A8A"/>
+    <circle cx="49" cy="46" r="3" fill="#1E3A8A"/>
+    <!-- Smile -->
+    <path d="M 34 56 Q 40 59 46 56" stroke="#B8935F" stroke-width="2" fill="none" stroke-linecap="round"/>
+    <!-- Body -->
+    <rect x="10" y="80" width="60" height="60" rx="8" fill="#1E3A8A" opacity="0.7"/>
+    <!-- Arms -->
+    <rect x="-5" y="85" width="18" height="50" rx="9" fill="url(#skinGradient)"/>
+    <rect x="87" y="90" width="18" height="48" rx="9" fill="url(#skinGradient)"/>
+    <!-- Hands -->
+    <circle cx="-8" cy="140" r="12" fill="url(#skinGradient)"/>
+    <circle cx="108" cy="145" r="12" fill="url(#skinGradient)"/>
+    <!-- Legs -->
+    <rect x="20" y="150" width="12" height="40" rx="6" fill="#333"/>
+    <rect x="48" y="150" width="12" height="40" rx="6" fill="#333"/>
+  </g>
+
+  <!-- Child (right) -->
+  <g transform="translate(580, 280)">
+    <!-- Hair -->
+    <ellipse cx="30" cy="20" rx="28" ry="32" fill="url(#hairGradient3)"/>
+    <!-- Head -->
+    <circle cx="30" cy="40" r="20" fill="url(#skinGradient)"/>
+    <!-- Face features -->
+    <circle cx="23" cy="37" r="2.5" fill="#1E3A8A"/>
+    <circle cx="37" cy="37" r="2.5" fill="#1E3A8A"/>
+    <!-- Smile -->
+    <path d="M 25 45 Q 30 47 35 45" stroke="#B8935F" stroke-width="1.5" fill="none" stroke-linecap="round"/>
+    <!-- Body -->
+    <rect x="8" y="65" width="44" height="50" rx="6" fill="#F4B183" opacity="0.9"/>
+    <!-- Arms -->
+    <rect x="-8" y="70" width="14" height="40" rx="7" fill="url(#skinGradient)"/>
+    <rect x="54" y="72" width="14" height="38" rx="7" fill="url(#skinGradient)"/>
+    <!-- Hands -->
+    <circle cx="-10" cy="115" r="9" fill="url(#skinGradient)"/>
+    <circle cx="68" cy="118" r="9" fill="url(#skinGradient)"/>
+    <!-- Legs -->
+    <rect x="15" y="120" width="10" height="35" rx="5" fill="#555"/>
+    <rect x="35" y="120" width="10" height="35" rx="5" fill="#555"/>
+  </g>
+
+  <!-- Floating hearts for warmth -->
+  <path d="M 250 100 C 250 95 254 90 258 90 C 261 90 264 93 266 90 C 268 93 271 90 274 90 C 278 90 282 95 282 100 C 282 108 270 118 266 120 C 262 118 250 108 250 100" fill="#14B8A6" opacity="0.6"/>
+  <path d="M 650 150 C 650 145 654 140 658 140 C 661 140 664 143 666 140 C 668 143 671 140 674 140 C 678 140 682 145 682 150 C 682 158 670 168 666 170 C 662 168 650 158 650 150" fill="#14B8A6" opacity="0.5"/>
+</svg>

@@ -1043,7 +1043,7 @@ app.use((req, res, next) => {
   res.setHeader("X-XSS-Protection", "1; mode=block");
   res.setHeader("Referrer-Policy", "strict-origin-when-cross-origin");
   res.setHeader("Strict-Transport-Security", "max-age=31536000; includeSubDomains");
-  res.setHeader("Content-Security-Policy", "default-src 'self'; script-src 'self' 'unsafe-inline' https://cdnjs.cloudflare.com https://js.stripe.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data: blob: https://images.pexels.com https://images.unsplash.com; connect-src 'self' https://api.stripe.com https://nominatim.openstreetmap.org; frame-src https://js.stripe.com;");
+  res.setHeader("Content-Security-Policy", "default-src 'self'; script-src 'self' 'unsafe-inline' https://cdnjs.cloudflare.com https://js.stripe.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data: blob:; connect-src 'self' https://api.stripe.com https://nominatim.openstreetmap.org; frame-src https://js.stripe.com;");
   res.setHeader("Permissions-Policy", "camera=(), microphone=(self), geolocation=(self)");
   // CORS — lock to production domain (set FRONTEND_URL in env)
   const origin = req.headers.origin;

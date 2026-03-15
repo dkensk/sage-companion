@@ -1,0 +1,88 @@
+<svg viewBox="0 0 600 400" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="bgGrad2" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#E8F5F3;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#F0F9F8;stop-opacity:1" />
+    </linearGradient>
+    <linearGradient id="skinGrad" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" style="stop-color:#F4D6C8;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#E8C4B0;stop-opacity:1" />
+    </linearGradient>
+    <radialGradient id="hair1" cx="40%" cy="40%">
+      <stop offset="0%" style="stop-color:#C4A9A0;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#A89080;stop-opacity:1" />
+    </radialGradient>
+    <radialGradient id="hair2" cx="40%" cy="40%">
+      <stop offset="0%" style="stop-color:#D4A574;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#B8935F;stop-opacity:1" />
+    </radialGradient>
+  </defs>
+
+  <rect width="600" height="400" fill="url(#bgGrad2)"/>
+
+  <!-- Decorative shapes -->
+  <circle cx="550" cy="60" r="50" fill="#14B8A6" opacity="0.12"/>
+  <circle cx="80" cy="350" r="60" fill="#1E3A8A" opacity="0.08"/>
+
+  <!-- Grandmother (left, leaning back) -->
+  <g transform="translate(80, 120)">
+    <!-- Hair -->
+    <ellipse cx="35" cy="25" rx="30" ry="35" fill="url(#hair1)"/>
+    <!-- Head -->
+    <circle cx="35" cy="45" r="22" fill="url(#skinGrad)"/>
+    <!-- Ears -->
+    <ellipse cx="13" cy="45" rx="7" ry="10" fill="url(#skinGrad)"/>
+    <ellipse cx="57" cy="45" rx="7" ry="10" fill="url(#skinGrad)"/>
+    <!-- Eyes -->
+    <circle cx="27" cy="42" r="2.5" fill="#1E3A8A"/>
+    <circle cx="43" cy="42" r="2.5" fill="#1E3A8A"/>
+    <!-- Smile -->
+    <path d="M 30 50 Q 35 53 40 50" stroke="#B8935F" stroke-width="2" fill="none" stroke-linecap="round"/>
+    <!-- Body -->
+    <ellipse cx="35" cy="95" rx="40" ry="48" fill="#14B8A6" opacity="0.75"/>
+    <!-- Arms relaxed -->
+    <rect x="-5" y="80" width="16" height="45" rx="8" fill="url(#skinGrad)" transform="rotate(-15 3 80)"/>
+    <rect x="74" y="85" width="16" height="42" rx="8" fill="url(#skinGrad)" transform="rotate(12 82 85)"/>
+    <!-- Hands -->
+    <circle cx="2" cy="120" r="10" fill="url(#skinGrad)"/>
+    <circle cx="68" cy="125" r="10" fill="url(#skinGrad)"/>
+    <!-- Legs -->
+    <rect x="20" y="150" width="11" height="35" rx="5.5" fill="#555"/>
+    <rect x="44" y="150" width="11" height="35" rx="5.5" fill="#555"/>
+  </g>
+
+  <!-- Grandchild (right, showing phone) -->
+  <g transform="translate(340, 90)">
+    <!-- Hair -->
+    <ellipse cx="32" cy="18" rx="26" ry="30" fill="url(#hair2)"/>
+    <!-- Head -->
+    <circle cx="32" cy="38" r="19" fill="url(#skinGrad)"/>
+    <!-- Eyes -->
+    <circle cx="25" cy="35" r="2.2" fill="#1E3A8A"/>
+    <circle cx="39" cy="35" r="2.2" fill="#1E3A8A"/>
+    <!-- Smile (excited) -->
+    <path d="M 28 43 Q 32 45 36 43" stroke="#B8935F" stroke-width="1.5" fill="none" stroke-linecap="round"/>
+    <!-- Body -->
+    <rect x="8" y="60" width="48" height="52" rx="6" fill="#F4B183" opacity="0.85"/>
+    <!-- Right arm extended (holding phone) -->
+    <rect x="56" y="65" width="14" height="48" rx="7" fill="url(#skinGrad)" transform="rotate(20 63 65)"/>
+    <!-- Left arm -->
+    <rect x="-8" y="68" width="14" height="45" rx="7" fill="url(#skinGrad)"/>
+    <!-- Hands -->
+    <circle cx="75" cy="75" r="9" fill="url(#skinGrad)"/>
+    <circle cx="-8" cy="115" r="9" fill="url(#skinGrad)"/>
+    <!-- Phone -->
+    <rect x="70" y="65" width="28" height="45" rx="4" fill="#1E3A8A" opacity="0.9"/>
+    <rect x="72" y="68" width="24" height="38" rx="2" fill="#60A5FA"/>
+    <circle cx="84" cy="72" r="1.5" fill="#fff"/>
+    <!-- Legs -->
+    <rect x="18" y="120" width="10" height="30" rx="5" fill="#333"/>
+    <rect x="36" y="120" width="10" height="30" rx="5" fill="#333"/>
+  </g>
+
+  <!-- Warm decorative elements -->
+  <path d="M 120 320 C 120 315 124 310 128 310 C 131 310 134 313 136 310 C 138 313 141 310 144 310 C 148 310 152 315 152 320 C 152 328 140 338 136 340 C 132 338 120 328 120 320" fill="#14B8A6" opacity="0.5"/>
+
+  <!-- Light glow effect -->
+  <ellipse cx="300" cy="200" rx="200" ry="150" fill="#FFF9E6" opacity="0.3"/>
+</svg>

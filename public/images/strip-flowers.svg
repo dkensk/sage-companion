@@ -1,0 +1,138 @@
+<svg viewBox="0 0 600 420" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="stripBg2" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#F9F5F0;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#F0F9F8;stop-opacity:1" />
+    </linearGradient>
+    <linearGradient id="stripSkin2" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" style="stop-color:#F4D6C8;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#E8C4B0;stop-opacity:1" />
+    </linearGradient>
+    <radialGradient id="stripHairA" cx="40%" cy="40%">
+      <stop offset="0%" style="stop-color:#D4A574;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#B8935F;stop-opacity:1" />
+    </radialGradient>
+    <radialGradient id="stripHairB" cx="40%" cy="40%">
+      <stop offset="0%" style="stop-color:#C4A9A0;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#A89080;stop-opacity:1" />
+    </radialGradient>
+  </defs>
+
+  <rect width="600" height="420" fill="url(#stripBg2)"/>
+
+  <!-- Decorative background circles -->
+  <circle cx="100" cy="100" r="60" fill="#14B8A6" opacity="0.08"/>
+  <circle cx="500" cy="320" r="70" fill="#1E3A8A" opacity="0.07"/>
+
+  <!-- Grandmother (left-center) with flowers -->
+  <g transform="translate(100, 80)">
+    <!-- Hair -->
+    <ellipse cx="35" cy="24" rx="31" ry="35" fill="url(#stripHairA)"/>
+    <!-- Head -->
+    <circle cx="35" cy="46" r="22" fill="url(#stripSkin2)"/>
+    <!-- Ears -->
+    <ellipse cx="13" cy="46" rx="7" ry="10" fill="url(#stripSkin2)"/>
+    <ellipse cx="57" cy="46" rx="7" ry="10" fill="url(#stripSkin2)"/>
+    <!-- Eyes (kind) -->
+    <circle cx="27" cy="42" r="2.4" fill="#1E3A8A"/>
+    <circle cx="43" cy="42" r="2.4" fill="#1E3A8A"/>
+    <!-- Smile -->
+    <path d="M 30 51 Q 35 54 40 51" stroke="#9B7E5C" stroke-width="2" fill="none" stroke-linecap="round"/>
+    <!-- Body -->
+    <ellipse cx="35" cy="96" rx="40" ry="48" fill="#14B8A6" opacity="0.75"/>
+    <!-- Arms open (holding flowers) -->
+    <rect x="-8" y="78" width="16" height="48" rx="8" fill="url(#stripSkin2)" transform="rotate(-25 0 78)"/>
+    <rect x="78" y="82" width="16" height="46" rx="8" fill="url(#stripSkin2)" transform="rotate(22 86 82)"/>
+    <!-- Hands -->
+    <circle cx="-12" cy="125" r="10" fill="url(#stripSkin2)"/>
+    <circle cx="82" cy="130" r="10" fill="url(#stripSkin2)"/>
+    <!-- Legs -->
+    <rect x="21" y="150" width="11" height="35" rx="5.5" fill="#555"/>
+    <rect x="44" y="150" width="11" height="35" rx="5.5" fill="#555"/>
+  </g>
+
+  <!-- Flowers (bouquet in left hand) -->
+  <g transform="translate(85, 180)">
+    <!-- Stems -->
+    <line x1="0" y1="0" x2="-5" y2="20" stroke="#6B9E5F" stroke-width="2"/>
+    <line x1="5" y1="0" x2="2" y2="22" stroke="#6B9E5F" stroke-width="2"/>
+    <line x1="10" y1="0" x2="12" y2="20" stroke="#6B9E5F" stroke-width="2"/>
+    <line x1="15" y1="0" x2="18" y2="21" stroke="#6B9E5F" stroke-width="2"/>
+    <!-- Flower 1 (pink) -->
+    <circle cx="-5" cy="-8" r="6" fill="#E89BB5"/>
+    <circle cx="-8" cy="-12" r="4" fill="#F4C8D6"/>
+    <circle cx="-2" cy="-12" r="4" fill="#F4C8D6"/>
+    <circle cx="-8" cy="-6" r="4" fill="#F4C8D6"/>
+    <circle cx="-2" cy="-6" r="4" fill="#F4C8D6"/>
+    <circle cx="-5" cy="-9" r="2.5" fill="#FFE4EC"/>
+    <!-- Flower 2 (coral) -->
+    <circle cx="2" cy="-10" r="6.5" fill="#F5897F"/>
+    <circle cx="-2" cy="-14" r="4.5" fill="#F9B8AD"/>
+    <circle cx="6" cy="-14" r="4.5" fill="#F9B8AD"/>
+    <circle cx="-2" cy="-6" r="4.5" fill="#F9B8AD"/>
+    <circle cx="6" cy="-6" r="4.5" fill="#F9B8AD"/>
+    <circle cx="2" cy="-10" r="2.5" fill="#FFF0ED"/>
+    <!-- Flower 3 (rose) -->
+    <circle cx="12" cy="-9" r="6" fill="#D97E7F"/>
+    <circle cx="8" cy="-13" r="4" fill="#E5ADAD"/>
+    <circle cx="16" cy="-13" r="4" fill="#E5ADAD"/>
+    <circle cx="8" cy="-5" r="4" fill="#E5ADAD"/>
+    <circle cx="16" cy="-5" r="4" fill="#E5ADAD"/>
+    <circle cx="12" cy="-9" r="2.5" fill="#FFE8E8"/>
+  </g>
+
+  <!-- Child (center-right, reaching for flowers) -->
+  <g transform="translate(340, 125)">
+    <!-- Hair -->
+    <ellipse cx="32" cy="18" rx="27" ry="31" fill="url(#stripHairB)"/>
+    <!-- Head -->
+    <circle cx="32" cy="40" r="20" fill="url(#stripSkin2)"/>
+    <!-- Eyes -->
+    <circle cx="25" cy="37" r="2.2" fill="#1E3A8A"/>
+    <circle cx="39" cy="37" r="2.2" fill="#1E3A8A"/>
+    <!-- Smile (delighted) -->
+    <path d="M 28 46 Q 32 49 36 46" stroke="#9B7E5C" stroke-width="1.5" fill="none" stroke-linecap="round"/>
+    <!-- Body -->
+    <rect x="8" y="62" width="48" height="50" rx="6" fill="#F4B183" opacity="0.85"/>
+    <!-- Arms reaching up -->
+    <rect x="56" y="50" width="14" height="50" rx="7" fill="url(#stripSkin2)" transform="rotate(35 63 50)"/>
+    <rect x="-8" y="65" width="14" height="45" rx="7" fill="url(#stripSkin2)"/>
+    <!-- Hands -->
+    <circle cx="75" cy="45" r="9" fill="url(#stripSkin2)"/>
+    <circle cx="-10" cy="115" r="9" fill="url(#stripSkin2)"/>
+    <!-- Legs -->
+    <rect x="18" y="120" width="10" height="32" rx="5" fill="#555"/>
+    <rect x="38" y="120" width="10" height="32" rx="5" fill="#555"/>
+  </g>
+
+  <!-- Grandmother (right-center) -->
+  <g transform="translate(480, 90)">
+    <!-- Hair -->
+    <ellipse cx="32" cy="22" rx="29" ry="32" fill="url(#stripHairA)"/>
+    <!-- Head -->
+    <circle cx="32" cy="44" r="21" fill="url(#stripSkin2)"/>
+    <!-- Ears -->
+    <ellipse cx="11" cy="44" rx="6.5" ry="9.5" fill="url(#stripSkin2)"/>
+    <ellipse cx="53" cy="44" rx="6.5" ry="9.5" fill="url(#stripSkin2)"/>
+    <!-- Eyes (warm) -->
+    <circle cx="25" cy="40" r="2.3" fill="#1E3A8A"/>
+    <circle cx="39" cy="40" r="2.3" fill="#1E3A8A"/>
+    <!-- Smile -->
+    <path d="M 28 49 Q 32 52 36 49" stroke="#9B7E5C" stroke-width="1.5" fill="none" stroke-linecap="round"/>
+    <!-- Body -->
+    <ellipse cx="32" cy="94" rx="38" ry="46" fill="#14B8A6" opacity="0.75"/>
+    <!-- Arms around -->
+    <rect x="-2" y="76" width="15" height="45" rx="7.5" fill="url(#stripSkin2)" transform="rotate(-15 6.5 76)"/>
+    <rect x="66" y="80" width="15" height="43" rx="7.5" fill="url(#stripSkin2)" transform="rotate(10 73.5 80)"/>
+    <!-- Hands -->
+    <circle cx="-8" cy="120" r="9.5" fill="url(#stripSkin2)"/>
+    <circle cx="72" cy="125" r="9.5" fill="url(#stripSkin2)"/>
+    <!-- Legs -->
+    <rect x="18" y="145" width="11" height="33" rx="5.5" fill="#444"/>
+    <rect x="40" y="145" width="11" height="33" rx="5.5" fill="#444"/>
+  </g>
+
+  <!-- Decorative leaf elements -->
+  <path d="M 150 250 Q 160 240 170 260" stroke="#6B9E5F" stroke-width="2.5" fill="none" stroke-linecap="round"/>
+  <path d="M 450 280 Q 460 270 475 285" stroke="#6B9E5F" stroke-width="2.5" fill="none" stroke-linecap="round"/>
+</svg>

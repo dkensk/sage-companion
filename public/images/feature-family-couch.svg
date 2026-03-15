@@ -1,0 +1,124 @@
+<svg viewBox="0 0 600 400" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="featBg2" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#F9F5F0;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#F0F9F8;stop-opacity:1" />
+    </linearGradient>
+    <linearGradient id="featSkin2" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" style="stop-color:#F4D6C8;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#E8C4B0;stop-opacity:1" />
+    </linearGradient>
+    <radialGradient id="featHair1" cx="40%" cy="40%">
+      <stop offset="0%" style="stop-color:#C4A9A0;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#A89080;stop-opacity:1" />
+    </radialGradient>
+    <radialGradient id="featHair2" cx="40%" cy="40%">
+      <stop offset="0%" style="stop-color:#D4A574;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#B8935F;stop-opacity:1" />
+    </radialGradient>
+  </defs>
+
+  <rect width="600" height="400" fill="url(#featBg2)"/>
+
+  <!-- Couch -->
+  <g transform="translate(80, 180)">
+    <!-- Main cushion -->
+    <rect x="0" y="0" width="440" height="80" rx="12" fill="#8B6F47" opacity="0.7"/>
+    <!-- Back rest -->
+    <rect x="0" y="-40" width="440" height="50" rx="12" fill="#9E7D54" opacity="0.65"/>
+    <!-- Left armrest -->
+    <ellipse cx="-15" cy="30" rx="20" ry="50" fill="#7A5F3E" opacity="0.75"/>
+    <!-- Right armrest -->
+    <ellipse cx="455" cy="30" rx="20" ry="50" fill="#7A5F3E" opacity="0.75"/>
+    <!-- Cushion details -->
+    <line x1="20" y1="0" x2="20" y2="80" stroke="#6B5640" stroke-width="1" opacity="0.3"/>
+    <line x1="100" y1="0" x2="100" y2="80" stroke="#6B5640" stroke-width="1" opacity="0.3"/>
+    <line x1="180" y1="0" x2="180" y2="80" stroke="#6B5640" stroke-width="1" opacity="0.3"/>
+    <line x1="260" y1="0" x2="260" y2="80" stroke="#6B5640" stroke-width="1" opacity="0.3"/>
+    <line x1="340" y1="0" x2="340" y2="80" stroke="#6B5640" stroke-width="1" opacity="0.3"/>
+    <line x1="420" y1="0" x2="420" y2="80" stroke="#6B5640" stroke-width="1" opacity="0.3"/>
+  </g>
+
+  <!-- Grandmother (left) -->
+  <g transform="translate(100, 100)">
+    <!-- Hair -->
+    <ellipse cx="35" cy="26" rx="32" ry="36" fill="url(#featHair1)"/>
+    <!-- Head -->
+    <circle cx="35" cy="50" r="23" fill="url(#featSkin2)"/>
+    <!-- Ears -->
+    <ellipse cx="12" cy="50" rx="7.5" ry="11" fill="url(#featSkin2)"/>
+    <ellipse cx="58" cy="50" rx="7.5" ry="11" fill="url(#featSkin2)"/>
+    <!-- Eyes (kind, looking at child) -->
+    <circle cx="27" cy="46" r="2.6" fill="#1E3A8A"/>
+    <circle cx="43" cy="46" r="2.6" fill="#1E3A8A"/>
+    <!-- Smile (warm) -->
+    <path d="M 30 55 Q 35 58 40 55" stroke="#9B7E5C" stroke-width="1.8" fill="none" stroke-linecap="round"/>
+    <!-- Body -->
+    <ellipse cx="35" cy="110" rx="42" ry="52" fill="#14B8A6" opacity="0.8"/>
+    <!-- Left arm around child -->
+    <rect x="0" y="90" width="17" height="48" rx="8.5" fill="url(#featSkin2)" transform="rotate(-20 8.5 90)"/>
+    <!-- Right arm on couch -->
+    <rect x="70" y="100" width="17" height="45" rx="8.5" fill="url(#featSkin2)" transform="rotate(15 78.5 100)"/>
+    <!-- Hands -->
+    <circle cx="10" cy="130" r="10" fill="url(#featSkin2)"/>
+    <circle cx="85" cy="138" r="10" fill="url(#featSkin2)"/>
+    <!-- Legs -->
+    <rect x="22" y="170" width="12" height="38" rx="6" fill="#333"/>
+    <rect x="48" y="170" width="12" height="38" rx="6" fill="#333"/>
+  </g>
+
+  <!-- Child (center) -->
+  <g transform="translate(280, 130)">
+    <!-- Hair -->
+    <ellipse cx="28" cy="20" rx="25" ry="28" fill="url(#featHair2)"/>
+    <!-- Head -->
+    <circle cx="28" cy="40" r="19" fill="url(#featSkin2)"/>
+    <!-- Eyes (happy) -->
+    <circle cx="21" cy="37" r="2.2" fill="#1E3A8A"/>
+    <circle cx="35" cy="37" r="2.2" fill="#1E3A8A"/>
+    <!-- Smile (big smile) -->
+    <path d="M 24 46 Q 28 48 32 46" stroke="#9B7E5C" stroke-width="1.5" fill="none" stroke-linecap="round"/>
+    <!-- Body -->
+    <rect x="4" y="62" width="48" height="50" rx="6" fill="#F4B183" opacity="0.85"/>
+    <!-- Arms relaxed -->
+    <rect x="-8" y="68" width="14" height="42" rx="7" fill="url(#featSkin2)"/>
+    <rect x="52" y="70" width="14" height="40" rx="7" fill="url(#featSkin2)"/>
+    <!-- Hands -->
+    <circle cx="-10" cy="115" r="9" fill="url(#featSkin2)"/>
+    <circle cx="66" cy="118" r="9" fill="url(#featSkin2)"/>
+    <!-- Legs -->
+    <rect x="14" y="120" width="10" height="35" rx="5" fill="#555"/>
+    <rect x="32" y="120" width="10" height="35" rx="5" fill="#555"/>
+  </g>
+
+  <!-- Grandchild (right) -->
+  <g transform="translate(420, 150)">
+    <!-- Hair -->
+    <ellipse cx="26" cy="16" rx="23" ry="26" fill="url(#featHair1)"/>
+    <!-- Head -->
+    <circle cx="26" cy="36" r="17" fill="url(#featSkin2)"/>
+    <!-- Eyes -->
+    <circle cx="20" cy="33" r="2" fill="#1E3A8A"/>
+    <circle cx="32" cy="33" r="2" fill="#1E3A8A"/>
+    <!-- Smile -->
+    <path d="M 23 41 Q 26 43 29 41" stroke="#9B7E5C" stroke-width="1.3" fill="none" stroke-linecap="round"/>
+    <!-- Body -->
+    <rect x="4" y="55" width="44" height="46" rx="5" fill="#E8A76B" opacity="0.85"/>
+    <!-- Arms -->
+    <rect x="-6" y="60" width="12" height="40" rx="6" fill="url(#featSkin2)"/>
+    <rect x="50" y="62" width="12" height="38" rx="6" fill="url(#featSkin2)"/>
+    <!-- Hands -->
+    <circle cx="-8" cy="105" r="8" fill="url(#featSkin2)"/>
+    <circle cx="62" cy="107" r="8" fill="url(#featSkin2)"/>
+    <!-- Legs -->
+    <rect x="13" y="110" width="9" height="30" rx="4.5" fill="#333"/>
+    <rect x="30" y="110" width="9" height="30" rx="4.5" fill="#333"/>
+  </g>
+
+  <!-- Decorative elements -->
+  <circle cx="550" cy="50" r="50" fill="#1E3A8A" opacity="0.08"/>
+  <path d="M 180 330 C 180 325 184 320 188 320 C 191 320 194 323 196 320 C 198 323 201 320 204 320 C 208 320 212 325 212 330 C 212 338 200 348 196 350 C 192 348 180 338 180 330" fill="#14B8A6" opacity="0.4"/>
+
+  <!-- Warm glow -->
+  <ellipse cx="280" cy="200" rx="140" ry="110" fill="#FFF9E6" opacity="0.2"/>
+</svg>
