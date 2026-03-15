@@ -154,6 +154,21 @@
   <div class="empty-state" id="emptyState" style="display:none;">No articles found in this category.</div>
 </div>
 
+<!-- Newsletter CTA -->
+<section style="background:linear-gradient(135deg,#0F172A 0%,#1E3A8A 100%);padding:48px 24px;text-align:center;">
+  <div style="max-width:520px;margin:0 auto;">
+    <div style="font-size:28px;margin-bottom:8px;">📬</div>
+    <h3 style="color:white;font-size:22px;font-weight:800;margin-bottom:8px;">Get Senior Care Tips in Your Inbox</h3>
+    <p style="color:#94A3B8;font-size:15px;line-height:1.6;margin-bottom:20px;">Join our bi-weekly newsletter for caregiving insights, health tips, and updates from Sage Companion. No spam — unsubscribe anytime.</p>
+    <form id="subscribeForm" onsubmit="subscribeBlog(event)" style="display:flex;flex-direction:column;gap:10px;max-width:400px;margin:0 auto;">
+      <input type="text" id="subName" placeholder="First name (optional)" style="padding:12px 16px;border-radius:10px;border:2px solid rgba(255,255,255,0.15);background:rgba(255,255,255,0.08);color:white;font-size:15px;outline:none;" />
+      <input type="email" id="subEmail" placeholder="Your email address" required style="padding:12px 16px;border-radius:10px;border:2px solid rgba(255,255,255,0.15);background:rgba(255,255,255,0.08);color:white;font-size:15px;outline:none;" />
+      <button type="submit" id="subBtn" style="padding:14px 24px;border-radius:10px;border:none;background:linear-gradient(135deg,#14B8A6,#0F766E);color:white;font-size:16px;font-weight:700;cursor:pointer;">Subscribe</button>
+    </form>
+    <p id="subMsg" style="margin-top:12px;font-size:14px;display:none;"></p>
+  </div>
+</section>
+
 <footer>
   <div class="footer-inner">
     <div class="footer-brand"><span>🌿</span><span>Sage Companion LLC</span></div>
@@ -227,6 +242,36 @@ function filterPosts(category) {
 }
 
 loadPosts();
+
+async function subscribeBlog(e) {
+  e.preventDefault();
+  const btn = document.getElementById("subBtn");
+  const msg = document.getElementById("subMsg");
+  btn.textContent = "Subscribing...";
+  btn.disabled = true;
+  try {
+    const res = await fetch("/api/blog/subscribe", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        email: document.getElementById("subEmail").value.trim(),
+        name: document.getElementById("subName").value.trim(),
+      }),
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error);
+    msg.style.color = "#14B8A6";
+    msg.textContent = "You're subscribed! Look for our next newsletter.";
+    msg.style.display = "block";
+    btn.textContent = "Subscribed!";
+  } catch (err) {
+    msg.style.color = "#F87171";
+    msg.textContent = err.message || "Something went wrong. Please try again.";
+    msg.style.display = "block";
+    btn.textContent = "Subscribe";
+    btn.disabled = false;
+  }
+}
 </script>
 </body>
 </html>

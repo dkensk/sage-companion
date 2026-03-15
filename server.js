@@ -3234,6 +3234,120 @@ app.delete("/api/admin/blog/:id", adminAuth, async (req, res) => {
 });
 
 // ─────────────────────────────────────────────────────────────────────────────
+// BLOG NEWSLETTER / SUBSCRIBERS
+// ─────────────────────────────────────────────────────────────────────────────
+
+// Public: subscribe to newsletter
+app.post("/api/blog/subscribe", rateLimit("login"), sanitizeBody, async (req, res) => {
+  try {
+    const { email, name } = req.body;
+    if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+      return res.status(400).json({ error: "Valid email is required" });
+    }
+
+    const { data, error } = await supabase.from("blog_subscribers").upsert({
+      email: email.trim().toLowerCase(),
+      name: (name || "").trim(),
+      subscribed: true,
+      unsubscribed_at: null,
+    }, { onConflict: "email" }).select().single();
+
+    if (error) {
+      console.error("[Blog] Subscribe error:", error.message);
+      return res.status(500).json({ error: "Could not subscribe. Please try again." });
+    }
+
+    res.json({ ok: true, message: "You're subscribed! Look for our next newsletter." });
+  } catch (e) {
+    console.error("[Blog] Subscribe error:", e.message);
+    res.status(500).json({ error: "Something went wrong. Please try again." });
+  }
+});
+
+// Public: unsubscribe via link (GET for easy email link clicks)
+app.get("/api/blog/unsubscribe", async (req, res) => {
+  try {
+    const { email } = req.query;
+    if (!email) return res.status(400).send("Missing email parameter");
+
+    await supabase.from("blog_subscribers")
+      .update({ subscribed: false, unsubscribed_at: new Date().toISOString() })
+      .eq("email", email.trim().toLowerCase());
+
+    res.send(`
+      <html><head><title>Unsubscribed</title>
+      <style>body{font-family:system-ui;display:flex;justify-content:center;align-items:center;min-height:100vh;background:#F8FAFC;margin:0;}
+      .card{text-align:center;background:white;padding:40px;border-radius:16px;box-shadow:0 4px 24px rgba(0,0,0,0.08);max-width:400px;}
+      h2{color:#1E3A8A;margin-bottom:8px;}p{color:#64748B;}</style></head>
+      <body><div class="card"><h2>Unsubscribed</h2><p>You've been removed from the Sage Companion newsletter. We're sorry to see you go!</p>
+      <p><a href="/" style="color:#14B8A6;">Return to Sage Companion</a></p></div></body></html>
+    `);
+  } catch (e) {
+    res.status(500).send("Something went wrong. Please try again.");
+  }
+});
+
+// Admin: list all subscribers
+app.get("/api/admin/subscribers", adminAuth, async (req, res) => {
+  try {
+    const { data, error } = await supabase.from("blog_subscribers")
+      .select("*").order("created_at", { ascending: false });
+    if (error) throw error;
+    res.json(data || []);
+  } catch (e) {
+    console.error("[Blog] Subscribers list error:", e.message);
+    res.status(500).json({ error: "Failed to load subscribers" });
+  }
+});
+
+// Admin: send newsletter to all active subscribers
+app.post("/api/admin/newsletter/send", adminAuth, async (req, res) => {
+  if (!resend) return res.status(503).json({ error: "Email (Resend) not configured" });
+  try {
+    const { subject, htmlContent } = req.body;
+    if (!subject || !htmlContent) return res.status(400).json({ error: "Subject and content are required" });
+
+    // Get all active subscribers
+    const { data: subscribers, error } = await supabase.from("blog_subscribers")
+      .select("email, name").eq("subscribed", true);
+    if (error) throw error;
+    if (!subscribers || subscribers.length === 0) {
+      return res.status(400).json({ error: "No active subscribers" });
+    }
+
+    // Send in batches of 50 (Resend limit)
+    let sent = 0;
+    let failed = 0;
+    const batchSize = 50;
+
+    for (let i = 0; i < subscribers.length; i += batchSize) {
+      const batch = subscribers.slice(i, i + batchSize);
+      const promises = batch.map(sub => {
+        const unsubUrl = `https://mysagecompanion.com/api/blog/unsubscribe?email=${encodeURIComponent(sub.email)}`;
+        const personalHtml = htmlContent + `<hr style="margin-top:32px;border:none;border-top:1px solid #E2E8F0;"><p style="font-size:12px;color:#94A3B8;text-align:center;">You're receiving this because you subscribed to the Sage Companion newsletter.<br><a href="${unsubUrl}" style="color:#94A3B8;">Unsubscribe</a></p>`;
+
+        return resend.emails.send({
+          from: FROM_EMAIL,
+          to: sub.email,
+          subject,
+          html: personalHtml,
+        }).then(() => { sent++; }).catch(e => {
+          console.error(`[Newsletter] Failed to send to ${sub.email}:`, e.message);
+          failed++;
+        });
+      });
+      await Promise.all(promises);
+    }
+
+    console.log(`[Newsletter] Sent: ${sent}, Failed: ${failed}, Total: ${subscribers.length}`);
+    res.json({ ok: true, sent, failed, total: subscribers.length });
+  } catch (e) {
+    console.error("[Newsletter] Send error:", e.message);
+    res.status(500).json({ error: "Failed to send newsletter" });
+  }
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
 // STATIC ROUTES
 // ─────────────────────────────────────────────────────────────────────────────
 app.get("/elder",          (req, res) => res.sendFile(path.join(__dirname, "public", "elder.html")));

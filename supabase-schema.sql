@@ -239,6 +239,19 @@ CREATE TABLE IF NOT EXISTS blog_posts (
 CREATE INDEX IF NOT EXISTS idx_blog_posts_slug      ON blog_posts(slug);
 CREATE INDEX IF NOT EXISTS idx_blog_posts_published ON blog_posts(published, created_at DESC);
 
+-- ── Blog subscribers (newsletter) ────────────────────────────────────────────
+CREATE TABLE IF NOT EXISTS blog_subscribers (
+  id            UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  email         TEXT UNIQUE NOT NULL,
+  name          TEXT DEFAULT '',
+  subscribed    BOOLEAN DEFAULT TRUE,
+  created_at    TIMESTAMPTZ DEFAULT NOW(),
+  unsubscribed_at TIMESTAMPTZ
+);
+
+CREATE INDEX IF NOT EXISTS idx_blog_subscribers_email ON blog_subscribers(email);
+CREATE INDEX IF NOT EXISTS idx_blog_subscribers_active ON blog_subscribers(subscribed, created_at DESC);
+
 -- ═══════════════════════════════════════════════════════════════════════════════
 --  2. INDEXES
 -- ═══════════════════════════════════════════════════════════════════════════════
@@ -346,6 +359,7 @@ ALTER TABLE reminders          ENABLE ROW LEVEL SECURITY;
 ALTER TABLE memories           ENABLE ROW LEVEL SECURITY;
 ALTER TABLE cost_log           ENABLE ROW LEVEL SECURITY;
 ALTER TABLE contact_messages   ENABLE ROW LEVEL SECURITY;
+ALTER TABLE blog_subscribers   ENABLE ROW LEVEL SECURITY;
 
 -- Drop existing policies (safe to re-run)
 DO $$ DECLARE t TEXT;
@@ -354,7 +368,7 @@ BEGIN
     'seniors','medications','med_log','activity','alerts','conversations',
     'doctor_questions','doctor_visits','appointments','usage_metrics',
     'push_subscriptions','reminder_snooze','senior_tokens','reminders',
-    'memories','cost_log','contact_messages'
+    'memories','cost_log','contact_messages','blog_subscribers'
   ] LOOP
     EXECUTE format('DROP POLICY IF EXISTS "Deny public access" ON %I', t);
   END LOOP;
@@ -378,6 +392,7 @@ CREATE POLICY "Deny public access" ON reminders          FOR ALL USING (false);
 CREATE POLICY "Deny public access" ON memories           FOR ALL USING (false);
 CREATE POLICY "Deny public access" ON cost_log           FOR ALL USING (false);
 CREATE POLICY "Deny public access" ON contact_messages   FOR ALL USING (false);
+CREATE POLICY "Deny public access" ON blog_subscribers   FOR ALL USING (false);
 
 
 -- ═══════════════════════════════════════════════════════════════════════════════
