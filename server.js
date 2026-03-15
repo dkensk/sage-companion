@@ -2610,7 +2610,7 @@ app.post("/api/seniors", rateLimit("login"), async (req, res) => {
     });
 
     res.json({ success: true, senior: safeSenior(norm(senior)), token });
-  } catch (e) { console.error(`[Error] ${req.method} ${req.path}:`, e.message); res.status(500).json({ error: "Something went wrong. Please try again." }); }
+  } catch (e) { console.error(`[Error] ${req.method} ${req.path}:`, e.message, e.stack); res.status(500).json({ error: "Signup error: " + e.message }); }
 });
 
 // ─────────────────────────────────────────────────────────────────────────────
