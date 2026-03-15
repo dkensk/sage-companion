@@ -220,6 +220,25 @@ CREATE TABLE IF NOT EXISTS contact_messages (
 );
 
 
+-- ── Blog posts ─────────────────────────────────────────────────────────────────
+CREATE TABLE IF NOT EXISTS blog_posts (
+  id          UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  slug        TEXT UNIQUE NOT NULL,
+  title       TEXT NOT NULL,
+  excerpt     TEXT NOT NULL DEFAULT '',
+  content     TEXT NOT NULL DEFAULT '',
+  category    TEXT NOT NULL DEFAULT 'general',
+  emoji       TEXT DEFAULT '📝',
+  color_from  TEXT DEFAULT '#1E3A8A',
+  color_to    TEXT DEFAULT '#2D4EAA',
+  published   BOOLEAN DEFAULT FALSE,
+  created_at  TIMESTAMPTZ DEFAULT NOW(),
+  updated_at  TIMESTAMPTZ DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS idx_blog_posts_slug      ON blog_posts(slug);
+CREATE INDEX IF NOT EXISTS idx_blog_posts_published ON blog_posts(published, created_at DESC);
+
 -- ═══════════════════════════════════════════════════════════════════════════════
 --  2. INDEXES
 -- ═══════════════════════════════════════════════════════════════════════════════

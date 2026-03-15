@@ -3108,6 +3108,124 @@ app.post("/api/contact", rateLimit("login"), async (req, res) => {
 });
 
 // ─────────────────────────────────────────────────────────────────────────────
+// BLOG API
+// ─────────────────────────────────────────────────────────────────────────────
+
+// Public: list published blog posts
+app.get("/api/blog", async (req, res) => {
+  try {
+    const { data, error } = await supabase
+      .from("blog_posts")
+      .select("id, slug, title, excerpt, category, emoji, color_from, color_to, created_at")
+      .eq("published", true)
+      .order("created_at", { ascending: false });
+    if (error) throw error;
+    res.json(data || []);
+  } catch (e) {
+    console.error("Blog list error:", e.message);
+    res.status(500).json({ error: "Failed to load blog posts" });
+  }
+});
+
+// Public: get single published blog post by slug
+app.get("/api/blog/:slug", async (req, res) => {
+  try {
+    const { data, error } = await supabase
+      .from("blog_posts")
+      .select("*")
+      .eq("slug", req.params.slug)
+      .eq("published", true)
+      .single();
+    if (error || !data) return res.status(404).json({ error: "Post not found" });
+    res.json(data);
+  } catch (e) {
+    console.error("Blog post error:", e.message);
+    res.status(500).json({ error: "Failed to load blog post" });
+  }
+});
+
+// Admin: list ALL blog posts (including unpublished)
+app.get("/api/admin/blog", adminAuth, async (req, res) => {
+  try {
+    const { data, error } = await supabase
+      .from("blog_posts")
+      .select("*")
+      .order("created_at", { ascending: false });
+    if (error) throw error;
+    res.json(data || []);
+  } catch (e) {
+    res.status(500).json({ error: "Failed to load blog posts" });
+  }
+});
+
+// Admin: create blog post
+app.post("/api/admin/blog", adminAuth, async (req, res) => {
+  try {
+    const { slug, title, excerpt, content, category, emoji, color_from, color_to, published } = req.body;
+    if (!slug || !title) return res.status(400).json({ error: "Slug and title are required" });
+
+    const cleanSlug = slug.toLowerCase().replace(/[^a-z0-9-]/g, "-").replace(/-+/g, "-").replace(/^-|-$/g, "");
+
+    const { data, error } = await supabase
+      .from("blog_posts")
+      .insert({
+        slug: cleanSlug, title,
+        excerpt: excerpt || "", content: content || "",
+        category: category || "general", emoji: emoji || "📝",
+        color_from: color_from || "#1E3A8A", color_to: color_to || "#2D4EAA",
+        published: published !== false
+      })
+      .select().single();
+    if (error) {
+      if (error.code === "23505") return res.status(409).json({ error: "A post with that slug already exists" });
+      throw error;
+    }
+    res.json(data);
+  } catch (e) {
+    console.error("Blog create error:", e.message);
+    res.status(500).json({ error: "Failed to create blog post" });
+  }
+});
+
+// Admin: update blog post
+app.put("/api/admin/blog/:id", adminAuth, async (req, res) => {
+  try {
+    const updates = {};
+    const allowed = ["slug", "title", "excerpt", "content", "category", "emoji", "color_from", "color_to", "published"];
+    for (const key of allowed) {
+      if (req.body[key] !== undefined) updates[key] = req.body[key];
+    }
+    if (updates.slug) {
+      updates.slug = updates.slug.toLowerCase().replace(/[^a-z0-9-]/g, "-").replace(/-+/g, "-").replace(/^-|-$/g, "");
+    }
+    updates.updated_at = new Date().toISOString();
+
+    const { data, error } = await supabase.from("blog_posts").update(updates).eq("id", req.params.id).select().single();
+    if (error) {
+      if (error.code === "23505") return res.status(409).json({ error: "A post with that slug already exists" });
+      throw error;
+    }
+    if (!data) return res.status(404).json({ error: "Post not found" });
+    res.json(data);
+  } catch (e) {
+    console.error("Blog update error:", e.message);
+    res.status(500).json({ error: "Failed to update blog post" });
+  }
+});
+
+// Admin: delete blog post
+app.delete("/api/admin/blog/:id", adminAuth, async (req, res) => {
+  try {
+    const { error } = await supabase.from("blog_posts").delete().eq("id", req.params.id);
+    if (error) throw error;
+    res.json({ ok: true });
+  } catch (e) {
+    console.error("Blog delete error:", e.message);
+    res.status(500).json({ error: "Failed to delete blog post" });
+  }
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
 // STATIC ROUTES
 // ─────────────────────────────────────────────────────────────────────────────
 app.get("/elder",          (req, res) => res.sendFile(path.join(__dirname, "public", "elder.html")));
@@ -3122,6 +3240,9 @@ app.get("/contact",        (req, res) => res.sendFile(path.join(__dirname, "publ
 app.get("/terms",          (req, res) => res.sendFile(path.join(__dirname, "public", "terms.html")));
 app.get("/privacy",        (req, res) => res.sendFile(path.join(__dirname, "public", "privacy.html")));
 app.get("/reset-password", (req, res) => res.sendFile(path.join(__dirname, "public", "reset-password.html")));
+app.get("/blog",           (req, res) => res.sendFile(path.join(__dirname, "public", "blog.html")));
+app.get("/blog/:slug",     (req, res) => res.sendFile(path.join(__dirname, "public", "blog-post.html")));
+app.get("/admin/blog",     (req, res) => res.sendFile(path.join(__dirname, "public", "admin-blog.html")));
 app.get("/",               (req, res) => res.sendFile(path.join(__dirname, "public", "index.html")));
 
 // ─────────────────────────────────────────────────────────────────────────────
