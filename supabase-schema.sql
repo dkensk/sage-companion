@@ -32,21 +32,6 @@ CREATE TABLE IF NOT EXISTS seniors (
   last_active         TIMESTAMPTZ  DEFAULT NOW()
 );
 
--- Safety: add columns that may be missing if seniors table was created from an older schema
-ALTER TABLE seniors ADD COLUMN IF NOT EXISTS email               TEXT;
-ALTER TABLE seniors ADD COLUMN IF NOT EXISTS password_hash       TEXT;
-ALTER TABLE seniors ADD COLUMN IF NOT EXISTS age                 INTEGER;
-ALTER TABLE seniors ADD COLUMN IF NOT EXISTS google_tokens       JSONB;
-ALTER TABLE seniors ADD COLUMN IF NOT EXISTS preferences         JSONB DEFAULT '{"voiceSpeed":"normal","theme":"default"}';
-ALTER TABLE seniors ADD COLUMN IF NOT EXISTS stripe_customer_id  TEXT;
-ALTER TABLE seniors ADD COLUMN IF NOT EXISTS subscription_status TEXT DEFAULT 'none';
-ALTER TABLE seniors ADD COLUMN IF NOT EXISTS subscription_plan   TEXT DEFAULT 'none';
-ALTER TABLE seniors ADD COLUMN IF NOT EXISTS trial_ends_at       TIMESTAMPTZ;
-ALTER TABLE seniors ADD COLUMN IF NOT EXISTS timezone            TEXT;
-ALTER TABLE seniors ADD COLUMN IF NOT EXISTS location            TEXT;
-ALTER TABLE seniors ADD COLUMN IF NOT EXISTS reset_token         TEXT;
-ALTER TABLE seniors ADD COLUMN IF NOT EXISTS reset_expires       TIMESTAMPTZ;
-
 -- ── Medications ───────────────────────────────────────────────────────────────
 CREATE TABLE IF NOT EXISTS medications (
   id              UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -418,7 +403,7 @@ VALUES (
   ARRAY['mild cognitive impairment', 'hypertension'],
   '{"voiceSpeed":"slow","theme":"high-contrast"}',
   NOW()
-) ON CONFLICT (id) DO NOTHING;
+) ON CONFLICT DO NOTHING;
 
 INSERT INTO medications (senior_id, name, dose, time, with_food, active)
 SELECT '00000000-0000-0000-0000-000000000001', name, dose, time, with_food, true
