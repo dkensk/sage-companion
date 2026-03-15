@@ -1222,7 +1222,133 @@
       .hero-photo-secondary { width: 70%; align-self: flex-end; margin-top: -32px; height: 160px; }
       .photo-strip { grid-template-columns: 1fr; max-width: 360px; }
       .photo-strip-card img { height: 200px; }
+      .pricing-grid { grid-template-columns: 1fr; max-width: 400px; margin: 0 auto; }
+      .facilities-inner { padding: 48px 24px; }
     }
+
+    /* ── PRICING ─────────────────────────────────────────────────────── */
+    .pricing-section { background: var(--bg2); }
+
+    .pricing-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 28px;
+      max-width: 800px;
+      margin: 0 auto;
+    }
+
+    .pricing-card {
+      background: white;
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 40px 32px;
+      text-align: center;
+      box-shadow: var(--shadow-sm);
+      transition: transform 0.22s var(--ease), box-shadow 0.22s var(--ease);
+      position: relative;
+    }
+    .pricing-card:hover { transform: translateY(-5px); box-shadow: var(--shadow-md); }
+
+    .pricing-card-popular {
+      border: 2px solid var(--navy);
+      box-shadow: var(--shadow-md);
+    }
+
+    .pricing-badge {
+      position: absolute;
+      top: -14px;
+      left: 50%;
+      transform: translateX(-50%);
+      background: linear-gradient(135deg, var(--navy), var(--teal));
+      color: white;
+      font-size: 12px;
+      font-weight: 800;
+      padding: 5px 18px;
+      border-radius: 20px;
+      letter-spacing: 0.04em;
+      text-transform: uppercase;
+    }
+
+    .pricing-plan { font-size: 15px; font-weight: 700; color: var(--muted); text-transform: uppercase; letter-spacing: 0.06em; margin-bottom: 12px; }
+    .pricing-price { font-size: 48px; font-weight: 900; color: var(--text); line-height: 1; margin-bottom: 4px; }
+    .pricing-price span { font-size: 18px; font-weight: 600; color: var(--muted); }
+    .pricing-period { font-size: 14px; color: var(--muted); margin-bottom: 8px; }
+    .pricing-savings { font-size: 14px; color: var(--green); font-weight: 700; margin-bottom: 24px; min-height: 20px; }
+
+    .pricing-features {
+      list-style: none;
+      text-align: left;
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+      margin-bottom: 32px;
+    }
+    .pricing-features li {
+      font-size: 14px;
+      color: var(--text);
+      display: flex;
+      align-items: flex-start;
+      gap: 10px;
+      line-height: 1.5;
+    }
+    .pricing-features li::before {
+      content: "✓";
+      color: var(--green);
+      font-weight: 900;
+      flex-shrink: 0;
+    }
+
+    .pricing-btn {
+      display: inline-block;
+      width: 100%;
+      padding: 14px 24px;
+      border-radius: 12px;
+      font-size: 16px;
+      font-weight: 800;
+      text-decoration: none;
+      cursor: pointer;
+      border: none;
+      font-family: inherit;
+      transition: transform 0.15s var(--ease), box-shadow 0.15s var(--ease);
+    }
+    .pricing-btn:hover { transform: translateY(-2px); box-shadow: var(--shadow-md); }
+    .pricing-btn-primary { background: linear-gradient(135deg, var(--navy), var(--teal)); color: white; }
+    .pricing-btn-outline { background: white; color: var(--navy); border: 2px solid var(--navy); }
+
+    .pricing-trial { font-size: 13px; color: var(--muted); margin-top: 16px; }
+
+    /* ── FACILITIES ───────────────────────────────────────────────────── */
+    .facilities-section {
+      background: linear-gradient(145deg, #0F172A, #1E3A8A);
+      color: white;
+    }
+
+    .facilities-inner {
+      max-width: 720px;
+      margin: 0 auto;
+      text-align: center;
+      padding: 64px 32px;
+    }
+
+    .facilities-icon { font-size: 48px; margin-bottom: 20px; }
+    .facilities-title { font-size: 30px; font-weight: 900; letter-spacing: -0.02em; margin-bottom: 14px; }
+    .facilities-sub { font-size: 17px; opacity: 0.8; line-height: 1.7; margin-bottom: 32px; }
+
+    .facilities-email {
+      display: inline-flex;
+      align-items: center;
+      gap: 10px;
+      background: rgba(255,255,255,0.12);
+      border: 1px solid rgba(255,255,255,0.2);
+      padding: 16px 28px;
+      border-radius: 14px;
+      color: white;
+      font-size: 18px;
+      font-weight: 700;
+      text-decoration: none;
+      transition: background 0.2s var(--ease);
+    }
+    .facilities-email:hover { background: rgba(255,255,255,0.2); }
   </style>
   <script>
     if ('serviceWorker' in navigator) {
@@ -1243,6 +1369,7 @@
   <div class="nav-links">
     <a href="#how-it-works" class="nav-link">How It Works</a>
     <a href="#features" class="nav-link">Features</a>
+    <a href="#pricing" class="nav-link">Pricing</a>
     <a href="#faq" class="nav-link">FAQ</a>
     <a href="#blog" class="nav-link">Blog</a>
     <a href="#" onclick="goSenior(); return false;" class="nav-cta">Get Started</a>
@@ -1538,6 +1665,64 @@
         </div>
       </div>
     </div>
+  </div>
+</section>
+
+<!-- ── PRICING ──────────────────────────────────────────────────────── -->
+<section class="section pricing-section" id="pricing">
+  <div class="section-inner">
+    <div class="section-eyebrow reveal">Simple pricing</div>
+    <h2 class="section-title reveal">Start free, stay affordable</h2>
+    <p class="section-sub reveal">Every plan includes a 14-day free trial. No credit card required.</p>
+
+    <div class="pricing-grid">
+      <div class="pricing-card reveal reveal-delay-1">
+        <div class="pricing-plan">Monthly</div>
+        <div class="pricing-price">$9<span>.99</span></div>
+        <div class="pricing-period">per month</div>
+        <div class="pricing-savings">&nbsp;</div>
+        <ul class="pricing-features">
+          <li>Unlimited conversations with Sage</li>
+          <li>Medication reminders &amp; tracking</li>
+          <li>Family dashboard access</li>
+          <li>Emergency alerts</li>
+          <li>Appointment management</li>
+          <li>Cancel anytime</li>
+        </ul>
+        <button onclick="goSenior()" class="pricing-btn pricing-btn-outline">Start Free Trial</button>
+        <div class="pricing-trial">14 days free, then $9.99/mo</div>
+      </div>
+
+      <div class="pricing-card pricing-card-popular reveal reveal-delay-2">
+        <div class="pricing-badge">Best Value</div>
+        <div class="pricing-plan">Yearly</div>
+        <div class="pricing-price">$89<span>.99</span></div>
+        <div class="pricing-period">per year</div>
+        <div class="pricing-savings">Save $29.89 per year</div>
+        <ul class="pricing-features">
+          <li>Everything in Monthly</li>
+          <li>25% savings vs. monthly</li>
+          <li>Priority support</li>
+          <li>Early access to new features</li>
+          <li>Unlimited family members</li>
+          <li>Cancel anytime</li>
+        </ul>
+        <button onclick="goSenior()" class="pricing-btn pricing-btn-primary">Start Free Trial</button>
+        <div class="pricing-trial">14 days free, then $89.99/yr</div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ── SENIOR CARE FACILITIES ──────────────────────────────────────── -->
+<section class="section facilities-section">
+  <div class="facilities-inner">
+    <div class="facilities-icon">🏥</div>
+    <h2 class="facilities-title reveal">Senior Care Facilities</h2>
+    <p class="facilities-sub reveal">Looking to bring Sage Companion to your assisted living community, nursing home, or senior care facility? We offer volume licensing and custom integrations tailored to your residents' needs.</p>
+    <a href="mailto:support@mysagecompanion.com" class="facilities-email reveal">
+      ✉️ support@mysagecompanion.com
+    </a>
   </div>
 </section>
 
