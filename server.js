@@ -2572,7 +2572,7 @@ app.post("/api/seniors", rateLimit("login"), async (req, res) => {
       if (!exists) break;
     }
 
-    const { data: senior } = await supabase.from("seniors").insert({
+    const { data: senior, error: insertErr } = await supabase.from("seniors").insert({
       name: name.trim(), age: age ? parseInt(age) : null,
       email: email.trim().toLowerCase(), password_hash: passwordHash,
       family_code: familyCode, conditions: [],
@@ -2580,10 +2580,15 @@ app.post("/api/seniors", rateLimit("login"), async (req, res) => {
       last_active: new Date().toISOString(),
     }).select().single();
 
+    if (insertErr || !senior) {
+      console.error("[Auth] Signup insert failed:", insertErr?.message || "No data returned");
+      return res.status(500).json({ error: insertErr?.message || "Failed to create account. Please try again." });
+    }
+
     await supabase.from("activity").insert({
       senior_id: senior.id, type: "system",
       description: `${name} joined Sage Companion`, timestamp: new Date().toISOString(),
-    });
+    }).catch(e => console.error("[Auth] Activity insert failed:", e.message));
 
     // Issue a senior token so the user is logged in immediately after setup
     const token = makeSeniorToken(senior.id);
