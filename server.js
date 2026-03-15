@@ -58,7 +58,7 @@ if (IS_PROD) {
   if (!process.env.ANTHROPIC_API_KEY) missing.push("ANTHROPIC_API_KEY");
   if (missing.length > 0) {
     console.error("🚨 FATAL: Missing required production environment variables:", missing.join(", "));
-    console.error("   Set these in Railway → Variables before deploying.");
+    console.error("   Set these in Render → Environment before deploying.");
     process.exit(1);
   }
   console.log("✅ Production secret check passed");
@@ -446,9 +446,10 @@ function verifySeniorToken(token) {
 }
 
 function seniorAuth(req, res, next) {
-  // Allow demo senior through without a token
+  // Allow demo senior through without a token (read-only demo, non-destructive endpoints only)
   const seniorId = req.params.seniorId || req.body?.seniorId;
-  if (seniorId === DEMO_SENIOR_ID) { req.seniorId = DEMO_SENIOR_ID; return next(); }
+  const isDestructive = ["DELETE", "PUT"].includes(req.method) || req.path.includes("/delete") || req.path.includes("/account");
+  if (seniorId === DEMO_SENIOR_ID && !isDestructive) { req.seniorId = DEMO_SENIOR_ID; return next(); }
 
   const token = req.headers["x-senior-token"];
   const payload = verifySeniorToken(token);
@@ -474,7 +475,8 @@ async function suspendCheck(req, res, next) {
 // ── Auth that accepts EITHER senior or family tokens ──────────────────────────
 function anyAuth(req, res, next) {
   const seniorId = req.params.seniorId || req.body?.seniorId;
-  if (seniorId === DEMO_SENIOR_ID) { req.seniorId = DEMO_SENIOR_ID; return next(); }
+  const isDestructive = ["DELETE", "PUT"].includes(req.method) || req.path.includes("/delete") || req.path.includes("/account");
+  if (seniorId === DEMO_SENIOR_ID && !isDestructive) { req.seniorId = DEMO_SENIOR_ID; return next(); }
 
   const sToken = req.headers["x-senior-token"];
   const fToken = req.headers["x-family-token"];
@@ -1366,9 +1368,10 @@ app.post("/api/emergency", seniorAuth, async (req, res) => {
 
 app.post("/api/chat", seniorAuth, suspendCheck, rateLimit("chat"), async (req, res) => {
   try {
-    const { seniorId, message, sessionId, clientTime, timezone, location, includeTTS } = req.body;
+    const { message, sessionId, clientTime, timezone, location, includeTTS } = req.body;
     if (!message) return res.status(400).json({ error: "Message required" });
-    const effectiveSeniorId = seniorId || DEMO_SENIOR_ID;
+    // SECURITY: Always use the authenticated seniorId from middleware, never from request body
+    const effectiveSeniorId = req.seniorId || DEMO_SENIOR_ID;
 
     // ── Parallel DB queries (saves ~300-500ms vs sequential) ──────────────────
     // Use client timezone for "today" boundaries (server runs in UTC)
@@ -3563,10 +3566,14 @@ app.post("/api/account/delete", seniorAuth, rateLimit("login"), async (req, res)
     const { data: senior } = await supabase.from("seniors").select("id, password_hash, stripe_customer_id, name").eq("id", req.seniorId).single();
     if (!senior) return res.status(404).json({ error: "Account not found" });
 
-    if (senior.password_hash && password) {
+    // Require password verification for account deletion
+    if (!password) return res.status(400).json({ error: "Password is required to delete your account" });
+    if (senior.password_hash) {
       const [salt, storedHash] = senior.password_hash.split(":");
       const hash = crypto.pbkdf2Sync(password, salt, 100000, 64, "sha512").toString("hex");
       if (hash !== storedHash) return res.status(401).json({ error: "Password is incorrect" });
+    } else {
+      return res.status(400).json({ error: "Cannot verify identity. Please contact support@mysagecompanion.com." });
     }
 
     // Cancel Stripe subscription if exists
