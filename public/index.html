@@ -615,6 +615,139 @@
     }
     .faq-item.open .faq-a { max-height: 200px; padding: 0 24px 20px; }
 
+    /* ── BLOG ──────────────────────────────────────────────────────── */
+    .blog-section { background: var(--bg); }
+
+    .blog-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr 1fr;
+      gap: 28px;
+    }
+
+    .blog-card {
+      background: white;
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      overflow: hidden;
+      box-shadow: var(--shadow-sm);
+      transition: transform 0.25s var(--ease), box-shadow 0.25s var(--ease);
+      cursor: pointer;
+      text-decoration: none;
+      color: inherit;
+      display: flex;
+      flex-direction: column;
+    }
+    .blog-card:hover {
+      transform: translateY(-4px);
+      box-shadow: var(--shadow-md);
+    }
+
+    .blog-card-img {
+      width: 100%;
+      height: 200px;
+      object-fit: cover;
+      display: block;
+    }
+
+    .blog-card-img-placeholder {
+      width: 100%;
+      height: 200px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 48px;
+      color: white;
+    }
+
+    .blog-card-body {
+      padding: 28px;
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+    }
+
+    .blog-card-tag {
+      display: inline-block;
+      font-size: 11px;
+      font-weight: 700;
+      letter-spacing: 1.5px;
+      text-transform: uppercase;
+      padding: 4px 12px;
+      border-radius: 8px;
+      margin-bottom: 14px;
+      width: fit-content;
+    }
+    .blog-tag-caregiving { background: #EFF6FF; color: var(--navy); }
+    .blog-tag-technology { background: #F0FDF4; color: var(--teal); }
+    .blog-tag-health     { background: #FFFBEB; color: #92400E; }
+    .blog-tag-family     { background: #FFF1F2; color: #9F1239; }
+    .blog-tag-tips       { background: #F3E8FF; color: #6B21A8; }
+
+    .blog-card-title {
+      font-size: 19px;
+      font-weight: 800;
+      color: var(--text);
+      line-height: 1.35;
+      margin-bottom: 12px;
+    }
+
+    .blog-card-excerpt {
+      font-size: 14px;
+      color: var(--muted);
+      line-height: 1.65;
+      margin-bottom: 20px;
+      flex: 1;
+    }
+
+    .blog-card-meta {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      font-size: 13px;
+      color: var(--muted);
+      padding-top: 16px;
+      border-top: 1px solid var(--border);
+    }
+
+    .blog-card-date { font-weight: 600; }
+
+    .blog-card-read {
+      color: var(--navy);
+      font-weight: 700;
+      display: flex;
+      align-items: center;
+      gap: 4px;
+      transition: gap 0.2s;
+    }
+    .blog-card:hover .blog-card-read { gap: 8px; }
+
+    .blog-view-all {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      margin-top: 48px;
+      font-size: 16px;
+      font-weight: 700;
+      color: var(--navy);
+      text-decoration: none;
+      padding: 14px 32px;
+      border: 2px solid var(--navy);
+      border-radius: 14px;
+      transition: background 0.2s, color 0.2s;
+    }
+    .blog-view-all:hover {
+      background: var(--navy);
+      color: white;
+    }
+
+    @media (max-width: 860px) {
+      .blog-grid { grid-template-columns: 1fr 1fr; }
+    }
+    @media (max-width: 560px) {
+      .blog-grid { grid-template-columns: 1fr; gap: 20px; }
+      .blog-card-img, .blog-card-img-placeholder { height: 180px; }
+    }
+
     /* ── FINAL CTA ──────────────────────────────────────────────────── */
     .cta-section {
       padding: 96px 24px;
@@ -1112,6 +1245,7 @@
     <a href="#how-it-works" class="nav-link">How It Works</a>
     <a href="#features" class="nav-link">Features</a>
     <a href="#faq" class="nav-link">FAQ</a>
+    <a href="#blog" class="nav-link">Blog</a>
     <a href="#" onclick="goSenior(); return false;" class="nav-cta">Get Started</a>
   </div>
 </nav>
@@ -1460,6 +1594,101 @@
   </div>
 </section>
 
+<!-- ── BLOG ───────────────────────────────────────────────────────────── -->
+<section class="section blog-section" id="blog">
+  <div class="section-inner">
+    <div class="section-eyebrow reveal">From our blog</div>
+    <h2 class="section-title reveal">Insights for caregivers & families</h2>
+    <p class="section-sub reveal">Tips, stories, and guidance to help you navigate the journey of caring for aging loved ones.</p>
+
+    <div class="blog-grid reveal">
+
+      <a class="blog-card" href="/blog/medication-reminders-for-seniors">
+        <div class="blog-card-img-placeholder" style="background: linear-gradient(135deg, #1E3A8A, #2D4EAA);">💊</div>
+        <div class="blog-card-body">
+          <span class="blog-card-tag blog-tag-health">Health</span>
+          <h3 class="blog-card-title">Why Medication Reminders Matter More Than You Think</h3>
+          <p class="blog-card-excerpt">Nearly 50% of seniors don't take medications as prescribed. Here's how gentle, consistent reminders can dramatically improve health outcomes and reduce hospital visits.</p>
+          <div class="blog-card-meta">
+            <span class="blog-card-date">Mar 10, 2026</span>
+            <span class="blog-card-read">Read more →</span>
+          </div>
+        </div>
+      </a>
+
+      <a class="blog-card" href="/blog/ai-companions-for-elderly">
+        <div class="blog-card-img-placeholder" style="background: linear-gradient(135deg, #0F766E, #14B8A6);">🤖</div>
+        <div class="blog-card-body">
+          <span class="blog-card-tag blog-tag-technology">Technology</span>
+          <h3 class="blog-card-title">How AI Companions Are Changing Elder Care</h3>
+          <p class="blog-card-excerpt">Artificial intelligence isn't just for tech companies. Learn how conversational AI is helping seniors stay independent, connected, and healthier than ever.</p>
+          <div class="blog-card-meta">
+            <span class="blog-card-date">Mar 5, 2026</span>
+            <span class="blog-card-read">Read more →</span>
+          </div>
+        </div>
+      </a>
+
+      <a class="blog-card" href="/blog/long-distance-caregiving-tips">
+        <div class="blog-card-img-placeholder" style="background: linear-gradient(135deg, #92400E, #D97706);">👨‍👩‍👧</div>
+        <div class="blog-card-body">
+          <span class="blog-card-tag blog-tag-family">Family</span>
+          <h3 class="blog-card-title">5 Tips for Long-Distance Caregiving</h3>
+          <p class="blog-card-excerpt">Caring for a parent from miles away comes with unique challenges. These practical strategies help you stay involved and informed — no matter the distance.</p>
+          <div class="blog-card-meta">
+            <span class="blog-card-date">Feb 28, 2026</span>
+            <span class="blog-card-read">Read more →</span>
+          </div>
+        </div>
+      </a>
+
+      <a class="blog-card" href="/blog/keeping-doctors-appointments-organized">
+        <div class="blog-card-img-placeholder" style="background: linear-gradient(135deg, #6B21A8, #9333EA);">🩺</div>
+        <div class="blog-card-body">
+          <span class="blog-card-tag blog-tag-tips">Tips</span>
+          <h3 class="blog-card-title">Never Lose Track of a Doctor Visit Again</h3>
+          <p class="blog-card-excerpt">Between specialists, follow-ups, and test results, it's easy to lose track. Here's how to keep every appointment organized and accessible for the whole family.</p>
+          <div class="blog-card-meta">
+            <span class="blog-card-date">Feb 20, 2026</span>
+            <span class="blog-card-read">Read more →</span>
+          </div>
+        </div>
+      </a>
+
+      <a class="blog-card" href="/blog/reducing-caregiver-burnout">
+        <div class="blog-card-img-placeholder" style="background: linear-gradient(135deg, #9F1239, #E11D48);">❤️</div>
+        <div class="blog-card-body">
+          <span class="blog-card-tag blog-tag-caregiving">Caregiving</span>
+          <h3 class="blog-card-title">Caregiver Burnout Is Real — Here's How to Prevent It</h3>
+          <p class="blog-card-excerpt">Over 60% of family caregivers experience burnout. Recognizing the signs early and using the right tools can help you sustain your caregiving journey.</p>
+          <div class="blog-card-meta">
+            <span class="blog-card-date">Feb 14, 2026</span>
+            <span class="blog-card-read">Read more →</span>
+          </div>
+        </div>
+      </a>
+
+      <a class="blog-card" href="/blog/seniors-and-technology">
+        <div class="blog-card-img-placeholder" style="background: linear-gradient(135deg, #0F172A, #334155);">📱</div>
+        <div class="blog-card-body">
+          <span class="blog-card-tag blog-tag-technology">Technology</span>
+          <h3 class="blog-card-title">Helping Seniors Embrace Technology Without the Frustration</h3>
+          <p class="blog-card-excerpt">The key isn't teaching seniors to use technology — it's building technology that works the way they already think. Here's what that looks like in practice.</p>
+          <div class="blog-card-meta">
+            <span class="blog-card-date">Feb 7, 2026</span>
+            <span class="blog-card-read">Read more →</span>
+          </div>
+        </div>
+      </a>
+
+    </div>
+
+    <div style="text-align: center;">
+      <a href="/blog" class="blog-view-all">View all articles →</a>
+    </div>
+  </div>
+</section>
+
 <!-- ── FINAL CTA ─────────────────────────────────────────────────────── -->
 <section class="cta-section">
   <div class="cta-inner">
@@ -1483,6 +1712,7 @@
       <a href="#features">Features</a>
       <a href="#how-it-works">How It Works</a>
       <a href="#faq">FAQ</a>
+      <a href="#blog">Blog</a>
       <a href="/help">Help & Support</a>
       <a href="/contact">Contact Us</a>
       <a href="/terms">Terms of Service</a>
