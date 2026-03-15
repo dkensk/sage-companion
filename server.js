@@ -937,11 +937,12 @@ app.post("/api/stripe/webhook", express.raw({ type: "application/json" }), async
         if (senior) {
           await supabase.from("seniors").update({ subscription_status: "cancelled" }).eq("id", senior.id);
           // Admin notification for cancellation
-          await supabase.from("alerts").insert({
+          const { error: cancelAlertErr } = await supabase.from("alerts").insert({
             senior_id: senior.id, type: "cancellation",
             message: `Subscription cancelled: ${senior.name || "Unknown"} (${senior.email || senior.id})`,
             severity: "warning", resolved: false,
-          }).catch(() => {});
+          });
+          if (cancelAlertErr) console.error("[Stripe] Cancel alert insert failed:", cancelAlertErr.message);
           console.log(`[Stripe] Subscription cancelled for ${senior.id}`);
         }
         break;
@@ -1396,10 +1397,10 @@ app.post("/api/chat", seniorAuth, suspendCheck, rateLimit("chat"), async (req, r
 
     // Persist user timezone and location for future sessions (non-blocking)
     if (timezone && senior && timezone !== senior.timezone) {
-      supabase.from("seniors").update({ timezone }).eq("id", effectiveSeniorId).then(({ error }) => { if (error) console.error("[Chat] timezone save:", error.message); }).catch(e => console.error("[Chat] timezone save failed:", e.message));
+      supabase.from("seniors").update({ timezone }).eq("id", effectiveSeniorId).then(({ error }) => { if (error) console.error("[Chat] timezone save:", error.message); });
     }
     if (location && senior && location !== senior.location) {
-      supabase.from("seniors").update({ location }).eq("id", effectiveSeniorId).then(({ error }) => { if (error) console.error("[Chat] location save:", error.message); }).catch(e => console.error("[Chat] location save failed:", e.message));
+      supabase.from("seniors").update({ location }).eq("id", effectiveSeniorId).then(({ error }) => { if (error) console.error("[Chat] location save:", error.message); });
     }
 
     // Fall back to stored location if client didn't send one (e.g. geolocation not yet resolved)
@@ -1679,7 +1680,7 @@ Never invent facts not listed above. If something contradicts a memory, ask gent
             }).select().single();
             if (appt) {
               savedAppointment = { id: appt.id, title: apptData.title, date: apptData.date, time: apptData.time || null, location: apptData.location || null };
-              supabase.from("activity").insert({ senior_id: effectiveSeniorId, type: "appointment_added", description: `Voice appointment: ${apptData.title} on ${apptData.date}`, timestamp: new Date().toISOString() }).then(() => {}).catch(e => console.error("[Chat] activity insert failed:", e.message));
+              supabase.from("activity").insert({ senior_id: effectiveSeniorId, type: "appointment_added", description: `Voice appointment: ${apptData.title} on ${apptData.date}`, timestamp: new Date().toISOString() }).then(({ error: aErr }) => { if (aErr) console.error("[Chat] activity insert failed:", aErr.message); });
               trackUsage(effectiveSeniorId, "appointments_added").catch(() => {});
             }
           }
@@ -1700,9 +1701,9 @@ Never invent facts not listed above. If something contradicts a memory, ask gent
             if (rem) {
               savedReminder = { id: rem.id, text: remData.text, date: remData.date || null, time: remData.time || null };
               if (remData.date) {
-                supabase.from("appointments").insert({ senior_id: effectiveSeniorId, title: remData.text, date: remData.date, time: remData.time || null, notes: "From reminders", source: "reminder" }).then(() => {}).catch(e => console.error("[Chat] reminder-to-appointment insert failed:", e.message));
+                supabase.from("appointments").insert({ senior_id: effectiveSeniorId, title: remData.text, date: remData.date, time: remData.time || null, notes: "From reminders", source: "reminder" }).then(({ error: rErr }) => { if (rErr) console.error("[Chat] reminder-to-appointment insert failed:", rErr.message); });
               }
-              supabase.from("activity").insert({ senior_id: effectiveSeniorId, type: "reminder_added", description: `Voice reminder: "${remData.text.slice(0, 60)}"`, timestamp: new Date().toISOString() }).then(() => {}).catch(e => console.error("[Chat] activity insert failed:", e.message));
+              supabase.from("activity").insert({ senior_id: effectiveSeniorId, type: "reminder_added", description: `Voice reminder: "${remData.text.slice(0, 60)}"`, timestamp: new Date().toISOString() }).then(({ error: aErr }) => { if (aErr) console.error("[Chat] activity insert failed:", aErr.message); });
             }
           }
         } catch (e) { console.error("[Chat] Reminder parse error:", e.message); }
@@ -2588,21 +2589,23 @@ app.post("/api/seniors", rateLimit("login"), async (req, res) => {
       return res.status(500).json({ error: insertErr?.message || "Failed to create account. Please try again." });
     }
 
-    await supabase.from("activity").insert({
+    const { error: actErr } = await supabase.from("activity").insert({
       senior_id: senior.id, type: "system",
       description: `${name} joined Sage Companion`, timestamp: new Date().toISOString(),
-    }).catch(e => console.error("[Auth] Activity insert failed:", e.message));
+    });
+    if (actErr) console.error("[Auth] Activity insert failed:", actErr.message);
 
     // Issue a senior token so the user is logged in immediately after setup
     const token = makeSeniorToken(senior.id);
     console.log(`[Auth] ✅ New user registered: ${name}`);
 
     // Admin notification for new signup
-    await supabase.from("alerts").insert({
+    const { error: alertErr } = await supabase.from("alerts").insert({
       senior_id: senior.id, type: "signup",
       message: `New user registered: ${name} (${email.trim().toLowerCase()})`,
       severity: "info", resolved: false,
-    }).catch(() => {});
+    });
+    if (alertErr) console.error("[Auth] Alert insert failed:", alertErr.message);
 
     // Send welcome email with family code (non-blocking)
     sendWelcomeEmail(email.trim().toLowerCase(), name.trim(), familyCode).catch(e => {
@@ -2610,7 +2613,7 @@ app.post("/api/seniors", rateLimit("login"), async (req, res) => {
     });
 
     res.json({ success: true, senior: safeSenior(norm(senior)), token });
-  } catch (e) { console.error(`[Error] ${req.method} ${req.path}:`, e.message, e.stack); res.status(500).json({ error: "Signup error: " + e.message }); }
+  } catch (e) { console.error(`[Error] ${req.method} ${req.path}:`, e.message, e.stack); res.status(500).json({ error: "Something went wrong. Please try again." }); }
 });
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -2791,13 +2794,14 @@ app.post("/api/admin/users/:id/suspend", adminAuth, async (req, res) => {
     if (error) return res.status(400).json({ error: error.message });
 
     // Log the action as an alert
-    await supabase.from("alerts").insert({
+    const { error: suspAlertErr } = await supabase.from("alerts").insert({
       senior_id: id,
       type: suspended ? "suspension" : "reactivation",
       message: `User ${suspended ? "suspended" : "reactivated"}: ${senior.name || "Unknown"} (${senior.email || id})`,
       severity: suspended ? "warning" : "info",
       resolved: true,
-    }).catch(() => {});
+    });
+    if (suspAlertErr) console.error("[Admin] Alert insert failed:", suspAlertErr.message);
 
     console.log(`[Admin] User ${id} ${suspended ? "suspended" : "reactivated"}`);
     res.json({ success: true, suspended: !!suspended });
